@@ -1,0 +1,25 @@
+# Datos del reto: son de la organización, pesan GB y no se publican
+data/
+out/
+*.csv.gz
+*.tar.gz
+*.zip
+*.parquet
+
+# Secretos: el token del equipo vive solo en .env (nunca en código, chat ni vídeo)
+.env
+.env.*
+!.env.example
+*.har
+*.session
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Worktrees de agentes (Codex / Claude)
+.worktrees/
+.claude/worktrees/
