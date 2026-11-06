@@ -331,7 +331,18 @@ class Engine:
                 if cand:
                     break
         if not cand:
-            return False
+            if not m:
+                return False
+            party = self.mandate_party.get(m.group(1))
+            if not party:
+                return False
+            its = [self.items[i] for i in self.ph.by_party.get(party, ()) if self.items[i].kind == "ARI"
+                   and abs(self.items[i].total - amt) <= 2 and (self.items[i].issue or t.date) <= t.date]
+            if not its:
+                return False
+            it = max(its, key=lambda i: i.issue or dt.date.min)
+            self.emit(t, it, amt, "RETURNED", "dd_return_mandate", f"mandato {m.group(1)}")
+            return True
         r = max(cand, key=lambda x: x["collection_date"])
         it = self.item_by_number(r["remittance_info"], t.entity, kinds={"ARI"})
         if not it:
@@ -507,7 +518,8 @@ class Engine:
         up = ascii_upper(t.text)
         for pat in (r"ORD\.?\s+(.+?)(?:\s+FRA\b|\s+FV|\s*\||$)", r"TRANSFERENCIAS?\s+DE\s+(.+?)(?:\s*CONCEPTO|$)",
                     r"TRANSFERENCIAS\s+(.+?)\s*\|", r"/ORDP/(.+?)/", r"SEPA-UEBERWEISUNG AN (.+)$",
-                    r"TRANSFERENCIA A (.+?)(?:\s*\||$)", r"ABWA\+(.+)$"):
+                    r"TRANSFERENCIA A (.+?)(?:\s*\||$)", r"ABWA\+(.+)$", r"\|\s*\d{6,}-(.+?)(?:\s*\||$)",
+                    r"ADEUDO A SU CARGO\s*\|\s*(.+?)\s+N\s+\d", r"^([A-Z][A-Z0-9 .,&'-]{5,}?)\s*\|\s*N\s+\d"):
             m = re.search(pat, up)
             if m:
                 return m.group(1).replace("|", "").strip()
@@ -645,6 +657,10 @@ class Engine:
 
     def _party_amount(self, t, party, how):
         kinds = {"ARI", "ARC"} if t.amount > 0 else {"API", "APC"}
+        if party.startswith("S") and t.amount > 0:
+            kinds = {"APC"}  # el proveedor nos devuelve un abono suyo (POLICIES §4, último punto)
+        elif party.startswith("C") and t.amount < 0:
+            kinds = {"ARC"}  # rappel o abono pagado al cliente por transferencia
         its = self.open_items_of(party, t, kinds)
         if not its:
             return False
