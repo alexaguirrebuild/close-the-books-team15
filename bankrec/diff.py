@@ -1,6 +1,7 @@
 """QA por segmento: enseña movimientos donde fallamos, con nuestra respuesta, la buena y el porqué de nuestra regla.
 
     python -m bankrec.diff --phase sample --segment ar_dd_batch -n 3
+    python -m bankrec.diff --phase holdout --segment ap_factored -n 5     # sobre el holdout rápido
 Es la herramienta del rol de QA: mira 5 fallos, encuentra el patrón, propón la regla.
 """
 from __future__ import annotations
@@ -40,9 +41,13 @@ def main(argv=None):
     ap.add_argument("--segment", required=True)
     ap.add_argument("-n", type=int, default=3)
     a = ap.parse_args(argv)
-    gold = load(DATA / a.phase / "golden_allocations.csv.gz")
+    src = "train" if a.phase == "holdout" else a.phase
     ours = load(OUT / f"explain_{a.phase}.csv.gz")
-    bt = {r["bank_txn_id"]: r for r in rows(DATA / a.phase / "bank_transactions.csv.gz")}
+    gold = defaultdict(list)
+    for r in rows(DATA / src / "golden_allocations.csv.gz"):
+        if r["bank_txn_id"] in ours and r["segment"] == a.segment:
+            gold[r["bank_txn_id"]].append(r)
+    bt = {r["bank_txn_id"]: r for r in rows(DATA / src / "bank_transactions.csv.gz") if r["bank_txn_id"] in gold}
     shown = 0
     for tid, gr in gold.items():
         if gr[0]["segment"] != a.segment or tid not in ours or same(gr, ours[tid]):

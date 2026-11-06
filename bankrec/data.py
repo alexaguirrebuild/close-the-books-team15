@@ -154,8 +154,9 @@ class FX:
 
 
 class Phase:
-    def __init__(self, name: str):
+    def __init__(self, name: str, holdout: "dt.date | None" = None):
         self.name = name
+        self.holdout = holdout
         self.dir = DATA / name
         mdir = DATA / "masters"
         final_m = DATA / "final" / "masters_final"
@@ -172,6 +173,8 @@ class Phase:
         self._load_items()
         self.txns = [Txn(r) for r in rows(self.dir / "bank_transactions.csv.gz")]
         self.txns.sort(key=lambda t: (t.date, t.id))
+        if holdout:
+            self._cut_holdout(holdout)
         self.dd = self._csvs("direct_debit_batches")
         self.cards = self._csvs("card_settlements")
         self.cheques = self._csvs("cheque_deposits")
@@ -237,6 +240,35 @@ class Phase:
                 for r in rows(p):
                     if r["item_id"] not in self.items:
                         add(r)
+
+    def _cut_holdout(self, cut):
+        """Simula LIVE dentro de TRAIN. Saldo a `cut` = saldo oficial al inicio de LIVE (1-jul-2025)
+        + lo cobrado según el golden entre `cut` y el final de TRAIN (las devoluciones RETURNED restan).
+        Es exacto por construcción; las facturas emitidas desde `cut` entran por su total, como en LIVE."""
+        live_open = {r["item_id"]: cents(r["open_amount"]) for r in rows(DATA / "live" / "open_items_at_start.csv.gz")}
+        date_of = {t.id: t.date for t in self.txns}
+        paid = defaultdict(int)
+        for r in rows(self.dir / "golden_allocations.csv.gz"):
+            if not r["item_id"]:
+                continue
+            d = date_of.get(r["bank_txn_id"])
+            if d is None or d < cut:
+                continue
+            if r["exception"] == "RETURNED":
+                paid[r["item_id"]] -= cents(r["amount"])
+            elif r["exception"] != "DUPLICATE_PAYMENT":
+                paid[r["item_id"]] += cents(r["amount"])
+        keep = {}
+        for iid, it in self.items.items():
+            if it.issue and it.issue >= cut:
+                keep[iid] = it
+                continue
+            o = min(live_open.get(iid, 0) + paid.get(iid, 0), it.total)
+            if o > 0:
+                it.open = o
+                keep[iid] = it
+        self.items = keep
+        self.txns = [t for t in self.txns if t.date >= cut]
 
     # ---------- índices ----------
     def _index(self):

@@ -12,7 +12,7 @@ Para el formulario «Proyecto» (descripción, de 1.500 caracteres como máximo)
 3. **Estado por partida:** saldo abierto, plazos y devoluciones que reabren.
 4. **Trazabilidad:** `explain_<fase>.csv.gz`, con regla y evidencia por fila.
 
-**Resultados.** Holdout de TRAIN __ · LIVE __ · automático con confianza alta __ % · a revisión humana __ %.
+**Resultados.** Holdout de TRAIN 71,74 (viernes; actualizar) · LIVE __ · automático con confianza alta __ % · a revisión humana __ %.
 
 **Stack.** Python estándar (sin dependencias), Claude Code como orquestador, Codex para variantes en paralelo y Antigravity para leer los PDF y avisos a escala.
 

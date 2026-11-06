@@ -2,7 +2,8 @@
 
     python -m bankrec.run --phase sample            # genera out/sub_sample.csv.gz y lo puntúa contra el golden
     python -m bankrec.run --phase live              # genera out/sub_live.csv.gz (NO lo envía)
-    python -m bankrec.run --phase train --since 2025-01-01   # holdout de TRAIN, puntuado
+    python -m bankrec.run --phase holdout           # holdout rápido: TRAIN ene-jun 2025 con saldos abiertos a 1-ene (~LIVE)
+    python -m bankrec.run --phase train --since 2025-01-01   # holdout lento: recorre los 4 años
 
 Cada ejecución deja también out/explain_<fase>.csv.gz: el porqué de cada fila (regla y evidencia). Eso no se envía.
 """
@@ -100,24 +101,28 @@ def score(ph, sub_path, golden_path, since=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--phase", default="sample", choices=["sample", "train", "live", "final"])
+    ap.add_argument("--phase", default="sample", choices=["sample", "train", "holdout", "live", "final"])
     ap.add_argument("--since", help="holdout: solo movimientos desde esta fecha (YYYY-MM-DD)")
     ap.add_argument("--no-score", action="store_true")
     a = ap.parse_args(argv)
     t0 = time.time()
-    ph = Phase(a.phase)
+    if a.phase == "holdout":
+        a.since = a.since or "2025-01-01"
+        ph = Phase("train", holdout=dt.date.fromisoformat(a.since))
+    else:
+        ph = Phase(a.phase)
     print(f"[{a.phase}] {len(ph.txns)} movimientos, {len(ph.items)} partidas · carga {time.time() - t0:.0f}s", flush=True)
     eng = Engine(ph)
     rows = eng.run()
     since = dt.date.fromisoformat(a.since) if a.since else None
     rows = assemble(ph, rows, since)
-    tag = a.phase + (f"_since{a.since}" if a.since else "")
+    tag = "holdout" if a.phase == "holdout" else a.phase + (f"_since{a.since}" if a.since else "")
     sub = OUT / f"sub_{tag}.csv.gz"
     write(rows, sub, OUT / f"explain_{tag}.csv.gz")
     rules = Counter(r.rule.split("_")[0] if r.rule.startswith("kw") else r.rule for r in rows)
     print(f"  {len(rows)} filas -> {sub} · {time.time() - t0:.0f}s")
     print("  reglas:", ", ".join(f"{k}={v}" for k, v in rules.most_common(14)))
-    golden = DATA / a.phase / "golden_allocations.csv.gz"
+    golden = DATA / ph.name / "golden_allocations.csv.gz"
     if not a.no_score and golden.exists():
         res = score(ph, sub, golden, since)
         print(json.dumps({"ok": res["ok"], "score": res["score"], "metrics": res["metrics"], "errors": res["errors"][:5]},
