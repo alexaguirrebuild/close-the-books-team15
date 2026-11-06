@@ -9,6 +9,7 @@ fecha, importes, texto del motivo), de modo que un cambio de columnas o de idiom
 """
 from __future__ import annotations
 
+import bisect
 import csv
 import datetime as dt
 import io
@@ -16,6 +17,7 @@ import re
 from collections import defaultdict
 
 from .data import ascii_upper, cents, rows
+from .engine import PAYMENT_FACTORY
 
 # ------------------------------------------------------------------ números y fechas
 AMT_RE = re.compile(r"^\(?[-+]?\d[\d.,' ]*\)?$")
@@ -118,7 +120,11 @@ def parse_line(cells):
         gross, ded = amts[0], amts[-2]
     elif len(amts) == 2:
         gross = amts[0]
-        ded = paid - gross if paid != gross else 0
+        if amts[1] < 0 < gross and -amts[1] < gross or (amts[1] < 0 and gross < 0 and amts[1] > gross):
+            ded = amts[1]  # bruto + deducción (sin columna "pagado")
+            paid = gross + ded
+        else:
+            ded = paid - gross if paid != gross else 0
     else:
         gross = paid
         ded = 0
@@ -333,6 +339,12 @@ def prepare(engine):
     engine.ra_by_total = defaultdict(list)
     engine.ra_by_ref = defaultdict(list)
     engine.ra_used = set()
+    engine.ra_fx = defaultdict(list)
+    engine.ra_fx_dates = {}
+    engine.ra_num = defaultdict(list)
+    for it in engine.items.values():
+        if it.number:
+            engine.ra_num[norm_ref(it.number)].append(it)
     idx = base / "index.csv"
     if not idx.exists():
         return
@@ -358,11 +370,17 @@ def prepare(engine):
         adv["party"] = engine.resolve_name(r["payer_name"])
         adv["refn"] = norm_ref(adv["ref"])
         engine.ra_list.append(adv)
+        if adv['ccy']:
+            engine.ra_fx[adv['entity']].append(adv)
         engine.ra_by_total[(adv["entity"], adv["total"])].append(adv)
         if sum_paid != adv["total"]:
             engine.ra_by_total[(adv["entity"], sum_paid)].append(adv)
         if len(adv["refn"]) >= 5:
             engine.ra_by_ref[adv["refn"]].append(adv)
+    engine.ra_fx_dates = {}
+    for ent, lst in engine.ra_fx.items():
+        lst.sort(key=lambda a: a["received"])
+        engine.ra_fx_dates[ent] = [a["received"] for a in lst]
 
 
 # ------------------------------------------------------------------ casado
@@ -389,13 +407,14 @@ def _family(engine, p):
 
 
 def _cited(t, adv):
+    """El texto del banco cita la referencia de pago del aviso (como token entero o literal)."""
     r = adv["refn"]
     if len(r) < 5:
         return False
     if r in t.tokens:
         return True
-    dg = re.sub(r"\D", "", r)
-    return len(dg) >= 8 and (dg in t.tokens or dg in re.sub(r"\D", "", t.up))
+    raw = ascii_upper(adv["ref"]).strip()
+    return len(raw) >= 8 and raw in t.up
 
 
 def _find_adv(engine, t):
@@ -410,13 +429,31 @@ def _find_adv(engine, t):
                 cands.setdefault(a["file"], a)
     party, _ = engine.resolve_party(t)
     fam = _family(engine, party)
+    fxset = set()
+    # avisos en otra divisa que la cuenta (POLICIES §3 FX_DIFFERENCE): el total convertido cuadra con el spread del banco
+    lst = engine.ra_fx.get(t.entity, ())
+    keys = engine.ra_fx_dates.get(t.entity, ())
+    lo = bisect.bisect_left(keys, t.date - dt.timedelta(days=15))
+    hi = bisect.bisect_right(keys, t.date + dt.timedelta(days=5))
+    for a in lst[lo:hi]:
+        if a["ccy"] == t.ccy or a["file"] in cands:
+            continue
+        if t.orig_ccy == a["ccy"] and t.orig_amount:
+            ok = abs(abs(t.orig_amount) - a["total"]) <= 2
+        else:
+            conv = engine.ph.fx.conv(a["total"], a["ccy"], t.ccy, t.date)
+            # el banco convierte peor que la referencia: spread de 0,1 % a 1,5 % (POLICIES §3)
+            ok = conv and -0.002 <= (conv - t.amount) / conv <= 0.016
+        if ok:
+            cands[a["file"]] = a
+            fxset.add(a["file"])
     best, best_key = None, None
     for a in cands.values():
         if a["file"] in engine.ra_used:
             continue
         delta = (a["received"] - t.date).days
         cited = _cited(t, a)
-        total_ok = a["total"] == cash or a["sum_paid"] == cash
+        total_ok = a["total"] == cash or a["sum_paid"] == cash or a["file"] in fxset
         if not cited and not (-5 <= delta <= 15):
             continue
         if not cited and not total_ok:
@@ -431,10 +468,25 @@ def _find_adv(engine, t):
 
 
 def _lookup(engine, line, t, party):
-    amt = abs(line["paid"]) if line["ded"] == 0 else None
-    it = engine.item_by_number(line["doc"], t.entity, party=party, kinds={"ARI", "ARC"})
-    if it is None:
-        it = engine.item_by_number(line["doc"], None, party=party, kinds={"ARI", "ARC"})
+    """Partida de una línea. El signo manda: pagado negativo = abono (los números con y sin prefijo chocan)."""
+    pref = {"ARC"} if line["paid"] < 0 else {"ARI"}
+    ents = {t.entity} | PAYMENT_FACTORY.get(t.entity, set())
+    amt = abs(line["paid"])
+    it = None
+    for kinds in (pref, {"ARI", "ARC"}):
+        # 1) número idéntico (con prefijo); 2) sin prefijo / ceros: la entidad tiene que coincidir siempre
+        exact = [engine.items[i] for i in engine.ph.by_num.get(norm_ref(line["doc"]), ())
+                 if engine.items[i].kind in kinds and engine.items[i].entity in ents]
+        if not exact:  # índice propio (otros plugins pueden redirigir ph.by_num)
+            exact = [i for i in engine.ra_num.get(norm_ref(line["doc"]), ()) if i.kind in kinds and i.entity in ents]
+        if exact:
+            exact.sort(key=lambda i: (-(i.open > 0), abs(i.open - amt) > 2, i.issue or dt.date.min))
+            it = exact[0]
+            break
+        cand = engine.item_by_number(line["doc"], t.entity, party=party, kinds=kinds, amount=amt)
+        if cand is not None and cand.entity in ents:
+            it = cand
+            break
     if it is None:
         # número del cliente (su pedido/voucher)
         from .data import num_variants
@@ -445,14 +497,111 @@ def _lookup(engine, line, t, party):
         if party:
             fam = _family(engine, party)
             ids = [i for i in ids if i.party in fam] or ids
-        if len(ids) >= 1:
+        if ids:
             ids.sort(key=lambda i: (-(i.open > 0), i.issue))
             it = ids[0]
     return it
 
 
+SETTLE_RX = re.compile(r"(?:SETTLEMENT|REGULARI[ZS]A[A-Z]*|REGLEMENT|SALDO FRA)\s+([A-Z0-9][A-Z0-9\-]{4,})")
+
+
+def _settlement(engine, t):
+    """Pago del importe discutido de una factura (POLICIES §3, vacío: «the settlement of a disputed amount»).
+
+    El texto dice «SETTLEMENT <factura>» o «REGULARIZACION <factura>» y el cobro es menor que el abierto:
+    la disputa se hizo antes (otro pago con SHORT_DISPUTE), así que aquí se aplica lo cobrado y sin excepción."""
+    m = SETTLE_RX.search(re.sub(r"\s*\|\s*", " ", t.up))
+    if not m:
+        return False
+    party, _ = engine.resolve_party(t)
+    it = engine.item_by_number(m.group(1), t.entity, party=party, kinds={"ARI"})
+    if it is None or it.entity != t.entity:
+        return False
+    cash = abs(t.amount)
+    if it.ccy == t.ccy:
+        cash_item = cash
+    elif t.orig_ccy == it.ccy and t.orig_amount:
+        cash_item = abs(t.orig_amount)
+    else:
+        cash_item = engine.ph.fx.conv(cash, t.ccy, it.ccy, t.date)
+    if 0 < it.open <= cash_item + 2:
+        return False  # pago completo: lo resuelve el motor (sobrepago, FX...)
+    exc = "FX_DIFFERENCE" if it.ccy != t.ccy else ""
+    engine.emit(t, it, cash_item, exc, "dispute_settlement", f"liquidación de importe discutido {it.number}")
+    return True
+
+
+def _discount_amount(engine, it):
+    term = engine.ph.terms.get(it.terms or "")
+    if not term or not term.get("early_payment_discount_pct"):
+        return None
+    return int(round(it.total * float(term["early_payment_discount_pct"]) / 100))
+
+
+def _explain_gap(engine, t, lines, gap):
+    """El aviso lista importes brutos y el cobro es menor, sin decir dónde. Devuelve {item_id: (importe, excepción)}.
+
+    Orden: (1) descuento pronto pago en un subconjunto de facturas cuya suma de descuentos es la diferencia
+    (POLICIES §3 SHORT_DISCOUNT; fuera de plazo -> PARTIAL); (2) una factura con retención / comisiones / descuento;
+    (3) pago parcial de una sola factura por una fracción redonda; (4) la última queda parcial."""
+    inv = [(ln, it) for ln, it in lines if it.kind == "ARI" and not ln["ded"] and it.open > 0]
+    if not inv:
+        return {}
+    # (1) subconjunto de descuentos
+    disc = [(it, _discount_amount(engine, it)) for _, it in inv]
+    disc = [(it, d) for it, d in disc if d]
+    reach = {0: ()}
+    for k, (it, d) in enumerate(disc):
+        for sm, comb in list(reach.items()):
+            ns = sm + d
+            if ns <= gap + 2 * len(disc) and ns not in reach:
+                reach[ns] = comb + (k,)
+        if len(reach) > 200000:
+            break
+    for tol in range(0, 2 * len(disc) + 3):
+        for g in (gap - tol, gap + tol):
+            if g in reach and reach[g]:
+                res = {}
+                for k in reach[g]:
+                    it = disc[k][0]
+                    paid = it.open - disc[k][1]
+                    ok = engine.discount_ok(it, t, paid)
+                    if ok == "SHORT_DISCOUNT":
+                        res[it.id] = (it.open, "SHORT_DISCOUNT")
+                    else:
+                        res[it.id] = (paid, "PARTIAL")
+                return res
+    # (2) una factura con retención / comisiones bancarias
+    for ln, it in inv:
+        e = engine.explain_short(it, t, gap, it.open - gap)
+        if e in ("SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
+            return {it.id: (it.open, e)}
+    # (3) fracción redonda de una factura
+    cands = []
+    for ln, it in inv:
+        if 0 < gap < it.open:
+            r = gap / it.open
+            for q in (0.5, 0.25, 0.75, 0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 0.05, 0.15):
+                if abs(r - q) <= 0.0006:
+                    cands.append((it, q))
+                    break
+    if len(cands) >= 1:
+        it = sorted(cands, key=lambda x: -x[0].open)[0][0]
+        return {it.id: (it.open - gap, "PARTIAL")}
+    # (4) la última factura de la lista
+    it = inv[-1][1]
+    if gap < it.open:
+        return {it.id: (it.open - gap, "PARTIAL")}
+    return {}
+
+
 def match(engine, t):
-    if t.amount <= 0 or not getattr(engine, "ra_list", None):
+    if t.amount <= 0:
+        return False
+    if _settlement(engine, t):
+        return True
+    if not getattr(engine, "ra_list", None):
         return False
     adv = _find_adv(engine, t)
     if adv is None:
@@ -470,44 +619,54 @@ def match(engine, t):
         out.append((ln, it))
     if not out:
         return False
+    # diferencia entre lo que lista el aviso (neto de deducciones explícitas) y el cobro
+    override = {}
+    if all(it.ccy == t.ccy for _, it in out):
+        listed = sum(ln["paid"] for ln, _ in out)
+        gap = listed - t.amount
+        if gap > 2 and len(out) == len(adv["lines"]):
+            override = _explain_gap(engine, t, out, gap)
     for ln, it in out:
-        _emit_line(engine, t, adv, ln, it, ev)
+        _emit_line(engine, t, adv, ln, it, ev, override.get(it.id))
     engine.ra_used.add(adv["file"])
     return True
 
 
-def _emit_line(engine, t, adv, ln, it, ev):
-    if it.kind == "ARC":
-        engine.emit(t, it, it.open if it.open > 0 else it.total, "", "remittance", ev)
-        return
+def _emit_line(engine, t, adv, ln, it, ev, override=None):
     fxline = it.ccy != t.ccy
+    if it.kind == "ARC":
+        engine.emit(t, it, abs(ln["paid"]) if abs(ln["paid"]) > 0 else it.total, "", "remittance", ev)
+        return
     paid = abs(ln["paid"])
     reason = ascii_upper(ln["reason"])
-    full_open = it.open
-    exc = ""
-    amount = full_open
-    if full_open <= 0:
-        # ya liquidada: pago repetido (POLICIES §3 DUPLICATE_PAYMENT)
-        engine.emit(t, it, paid, "DUPLICATE_PAYMENT", "remittance", ev)
+    if override:
+        amount, exc = override
+        engine.emit(t, it, amount, exc, "remittance_gap", ev)
         return
-    short = full_open - paid
-    if ln["ded"] and ln["ded"] != 0 or short > 2:
+    exc = ""
+    amount = paid
+    short = it.open - paid
+    if ln["ded"] or short > 2:
         if DISCOUNT_RX.search(reason) or not reason:
             e = engine.explain_short(it, t, short, paid)
             if e in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
-                exc, amount = e, full_open
-            elif short > 2 and not reason:
-                exc, amount = "PARTIAL", paid
+                exc, amount = e, max(it.open, paid)
             elif short > 2:
-                exc, amount = "SHORT_DISPUTE", paid
+                # descuento fuera de plazo o sin motivo: la diferencia queda abierta (POLICIES §3 PARTIAL)
+                exc, amount = "PARTIAL", paid
         elif WITHHOLD_RX.search(reason):
-            exc, amount = "SHORT_WITHHOLDING", full_open
+            exc, amount = "SHORT_WITHHOLDING", max(it.open, paid)
         elif CHARGE_RX.search(reason) and not DISPUTE_RX.search(reason):
-            exc, amount = "SHORT_BANK_CHARGES", full_open
+            exc, amount = "SHORT_BANK_CHARGES", max(it.open, paid)
         elif short > 2:
             exc, amount = "SHORT_DISPUTE", paid
-    elif paid > full_open + 2:
-        exc, amount = "OVERPAYMENT", full_open
+        else:
+            amount = max(it.open, paid)
+    if amount > it.total and it.total > 0:
+        # el aviso paga más que la factura: sobrepago (la parte que sobra queda en cuenta)
+        if exc == "":
+            exc = "OVERPAYMENT"
+        amount = it.total
     if fxline and exc in ("", "SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "OVERPAYMENT"):
         exc = "FX_DIFFERENCE"
     engine.emit(t, it, amount, exc, "remittance", ev)
