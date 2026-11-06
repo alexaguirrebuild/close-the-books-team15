@@ -73,7 +73,9 @@ class Engine:
         self.reversal = self._find_reversals()
         self.plugins = []
         import importlib
-        for name in ("remittance", "pdfclauses", "learned"):
+        import os
+        names = os.environ.get("BANKREC_PLUGINS", "remittance,pdfclauses,learned").split(",")
+        for name in [n for n in names if n]:
             try:
                 mod = importlib.import_module(f"bankrec.{name}")
             except ModuleNotFoundError:
@@ -474,27 +476,32 @@ class Engine:
         return False
 
     # ------------------------------------------------------------ contraparte (POLICIES §5.1, §5.5)
-    def resolve_name(self, raw):
+    def resolve_names(self, raw):
+        """Contrapartes candidatas por nombre (puede haber homónimos). Las mejores primero."""
         k = name_key(raw)
         if not k:
-            return None
+            return []
         toks = k.split()
-        best, best_score = None, 0
+        scored = {}
         for pid in self.ph.name_index.get(toks[0], ()):
             for nk in self.ph.party_names.get(pid, ()):
                 if nk == k:
-                    return pid
-                # nombres truncados: uno empieza por el otro
-                if len(k) >= 8 and (nk.startswith(k) or k.startswith(nk)):
-                    sc = min(len(k), len(nk))
-                    if sc > best_score:
-                        best, best_score = pid, sc
+                    sc = 1000
+                elif len(k) >= 8 and (nk.startswith(k) or k.startswith(nk)):
+                    sc = 100 + min(len(k), len(nk))
                 else:
                     common = len(set(nk.split()) & set(toks))
-                    if common >= 2 and common > best_score / 10:
-                        if common * 10 > best_score:
-                            best, best_score = pid, common * 10
-        return best
+                    sc = common * 10 if common >= 2 else 0
+                if sc > scored.get(pid, 0):
+                    scored[pid] = sc
+        best = max(scored.values(), default=0)
+        if not best:
+            return []
+        return [p for p, v in sorted(scored.items(), key=lambda x: -x[1]) if v >= best - 5]
+
+    def resolve_name(self, raw):
+        c = self.resolve_names(raw)
+        return c[0] if c else None
 
     def payer_text(self, t):
         up = ascii_upper(t.text)
@@ -506,17 +513,25 @@ class Engine:
                 return m.group(1).replace("|", "").strip()
         return ""
 
-    def resolve_party(self, t):
+    def resolve_parties(self, t):
+        """Todas las contrapartes posibles del movimiento: IBAN conocido, IBAN aprendido y nombre (homónimos incluidos)."""
+        out, how = [], ""
         if t.cp_iban:
             p = self.ph.party_by_iban.get(t.cp_iban) or self.iban_learned.get(t.cp_iban)
             if p:
-                return p, "iban"
+                out.append(p)
+                how = "iban"
         for raw in (t.cp_name, self.payer_text(t)):
             if raw:
-                p = self.resolve_name(raw)
-                if p:
-                    return p, "nombre"
-        return None, ""
+                for p in self.resolve_names(raw):
+                    if p not in out:
+                        out.append(p)
+                        how = how or "nombre"
+        return out, how
+
+    def resolve_party(self, t):
+        ps, how = self.resolve_parties(t)
+        return (ps[0], how) if ps else (None, "")
 
     def open_items_of(self, party, t, kinds):
         pids = {party} | self.ph.children.get(party, set())
@@ -543,14 +558,28 @@ class Engine:
         cands = set()
         for tok in t.tokens:
             cands |= self.ph.by_num.get(tok, set())
-        party, _ = self.resolve_party(t)
+        parties, _ = self.resolve_parties(t)
+        party = parties[0] if parties else None
+        fam = set()
+        for p in parties:
+            fam |= {p} | self.ph.children.get(p, set())
         items = [self.items[c] for c in cands if self.items[c].kind in kinds and self.entity_ok(self.items[c], t)]
-        if party:
-            fam = {party} | self.ph.children.get(party, set())
+        if fam:
             items = [i for i in items if i.party in fam] or items
+        if fam and not items:  # referencias cortadas a 16/35/38 caracteres: prefijo del número
+            pref = [tok for tok in t.tokens if len(tok) >= 5 and not tok.isdigit()]
+            if pref:
+                for p in fam:
+                    for iid in self.ph.by_party.get(p, ()):
+                        it = self.items[iid]
+                        if it.open > 0 and it.kind in kinds:
+                            nn = re.sub(r"[^A-Z0-9]", "", ascii_upper(it.number))
+                            if any(nn.startswith(x) and len(x) < len(nn) for x in pref):
+                                items.append(it)
+                if len(items) > 1:
+                    items = [i for i in items if abs(self.to_bank(i.open, i, t) - abs(t.amount)) <= 2] or items
         # sufijos de 6 cifras ("RE RE250107423 108497 108019") cuando ya hay contraparte
-        if party:
-            fam = {party} | self.ph.children.get(party, set())
+        if fam:
             for tok in t.tokens:
                 if tok.isdigit() and len(tok) == 6:
                     for iid in self.ph.by_suffix.get(tok, ()):
@@ -584,6 +613,14 @@ class Engine:
             acc += v
             if abs(acc - cash) <= 2:
                 return items[: k + 1]
+        for i in range(1, len(vals)):  # o un tramo seguido de fechas
+            acc = 0
+            for j in range(i, len(vals)):
+                acc += vals[j]
+                if abs(acc - cash) <= 2:
+                    return items[i: j + 1]
+                if acc > cash + 2 and min(vals) > 0:
+                    break
         reach = {0: ()}
         for j, v in enumerate(vals):
             new = {}
@@ -600,9 +637,13 @@ class Engine:
         return None
 
     def m_party_amount(self, t):
-        party, how = self.resolve_party(t)
-        if not party:
-            return False
+        parties, how = self.resolve_parties(t)
+        for party in parties[:4]:
+            if self._party_amount(t, party, how):
+                return True
+        return False
+
+    def _party_amount(self, t, party, how):
         kinds = {"ARI", "ARC"} if t.amount > 0 else {"API", "APC"}
         its = self.open_items_of(party, t, kinds)
         if not its:

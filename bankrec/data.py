@@ -49,7 +49,7 @@ def norm_text(s: str) -> str:
 
 
 def name_key(s: str) -> str:
-    toks = [t for t in norm_text(s).split() if t not in LEGAL]
+    toks = [t for t in norm_text(s).split() if t not in LEGAL and len(t) > 1]
     return " ".join(toks)
 
 

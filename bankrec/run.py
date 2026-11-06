@@ -23,7 +23,8 @@ from .data import DATA, Phase
 from .engine import Engine
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "out"
+import os
+OUT = Path(os.environ.get("BANKREC_OUT", ROOT / "out"))
 EXC = ["PARTIAL", "OVERPAYMENT", "SHORT_DISCOUNT", "SHORT_BANK_CHARGES", "SHORT_WITHHOLDING", "SHORT_DISPUTE",
        "DUPLICATE_PAYMENT", "UNIDENTIFIED", "RETURNED", "FX_DIFFERENCE"]
 
