@@ -141,6 +141,8 @@ def rule_info(rule: str):
     m = re.match(r"party_(amount|subset|short|fx)_(.+)$", fam)
     if m:
         title, why, conf = PARTY_KIND[m.group(1)]
+        short = {"iban": "IBAN", "nombre": "nombre", "nombre_pdf": "nombre + PDF", "nombre_texto": "nombre en el texto"}
+        title = f"{title} · {short.get(m.group(2), m.group(2))}"
         return fam, title, why.format(via=PARTY_VIA.get(m.group(2), m.group(2))), conf, "§5.1, §5.5"
     if fam.startswith("payment_run"):
         return fam, "Fichero de pagos", "Documento de nuestro fichero de pagos.", "alta", "§5.3"
@@ -170,6 +172,11 @@ def read_rows(path):
 
 def norm_num(s: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", (s or "").upper())
+
+
+def es(c) -> str:
+    """Céntimos -> '1.234,56' (formato español)."""
+    return f"{c / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def fmt_amounts(c: int) -> str:
@@ -330,6 +337,7 @@ class Store:
         for v in self.items_by_party.values():
             v.sort(key=lambda i: (self.items[i]["issue"], i))
         self._item_blob = None
+        self._doc_cache = {}
         # 4. documentos
         self.pdf_index = {}
         order = ["train", "live", "final"]
@@ -642,6 +650,12 @@ class Store:
         return self.doc_view(d, "pdfs", f, dtype=dtype, ddate=ddate)
 
     def doc_view(self, d, sub, f, dtype="", ddate=""):
+        key = (d, sub, f, dtype, ddate)
+        if key not in self._doc_cache:  # los documentos no cambian: se leen y se parsean una vez
+            self._doc_cache[key] = self._doc_view(d, sub, f, dtype, ddate)
+        return self._doc_cache[key]
+
+    def _doc_view(self, d, sub, f, dtype, ddate):
         path = DATA / d / sub / f
         fmt = path.suffix.lstrip(".").lower()
         v = {"kind": "advice" if sub == "remittance_advices" else "pdf", "file": f, "phase_dir": d, "fmt": fmt,
@@ -914,7 +928,7 @@ def clauses_es(c: dict) -> list[dict]:
     out = []
 
     def eur(x):
-        return f"{x / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if isinstance(x, int) else str(x)
+        return es(x) if isinstance(x, int) else str(x)
 
     for k, v in c.items():
         if k == "plan":
@@ -961,7 +975,7 @@ def reconcile(st: Store, lines, rows, bank, bank_ccy, tot, d):
     if abs(diff) <= 1:
         if ex & {"PARTIAL", "SHORT_DISPUTE"}:
             open_left = sum(ln["remaining"] or 0 for ln in lines)
-            res["detail"] = f"Se aplica lo cobrado; queda abierto {open_left / 100:,.2f} en las partidas."
+            res["detail"] = f"Se aplica lo cobrado; queda abierto {es(open_left)} en las partidas."
         if diff:
             res["steps"].append({"k": "Redondeo", "v": -diff})
         return res
@@ -986,15 +1000,15 @@ def reconcile(st: Store, lines, rows, bank, bank_ccy, tot, d):
                     exp += int(round(it["total"] * it["disc_pct"] / 100))
             ok = exp == 0 or abs(exp - diff) <= 2
             label = "Descuento pronto pago"
-            detail = (f"Esperado según condiciones de pago: {exp / 100:,.2f}. " if exp else "") + \
-                     f"Deducido: {diff / 100:,.2f} ({pct:.2f} % del total)."
+            detail = (f"Esperado según condiciones de pago: {es(exp)}. " if exp else "") + \
+                     f"Deducido: {es(diff)} ({pct:.2f} % del total)."
         elif "SHORT_WITHHOLDING" in ex:
             ok = any(abs(pct - r) < 0.15 for r in (1.25, 1.5, 10))
             label, detail = "Retención fiscal", f"Retenido {pct:.2f} % (tipos válidos: 1,25 %, 1,5 %, 10 %)."
         elif "SHORT_BANK_CHARGES" in ex:
             eur = st.fx.conv(diff, bank_ccy, "EUR", d)
             ok = eur <= 6000 and pct <= 2
-            label, detail = "Comisión del banco intermediario", f"{eur / 100:,.2f} EUR ({pct:.2f} %) · límite 60 EUR y 2 %."
+            label, detail = "Comisión del banco intermediario", f"{es(eur)} EUR ({pct:.2f} %) · límite 60 EUR y 2 %."
         elif ex & {"PARTIAL", "SHORT_DISPUTE"}:
             ok, label, detail = False, "Aplicado mayor que lo cobrado", "Revisa importes aplicados frente al extracto."
         if label is None:
@@ -1002,7 +1016,7 @@ def reconcile(st: Store, lines, rows, bank, bank_ccy, tot, d):
     else:
         if "OVERPAYMENT" in ex:
             ok, label = True, "Sobrepago"
-            detail = f"El cliente pagó {-diff / 100:,.2f} de más; queda a su favor en su cuenta (sin fila extra)."
+            detail = f"El cliente pagó {es(-diff)} de más; queda a su favor en su cuenta (sin fila extra)."
         elif "DUPLICATE_PAYMENT" in ex or "RETURNED" in ex:
             ok, label, detail = abs(pct) < 1, EXC_ES[sorted(ex & {"DUPLICATE_PAYMENT", "RETURNED"})[0]][0], ""
         else:
@@ -1184,6 +1198,8 @@ def main(argv=None):
         print(f"[ui] aviso: {st.error}", flush=True)
     else:
         print(f"[ui] listo en {time.time() - t0:.1f}s", flush=True)
+    # en Windows SO_REUSEADDR deja a dos servidores escuchar el mismo puerto y responde el viejo: mejor fallar
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
     srv.daemon_threads = True
     print(f"[ui] http://{a.host}:{a.port}/  (Ctrl+C para salir)", flush=True)

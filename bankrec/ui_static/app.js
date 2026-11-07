@@ -7,12 +7,12 @@ function money(c, ccy = "EUR", sign = false) {
   if (c == null || c === "") return "";
   const k = ccy + sign;
   const f = fmtCache[k] || (fmtCache[k] = new Intl.NumberFormat("es-ES", {style: "currency", currency: ccy || "EUR",
-    minimumFractionDigits: 2, signDisplay: sign ? "exceptZero" : "auto"}));
+    minimumFractionDigits: 2, useGrouping: "always", signDisplay: sign ? "exceptZero" : "auto"}));
   return f.format(c / 100);
 }
 const compact = new Intl.NumberFormat("es-ES", {notation: "compact", maximumFractionDigits: 1});
 const eurC = c => compact.format(c / 100) + " €";
-const int = n => new Intl.NumberFormat("es-ES").format(n ?? 0);
+const int = n => new Intl.NumberFormat("es-ES", {useGrouping: "always"}).format(n ?? 0);
 const pct = (a, b) => b ? (100 * a / b).toLocaleString("es-ES", {maximumFractionDigits: 1}) + " %" : "—";
 const dfmt = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(2, 4) : "";
 
@@ -79,7 +79,7 @@ function renderKpis(s) {
   <div class="kpi"><div class="lbl">Importe conciliado</div><div class="v num">${eurC(s.amount_eur.reconciled)}</div>
     <div class="s">de ${eurC(s.amount_eur.total)} · pendiente ${eurC(s.amount_eur.pending)}</div></div>
   <div class="kpi">${m ? `<div class="lbl">Score oficial${S.phase === "sample" ? " (muestra)" : ""}</div><div class="v num">${s.score.score.toLocaleString("es-ES")}</div>
-    <div class="s" title="F1 de pares · exactitud por movimiento · macro-F1 de excepciones">F1 ${(m.allocation_f1 * 100).toFixed(1)} · exact. ${(m.txn_accuracy * 100).toFixed(1)} · exc. ${(m.exception_macro_f1 * 100).toFixed(1)}</div>`
+    <div class="s" title="F1 de pares · exactitud por movimiento · macro-F1 de excepciones">F1 ${(m.allocation_f1 * 100).toFixed(1).replace(".", ",")} · exact. ${(m.txn_accuracy * 100).toFixed(1).replace(".", ",")} · exc. ${(m.exception_macro_f1 * 100).toFixed(1).replace(".", ",")}</div>`
     : g ? `<div class="lbl">Contra golden</div><div class="v num">${pct(g.ok, g.n)}</div><div class="s">${int(g.ko)} movimientos distintos</div>`
     : `<div class="lbl">Score</div><div class="v muted">—</div><div class="s">Sin golden en esta fase</div>`}</div>`;
 }
