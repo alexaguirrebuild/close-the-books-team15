@@ -108,3 +108,21 @@ De los 9.206 falsos UNIDENTIFIED, 8.990 son cobros que sí tienen partidas (`ar_
 - `python -m bankrec.diff --phase holdout --segment <seg> -n 5` enseña los fallos del holdout.
 - El holdout usa `data/live/open_items_at_start.csv.gz` para reconstruir los saldos: necesita LIVE descargado.
 - `sample` no decide. Una regla que dio 85,49 en `sample` dio 81,49 en holdout.
+
+## Lote 1 · Citas incompletas (Claude, sábado 7-nov, 16:10)
+
+Rama `citas-parciales`, PR #24 **fusionada en `Dev` a las 16:10 (20272cc) y sin activar** (no está en `DEFAULT_PLUGINS`). Plugin `bankrec/citas_parciales.py` + `tests/test_citas_parciales.py`.
+
+**Qué se midió antes de diseñar** (holdout base 89,91, dataset de 52.837 movimientos de los 4 segmentos):
+
+- La cita parcial pura (nuestra respuesta ⊂ golden) son 1.867 movimientos y 23.844 filas, no 3.309/31.945: el resto de la cifra del reparto son fallos de otra forma (sin partida, solape, disjunto).
+- En 1.853 de esos 1.867 el golden suma exactamente el cash (abonos restando). Las faltantes son del mismo cliente en el 100 % y no están citadas en el 90 %.
+- El grueso es inalcanzable con evidencia exacta: 988 movimientos tienen más de 30 candidatas abiertas y 6 o más faltantes; 1.015 tienen 30 o más candidatas. Ahí ningún conjunto determinista cuadra y la suma exacta única es falsa el 5-17 % de las veces (medido por el equipo con 12-18 candidatas). **El techo real del lote con reglas deterministas es +0,09 a +0,11, no +1,54.**
+
+**Qué hace el plugin:** envuelve `engine._complete_cited`; si el motor no completa, prueba 11 conjuntos deterministas de no citadas del mismo cliente (numeración con una cifra cambiada o sufijo 6-7 dígitos del texto, FIFO solo facturas, emitidas cerca de las citadas, subconjunto único con 8 candidatas o menos, mismo mes de emisión, misma semana de vencimiento, vencidas recientes…) y acepta el primero que cuadra el cash ±2 céntimos. Panel estático de 50 predicados: los 11 elegidos tienen precisión 1,000 (9), 0,996 y 0,984, y cero falsos positivos sobre 28.545 movimientos de otros segmentos resueltos por `ref`. Simulación con el evaluador oficial: 89,91 → 90,00.
+
+**Descartado con cifra:** cualquier conjunto que meta todos los abonos abiertos del cliente (0,80-0,90: arrastra pares abono+factura antiguos que se anulan); abonos relacionados por `related_document` (0 disparos); todas las abiertas (2 disparos); último token como prefijo cortado (2); numeración consecutiva (0-1). `ar_short_dispute` sin aviso enlazado no se toca.
+
+**Holdout real:** primera lista (con abonos) 89,92, solo 5 movimientos completados. Lista final (ab5127d, la que está en Dev): holdout en curso a las 16:15; la cifra va en la PR #24 y en el issue de relevo.
+
+**Qué queda:** dos ejecuciones idénticas y el tiempo de LIVE; una posible extensión de la numeración a la tira tras el guion (`0001234` además de `250001234`), sin medir. Herramientas en el scratchpad de la sesión (no en git): dataset por segmento con las partidas abiertas reconstruidas por cliente y fecha, simuladores de predicados y evaluador por predicado del explain.
