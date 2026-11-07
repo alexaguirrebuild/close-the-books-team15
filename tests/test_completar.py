@@ -172,3 +172,15 @@ class TestCompletarConVencidas:
         t.tokens = {"FV240427095", "FV240427096"}
         assert eng.m_refs(t)
         assert eng.settled == [(sorted([CITED, "OTRA", "A"]), "ref_completed")]
+
+    def test_una_vencida_ya_pagada_no_completa(self):
+        pagada = item("A", 300, due=PAST_DUE)
+        pagada.open = 0
+        eng = engine([pagada, *fillers(20)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [([CITED], "ref")]
+
+    def test_ninguna_combinacion_de_vencidas_suma_lo_que_falta(self):
+        eng = engine([item("A", 300, due=PAST_DUE), item("B", 450, due=PAST_DUE), *fillers(20)])
+        assert eng.m_refs(movement(1400))
+        assert eng.settled == [([CITED], "ref")]

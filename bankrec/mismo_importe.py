@@ -11,16 +11,13 @@ medido en TRAIN: 925 de 925 en ar_n_to_m, casi nunca en otros segmentos). Es evi
 """
 from __future__ import annotations
 
-import re
 from functools import partial
 from itertools import combinations
 
 from .engine import AMOUNT_TOLERANCE_CENTS, DUE_MARGIN_DAYS, MAX_SUBSET_ITEMS
-from .pdfclauses import MONTHS, _text_month
+from .pdfclauses import MONTHS, month_words, text_month, year_after
 from .sumas import exact_subsets
 
-YEAR_DIGITS = (2, 4)
-CENTURY = 2000
 PARTIAL_FRACTIONS = (0.4, 0.5, 0.6)
 RECEIVABLE_KINDS = ("ARI", "ARC")
 CENTS = 100
@@ -148,22 +145,11 @@ def _advices_with_partial(engine) -> dict:
             for txn_id, lines in engine.m2_rows.items()}
 
 
-def _text_year(text: str) -> int | None:
-    if not text.isdigit() or len(text) not in YEAR_DIGITS:
-        return None
-    return int(text) if len(text) == 4 else CENTURY + int(text)
-
-
 def _month_with_year(t) -> tuple[int, int] | None:
     """Un nombre de persona puede parecer un mes (JOHN MAY): el que lleva año detrás es el que cuenta."""
-    words = re.findall(r"[A-Z]+|\d+", t.up)
-    for position, word in enumerate(words[:-1]):
-        if word not in MONTHS:
-            continue
-        following = words[position + 1]
-        if following == "DE" and position + 2 < len(words):
-            following = words[position + 2]
-        year = _text_year(following)
+    words = month_words(t)
+    for position, word in enumerate(words):
+        year = year_after(words, position) if word in MONTHS else None
         if year:
             return year, MONTHS[word]
     return None
@@ -182,7 +168,7 @@ def pick_same_amount(engine, t, invoices: list):
     """La factura del mes que nombra el texto; si no hay ninguna, la más antigua. Solo desempata: nunca añade candidatas."""
     if len(invoices) == 1:
         return invoices[0]
-    named = _month_with_year(t) or _text_month(t)
+    named = _month_with_year(t) or text_month(t)
     if not named:
         return invoices[0]
     year, month = named

@@ -7,7 +7,8 @@ import pytest
 
 from bankrec import mismo_importe
 from bankrec.data import Item
-from bankrec.engine import Engine
+from bankrec.engine import DEFAULT_PLUGINS, Engine, load_plugins
+from bankrec.pdfclauses import year_after
 
 DAY = dt.date(2025, 6, 10)
 CASH = 10000
@@ -363,6 +364,13 @@ class TestSumaConParcial:
         eng = motor_real([vencida("A", 10000), credit_note("ABONO", cents=7000)])
         assert not eng.m_party_amount(movement(13500))
 
+    def test_una_factura_ya_pagada_no_es_candidata_ni_parcial(self):
+        pagada = vencida("B", 7000)
+        pagada.open = 0
+        eng = motor_real([vencida("A", 10000), pagada, vencida("C", 3333)])
+        assert not eng.m_party_amount(movement(13500))  # A entera y B al 50 %, si B siguiera abierta
+        assert eng.rows == []
+
     def test_un_proveedor_no_entra(self):
         eng = motor_real([vencida("A", 10000, party="S1", kind="API", side="AP"), vencida("B", 7000, party="S1", kind="API", side="AP")])
         eng.resolve_parties = lambda t: (["S1"], "nombre")
@@ -389,6 +397,37 @@ def spy_settle(items):
     eng.settle = lambda t, ids, rule, ev="", party=None: eng.delegated.append(list(ids)) or True
     mismo_importe.prepare(eng)
     return eng
+
+
+class TestAnoTrasElMes:
+    @pytest.mark.parametrize("words, year", [
+        (["MAYO", "2025"], 2025),
+        (["MAYO", "25"], 2025),
+        (["MAYO", "DE", "2025"], 2025),
+        (["MAYO", "123"], None),
+        (["MAYO", "DE"], None),
+        (["MAYO"], None),
+    ])
+    def test_lee_el_ano_que_sigue_al_mes(self, words, year):
+        assert year_after(words, 0) == year
+
+
+class TestOrdenDePlugins:
+    """`mismo_importe` transforma en `prepare` lo que deja `m2_avisos`: cargado antes no vería nada, sin ningún aviso."""
+
+    def test_detras_de_m2_avisos_carga(self):
+        names = [module.__name__ for module in load_plugins("m2_avisos,mismo_importe")]
+        assert names == ["bankrec.m2_avisos", "bankrec.mismo_importe"]
+
+    def test_delante_de_m2_avisos_se_rechaza(self):
+        with pytest.raises(SystemExit, match="mismo_importe"):
+            load_plugins("mismo_importe,m2_avisos")
+
+    def test_sin_m2_avisos_carga(self):
+        assert [module.__name__ for module in load_plugins("mismo_importe")] == ["bankrec.mismo_importe"]
+
+    def test_el_orden_por_defecto_es_valido(self):
+        assert load_plugins(DEFAULT_PLUGINS)
 
 
 if __name__ == "__main__":

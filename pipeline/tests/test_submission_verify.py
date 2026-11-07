@@ -235,6 +235,19 @@ class TestAgainstTheRealSample:
         assert not report["warnings"]
 
 
+def test_a_relative_root_from_inside_data_also_sends_the_reports_outside_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`--data-root .` has no name to recognise: the report ended up inside data/, where nothing looks for it."""
+    project = tmp_path / "repo"
+    data = project / "data"
+    build_phase(data, "live", TXNS, ITEMS)
+    monkeypatch.chdir(data)
+
+    main(["--data-root", ".", "--phase", "live"])
+
+    assert (project / "out" / "verification" / "report.json").is_file()
+    assert not (data / "out" / "verification").exists()
+
+
 def test_with_a_data_folder_the_reports_go_to_the_project_out_folder(tmp_path: Path) -> None:
     """roots.py keeps out/ and cache/ outside data/; the verification report must land next to them."""
     assert verify_reports_folder(tmp_path / "data") == tmp_path / "out" / "verification"

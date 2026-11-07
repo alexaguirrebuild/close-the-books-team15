@@ -70,11 +70,18 @@ RUN_ID = re.compile(r"\b[A-Z]{2}\d{10,}\b")
 # LATE: descuento pasado de plazo. Es fórmula exacta y POLICIES §3 lo trata como PARTIAL, que es lo que hace settle().
 EXPLAINED_SHORTFALLS = ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "LATE")
 OPTIONAL_PLUGINS = {"learned"}  # Solo estos pueden faltar: sin un plugin obligatorio se pierden puntos sin aviso.
+DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,mismo_importe"
+# (primero, después): el segundo transforma en prepare() lo que deja el primero; al revés no lo vería, y sin ningún aviso.
+PLUGIN_ORDER = (("m2_avisos", "mismo_importe"),)
 
 
 def load_plugins(names: str) -> list:
+    requested = [n for n in names.split(",") if n]
+    for first, then in PLUGIN_ORDER:
+        if first in requested and then in requested and requested.index(first) > requested.index(then):
+            raise SystemExit(f"BANKREC_PLUGINS: {then} tiene que ir detrás de {first}.")
     loaded = []
-    for name in [n for n in names.split(",") if n]:
+    for name in requested:
         module_name = f"bankrec.{name}"
         try:
             loaded.append(importlib.import_module(module_name))
@@ -88,6 +95,7 @@ AMOUNT_TOLERANCE_CENTS = 2
 CITED_MIN_DIGITS = 4
 MAX_COMPLETION_ITEMS = 18
 DUE_MARGIN_DAYS = 3
+DISCOUNT_GRACE_DAYS = 3  # POLICIES §3 SHORT_DISCOUNT
 MAX_DUE_CANDIDATES = 26
 MAX_OVERPAYMENT_SHARE = 0.10
 
@@ -114,7 +122,7 @@ class Engine:
         self.reversal = self._find_reversals()
         self.plugins = []
         import os
-        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", "devoluciones,m2_avisos,remittance,pdfclauses,learned,mismo_importe")):
+        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", DEFAULT_PLUGINS)):
             if hasattr(mod, "prepare"):
                 mod.prepare(self)
             if hasattr(mod, "match"):
@@ -158,17 +166,27 @@ class Engine:
         self.rows.append(Row(t.id, "", None, cat, exc, rule, ev))
 
     # ------------------------------------------------------------ excepciones (POLICIES §2-§3)
-    def discount_ok(self, it, t, cash_item):
+    def _discount_terms(self, it):
+        """Lo que se paga por `it` con descuento y el último día para tomarlo (POLICIES §3); None si sus condiciones no lo dan."""
         term = self.ph.terms.get(it.terms or "")
         if not term or not term.get("early_payment_discount_pct"):
             return None
-        pct = float(term["early_payment_discount_pct"])
-        days = int(term.get("discount_days") or 0)
-        disc = int(round(it.total * pct / 100))
-        if abs(cash_item - (it.total - disc)) <= 2:
-            in_time = it.issue and t.date <= it.issue + dt.timedelta(days=days + 3)
-            return "SHORT_DISCOUNT" if in_time else "LATE"
-        return None
+        to_pay = it.total - int(round(it.total * float(term["early_payment_discount_pct"]) / 100))
+        days = int(term.get("discount_days") or 0) + DISCOUNT_GRACE_DAYS
+        return to_pay, it.issue + dt.timedelta(days=days) if it.issue else None
+
+    def _discounted_total(self, it, t):
+        """Lo que se paga por `it` con descuento si `t` llega a plazo; None si no corresponde aplicarlo."""
+        terms = self._discount_terms(it)
+        if not terms or not terms[1] or t.date > terms[1]:
+            return None
+        return terms[0]
+
+    def discount_ok(self, it, t, cash_item):
+        terms = self._discount_terms(it)
+        if not terms or abs(cash_item - terms[0]) > 2:
+            return None
+        return "SHORT_DISCOUNT" if self._discounted_total(it, t) is not None else "LATE"
 
     def explain_short(self, it, t, short_item, cash_item):
         """Por qué falta dinero en una factura. Devuelve la excepción o None."""
@@ -193,22 +211,15 @@ class Engine:
         una solución única. El resto de facturas y los abonos van por su importe completo."""
         if len(invoices) < 2 or any(it.ccy != t.ccy for it in invoices + credits):
             return None
-        disc = {}
-        for it in invoices:
-            term = self.ph.terms.get(it.terms or "")
-            if not term or not term.get("early_payment_discount_pct") or not it.issue:
-                continue
-            days = int(term.get("discount_days") or 0)
-            if t.date <= it.issue + dt.timedelta(days=days + 3):
-                disc[it.id] = it.total - int(round(it.total * float(term["early_payment_discount_pct"]) / 100))
-        if not disc or len(disc) > max_eligible:
+        to_pay = {it.id: amount for it in invoices if (amount := self._discounted_total(it, t)) is not None}
+        if not to_pay or len(to_pay) > max_eligible:
             return None
         base = sum(it.open for it in invoices) - sum(c.total for c in credits)
         sols = []
-        ids = list(disc)
+        ids = list(to_pay)
         for n in range(1, len(ids) + 1):
             for sub in combinations(ids, n):
-                if abs(base - sum(self.items[i].total - disc[i] for i in sub) - cash) <= 2:
+                if abs(base - sum(self.items[i].total - to_pay[i] for i in sub) - cash) <= 2:
                     sols.append(set(sub))
         return sols[0] if len(sols) == 1 else None
 
@@ -275,16 +286,9 @@ class Engine:
                 self.emit(t, it, cash_item, "PARTIAL", rule, ev)
             return True
         # varias facturas: ¿descuento en todas?
-        disc_sum, all_disc = 0, True
-        for it in invoices:
-            term = self.ph.terms.get(it.terms or "")
-            if term and term.get("early_payment_discount_pct"):
-                pct = float(term["early_payment_discount_pct"])
-                disc_sum += it.total - int(round(it.total * pct / 100))
-            else:
-                all_disc = False
-                break
-        if all_disc and abs(disc_sum - sum(c.total for c in credits) - cash) <= 2 * len(invoices):
+        terms = [self._discount_terms(it) for it in invoices]
+        all_disc = all(terms)
+        if all_disc and abs(sum(to_pay for to_pay, _ in terms) - sum(c.total for c in credits) - cash) <= 2 * len(invoices):
             for it in cands:
                 full(it, "SHORT_DISCOUNT" if self.sign(it, t) > 0 else "")
             return True
