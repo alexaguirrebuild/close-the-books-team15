@@ -223,11 +223,10 @@ class Engine:
         # falta dinero
         if len(invoices) == 1:
             it = invoices[0]
+            # importe cobrado para la factura, en su divisa: se lee antes de que full() deje los abonos a cero
+            net_credit = sum(c.open if c.ccy == it.ccy else self.ph.fx.conv(c.open, c.ccy, it.ccy, t.date) for c in credits)
             for c in credits:
                 full(c)
-            cash_item = cash + sum(self.to_bank(c.open, c, t) for c in credits) if False else None
-            # importe cobrado para la factura, en su divisa
-            net_credit = sum(c.total for c in credits)
             cash_item = (cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)) + net_credit
             short = it.open - cash_item
             exc = self.explain_short(it, t, short, cash_item)
@@ -309,7 +308,7 @@ class Engine:
             out = [i for i in out if i.party == party] or out
         if amount is not None and len(out) > 1:
             out = [i for i in out if abs(i.open - amount) <= 2 or abs(i.total - amount) <= 2] or out
-        out.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min))
+        out.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min, i.id))
         return out[0] if out else None
 
     def m_dd_batch(self, t):
@@ -413,7 +412,7 @@ class Engine:
             if len(stub) >= 5:
                 for iid in self.ph.by_suffix.get(stub[-6:].rjust(6, "0"), set()) | self.ph.by_num.get(stub, set()):
                     c = self.items[iid]
-                    if c.side == "AR" and self.entity_ok(c, t) and (abs(c.open - amt) <= 2 or abs(c.total - amt) <= 2):
+                    if c.side == "AR" and c.open > 0 and self.entity_ok(c, t) and (abs(c.open - amt) <= 2 or abs(c.total - amt) <= 2):
                         it = c
                         break
             if not it:
@@ -628,7 +627,7 @@ class Engine:
         best = max(scored.values(), default=0)
         if not best:
             return []
-        return [p for p, v in sorted(scored.items(), key=lambda x: -x[1]) if v >= best - 5]
+        return [p for p, v in sorted(scored.items(), key=lambda x: (-x[1], x[0])) if v >= best - 5]
 
     def resolve_name(self, raw):
         c = self.resolve_names(raw)
@@ -751,7 +750,7 @@ class Engine:
         open_items = [i for i in items if i.open > 0]
         if not open_items:
             # ya liquidadas: ¿pago duplicado? (POLICIES §3 DUPLICATE_PAYMENT)
-            it = items[0]
+            it = min(items, key=lambda i: (i.issue or dt.date.min, i.id))
             if abs(abs(t.amount) - self.to_bank(it.total, it, t)) <= max(2, it.total * 0.005):
                 if it.side == "AR" and it.method == "dd" and not re.search(r"ADEUDO|RECIBO|DIRECT DEBIT|LASTSCHRIFT|PRELEV", t.up):
                     # recibo devuelto que el cliente vuelve a pagar por transferencia: no es duplicado

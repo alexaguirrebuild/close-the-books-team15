@@ -499,7 +499,7 @@ def _lookup(engine, line, t, party):
             fam = _family(engine, party)
             ids = [i for i in ids if i.party in fam] or ids
         if ids:
-            ids.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min))
+            ids.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min, i.id))
             it = ids[0]
     return it
 
