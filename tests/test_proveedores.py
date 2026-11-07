@@ -446,3 +446,68 @@ def test_el_cargo_del_viernes_no_se_lleva_otra_remesa():
 
     assert motor.m_payment_run(viernes) is True
     assert salida == [("payment_run_confirming", ["INV0"])]
+
+
+class TestDatosRotos:
+    """FINAL tiene un único envío: una fila rota en un fichero de lotes no puede tumbar la ejecución entera.
+    Se salta lo roto, se apunta, y el resto del movimiento y de la fase sigue."""
+
+    def test_documento_con_importe_roto_se_salta_sin_caer(self):
+        it = factura("API-2025-0000001")
+        eng = motor([it], by_num={"INV0001234": {it.id}}, names={"Proveedor Uno SL": "S1"})
+        for roto in ("N/A", "", None, "abc", "1.234,56"):
+            assert eng.run_doc_item(doc(importe=roto), cargo()) is None
+
+    def test_remesa_con_un_documento_roto_casa_los_demas(self):
+        from collections import defaultdict
+        buena = factura("API-2025-0000001", numero="INV0001111", cents=10000)
+        otra = factura("API-2025-0000002", numero="INV0002222", cents=20000)
+        eng = motor([buena, otra], by_num={"INV0001111": {buena.id}, "INV0002222": {otra.id}},
+                    names={"Proveedor Uno SL": "S1"})
+        rid = "PR010025030701"
+        filas = [dict(doc(numero="INV0001111", importe="100.00"), run_id=rid, run_type="aggregated",
+                      end_to_end_id=f"{rid}-0001", execution_date="2025-03-07", transfer_amount="100.00"),
+                 dict(doc(numero="INV0002222", importe="N/A"), run_id=rid, run_type="aggregated",
+                      end_to_end_id=f"{rid}-0002", execution_date="2025-03-07", transfer_amount="200.00")]
+        eng.run_rows, eng.e2e_rows, eng.transfers_by_amount, eng.used_batches = {rid: filas}, defaultdict(list), {}, set()
+        eng.rows, eng.settled_by, eng.iban_learned = [], defaultdict(list), {}
+        t = SimpleNamespace(id="T1", amount=-30000, account="ES01-BANK-EUR", ccy="EUR", date=DAY, up=f"PAGO REMESA {rid}",
+                            e2e="", orig_amount=None, orig_ccy=None, cp_iban="")
+        assert eng.m_payment_run(t) is True
+        assert [(r.item, r.amount) for r in eng.rows] == [(buena.id, 10000)]
+
+
+class TestRedDeSeguridad:
+    """Si una puerta de lotes revienta con un movimiento, se deshace lo que hubiera emitido, se apunta el error y
+    devuelve False para que el movimiento siga por las demás puertas. Nunca cae la fase."""
+
+    def _motor(self, falla_tras_emitir):
+        from collections import defaultdict
+        it = factura("API-2025-0000001", cents=10000)
+        eng = Engine.__new__(Engine)
+        eng.items = {it.id: it}
+        eng.rows, eng.settled_by, eng.iban_learned = [], defaultdict(list), {}
+        eng.used_batches = set()
+
+        def puerta_rota(t):
+            if falla_tras_emitir:
+                eng.emit(t, it, 4000, "", "dd_batch")
+            raise ValueError("could not convert string to float: 'N/A'")
+
+        for g in proveedores.GATES:
+            setattr(eng, g, puerta_rota)
+        proveedores._safety_net(eng)
+        return eng, it
+
+    def test_no_cae_y_devuelve_false(self):
+        eng, _ = self._motor(False)
+        t = SimpleNamespace(id="T1", amount=-100, cp_iban="")
+        for g in proveedores.GATES:
+            assert getattr(eng, g)(t) is False
+        assert len(eng.lote2_errors) == len(proveedores.GATES)
+
+    def test_deshace_lo_emitido_antes_del_fallo(self):
+        eng, it = self._motor(True)
+        t = SimpleNamespace(id="T1", amount=-100, cp_iban="")
+        assert eng.m_dd_batch(t) is False
+        assert eng.rows == [] and it.open == 10000 and not eng.settled_by[it.id]
