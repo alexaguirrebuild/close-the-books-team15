@@ -6,7 +6,7 @@ import pytest
 from submission_roots import build_phase, write_golden, write_submission_text
 
 from bankcheck.cli import main as cli_main
-from bankcheck.roots import resolve_layout
+from bankcheck.roots import DataRootNotFound, resolve_layout
 from bankcheck.submission import verify as verify_module
 from bankcheck.submission.score import score_submission_file
 from bankcheck.submission.validate import validate_submission
@@ -215,7 +215,10 @@ class TestSelfCheck:
 class TestAgainstTheRealSample:
     @pytest.fixture
     def sample(self):
-        layout = resolve_layout("sample", data_root=REPO_ROOT)
+        try:
+            layout = resolve_layout("sample", data_root=REPO_ROOT)
+        except DataRootNotFound:
+            pytest.skip("hace falta sample/ en la raíz del repo o en bankrec-docs-and-masters/")
         if not layout.warehouse_path.is_file():
             pytest.skip("hace falta `bankcheck ingest --phase sample`")
         return layout
