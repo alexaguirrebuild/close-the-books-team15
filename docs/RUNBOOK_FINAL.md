@@ -53,7 +53,7 @@ Aparta el fichero anterior como `out/sub_final.anterior.csv.gz` y borra la cach�
 **4. Enviar.** Solo el usuario, en su terminal:
 
 ```bash
-! python scripts/submit.py FINAL out/sub_final.csv.gz
+! uv run python scripts/submit.py FINAL out/sub_final.csv.gz
 ```
 
 Valida otra vez, enseña el fichero con su SHA-256 y pide escribir `FINAL`. Un fichero rechazado no gasta el envío; uno válido, sí, aunque sea el equivocado. **Pedir la URL de subida ya consume un hueco**, así que no se envía por probar.
@@ -65,12 +65,28 @@ El comando para y deja `out/final/ingest_report.json` y `cache/warehouse/final.f
 | Código | Qué se pierde | ¿Seguir con `--allow-ingest-errors`? |
 |---|---|---|
 | `REMITTANCE_*` en pocos ficheros | Esos avisos | **Sí, es razonable** |
-| `BAD_HEADER` o `FILE_UNREADABLE` en una tabla de raíz o un maestro | **La tabla entera queda vacía** | **No.** Vuelve a descargar o adapta `pipeline/bankcheck/tables.py` |
-| `FILE_NOT_READ` | Nada todavía | Mejor no: mira el fichero y quítalo si es ruido, o adapta el cargador si son datos |
+| `BAD_HEADER` (falta una columna o está repetida) o `FILE_UNREADABLE` en una tabla de raíz o un maestro | **La tabla entera queda vacía** | **No.** Vuelve a descargar o adapta `pipeline/bankcheck/tables.py` |
+| `FILE_NOT_READ` como error (`.csv`, `.gz`, extracto o aviso sin leer) | Nada todavía | Mejor no: mira el fichero y quítalo si es ruido, o adapta el cargador si son datos |
 | `STATEMENT_*`, `XVAL_DIFF`, `RAW_ONLY_LINE`, `MISSING_IN_RAW` | El contraste con el extracto de esa cuenta | Solo tras mirar qué cuenta afecta |
 | `BAD_VALUE`, `CSV_ROW_REJECTED` | Esas filas o valores | Según cuántos sean |
 
 Con `--allow-ingest-errors`, la validación final dice NO VÁLIDO por `INGEST_HAD_ERRORS`, aunque el formato esté bien. Si es el único error y `official_format_ok` es `true` en `out/final/validate__sub_final.json`, enviar es una decisión del usuario.
+
+Para enviar en ese caso, la persona que decide añade `--accept-ingest-errors`:
+
+```bash
+! uv run python scripts/submit.py FINAL out/sub_final.csv.gz --accept-ingest-errors
+```
+
+`submit.py` lee `out/final/validate__sub_final.json` y solo sigue si `official_format_ok` es `true`, `INGEST_HAD_ERRORS` es el **único** error y `file_sha256` coincide con el fichero que se envía. Avisa en pantalla, sigue pidiendo escribir `FINAL` y lo deja anotado en `out/envios.jsonl` con `accepted_ingest_errors`. Si `bankcheck validate` no llega a escribir un informe nuevo, no envía. En este camino `final_run.py` termina con código distinto de 0 y «NO validado»: la casilla de «Fichero listo y validado» no se cumple, pero sí debe mirarse el informe de sociedades nuevas que imprime.
+
+En cualquier envío, si el fichero cambia desde que se validó, `submit.py` para antes de pedir la URL y no gasta hueco.
+
+**No bloquean la publicación, pero hay que mirarlos:**
+
+- `EXTRA_COLUMNS`: una columna de más en un fichero. Se ignora y las demás se leen por su nombre, también si cambia el orden.
+- `FILE_NOT_READ` como aviso: un fichero que no puede ser un dato, como un `README`, o cualquier fichero de `masters_final/` que no sea un maestro conocido. Si es un maestro nuevo con datos que hagan falta, hay que adaptar el cargador.
+- `MASTER_SHRANK`: un maestro de `masters_final/` trae menos de la mitad de filas que el anterior. Lo sustituye entero, no se fusiona, así que puede faltar el resto.
 
 ## Si FINAL no trae un maestro
 

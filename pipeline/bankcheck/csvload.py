@@ -44,6 +44,11 @@ def _read_gzip_to_the_end(path: Path) -> None:
             pass
 
 
+def _has_every_expected_column(header: Sequence[str], spec: CsvSpec) -> bool:
+    """Las columnas se leen por su nombre, así que basta con que estén todas, una vez cada una y en cualquier orden."""
+    return all(header.count(name) == 1 for name in spec.columns)
+
+
 def _header_ok(ctx: IngestContext, spec: CsvSpec, path: Path, segment: str | None) -> bool:
     relative = ctx.layout.relative(path)
     try:
@@ -54,7 +59,10 @@ def _header_ok(ctx: IngestContext, spec: CsvSpec, path: Path, segment: str | Non
         ctx.issues.error("FILE_UNREADABLE", spec.source_type, str(error), file=relative, segment=segment)
         ctx.manifest.add(FileRecord(relative, spec.source_type, segment, path.stat().st_size, 0, "error", str(error)))
         return False
-    if header == list(spec.columns):
+    if _has_every_expected_column(header, spec):
+        extra = [name for name in header if name not in spec.columns]
+        if extra:
+            ctx.issues.warn("EXTRA_COLUMNS", spec.source_type, f"columnas de más, se ignoran: {extra}", file=relative, segment=segment)
         return True
     detail = f"cabecera inesperada: {header}; se esperaba {list(spec.columns)}"
     ctx.issues.error("BAD_HEADER", spec.source_type, detail, file=relative, segment=segment)
@@ -62,13 +70,30 @@ def _header_ok(ctx: IngestContext, spec: CsvSpec, path: Path, segment: str | Non
     return False
 
 
-def _reader_sql(paths: Sequence[Path], spec: CsvSpec) -> str:
+def _reader_columns(header: Sequence[str], spec: CsvSpec) -> list[str]:
+    """Los nombres para leer el fichero por posición. Una columna de más puede venir repetida, sin nombre o llamarse `filename`."""
+    return [name if name in spec.columns else f"_extra_{position}" for position, name in enumerate(header)]
+
+
+def _reader_sql(paths: Sequence[Path], columns_in_file: Sequence[str]) -> str:
     files = "[" + ", ".join(lit(path) for path in paths) + "]"
-    columns = ", ".join(f"{lit(name)}: 'VARCHAR'" for name in spec.columns)
+    columns = ", ".join(f"{lit(name)}: 'VARCHAR'" for name in columns_in_file)
     return (
         f"read_csv({files}, header=true, auto_detect=false, delim=',', quote='\"', escape='\"', "
         f"columns={{{columns}}}, filename=true, store_rejects=true, "
         f"rejects_table='_rejects', rejects_scan='_rejects_scan', rejects_limit=0)"
+    )
+
+
+def _raw_select_sql(paths: Sequence[Path], spec: CsvSpec) -> str:
+    """Las columnas esperadas de todos los ficheros, por nombre. Un lector por cada cabecera distinta."""
+    by_header: dict[tuple[str, ...], list[Path]] = {}
+    for path in paths:
+        by_header.setdefault(tuple(_read_header(path)), []).append(path)
+    wanted = ", ".join(spec.columns)
+    return " UNION ALL ".join(
+        f"SELECT {wanted}, filename FROM {_reader_sql(group, _reader_columns(header, spec))}"
+        for header, group in by_header.items()
     )
 
 
@@ -165,7 +190,7 @@ def load_csv(ctx: IngestContext, spec: CsvSpec, paths: Sequence[Path], segment_o
         _create_empty(ctx, spec)
         return 0
     con.execute("DROP TABLE IF EXISTS _rejects; DROP TABLE IF EXISTS _rejects_scan; DROP TABLE IF EXISTS _raw")
-    con.execute(f"CREATE TEMP TABLE _raw AS SELECT * FROM {_reader_sql(accepted, spec)}")
+    con.execute(f"CREATE TEMP TABLE _raw AS {_raw_select_sql(accepted, spec)}")
     _report_rejects(ctx, spec)
     _report_bad_values(ctx, spec)
     _record_files(ctx, spec, accepted, segment_of)
