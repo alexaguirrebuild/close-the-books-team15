@@ -398,7 +398,8 @@ class Engine:
             cand = [r for r in cand if r["batch_id"] in cited_batches]
         if not cand:
             for bid in re.findall(r"\d{9,12}", t.up):
-                cand = [r for r in self.dd_batches.get(bid, []) if abs(int(round(float(r["amount"]) * 100)) - amt) <= 2]
+                cand = [r for r in self.dd_batches.get(bid, []) if abs(int(round(float(r["amount"]) * 100)) - amt) <= 2
+                        and (not m or ascii_upper(r["mandate_id"]) == m.group(1))]
                 if cand:
                     break
         if not cand:
@@ -417,11 +418,18 @@ class Engine:
         # cuotas iguales cada mes: la devuelta es la última cobrada ANTES de la devolución, nunca una futura
         past = [x for x in cand if x.get("collection_date") and
                 0 <= (t.date - dt.date.fromisoformat(x["collection_date"][:10])).days <= 90]
-        if not past:
-            return False
-        r = max(past, key=lambda x: x["collection_date"])
+        if past:
+            r = max(past, key=lambda x: x["collection_date"])
+        else:
+            # POLICIES §5.10: una re-presentación futura identifica el recibo
+            # original ya devuelto. Sirve como documento, no como cobro futuro.
+            represented = [x for x in cand if x.get("re_presentation") == "Y" and x.get("collection_date")
+                           and 0 <= (dt.date.fromisoformat(x["collection_date"][:10]) - t.date).days <= 90]
+            if not represented:
+                return False
+            r = min(represented, key=lambda x: x["collection_date"])
         it = self.item_by_number(r["remittance_info"], t.entity, kinds={"ARI"})
-        if not it:
+        if not it or (it.issue and it.issue > t.date):
             return False
         self.emit(t, it, amt, "RETURNED", "dd_return", f"mandato {r['mandate_id']}")
         return True

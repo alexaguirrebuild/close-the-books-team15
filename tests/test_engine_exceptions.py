@@ -149,6 +149,20 @@ class ExceptionsTest(unittest.TestCase):
         self.assertFalse(eng.m_dd_return(bank))
         self.assertEqual(eng.rows, [])
 
+    def test_future_represented_receipt_can_identify_original_return(self):
+        eng = self.engine()
+        it = self.invoice(eng, "original", 10000)
+        it.open = 0
+        record = dict(batch_id="11111111111", amount="100.00", collection_date="2025-01-06",
+                      remittance_info=it.id, mandate_id="VTM-ES-1", re_presentation="Y")
+        eng.dd_by_mandate = {"VTM-ES-1": [record]}
+        eng.dd_batches = {"11111111111": [record]}
+        eng.item_by_number = lambda number, *args, **kw: eng.items[number]
+        bank = self.txn(-10000, text="DEVOLUCION RECIBO MANDATO VTM-ES-1")
+        self.assertTrue(eng.m_dd_return(bank))
+        self.assertEqual([(r.item, r.amount, r.exception) for r in eng.rows], [(it.id, 10000, "RETURNED")])
+        self.assertEqual(it.open, 10000)
+
 
 if __name__ == "__main__":
     unittest.main()
