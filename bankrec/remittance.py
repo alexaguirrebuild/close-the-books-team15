@@ -354,6 +354,7 @@ def prepare(engine):
             continue
         try:
             adv = read_advice(path, r.get("format"))
+            received = dt.date.fromisoformat(r["received_date"][:10])
         except Exception as e:  # un aviso roto no debe tumbar la fase
             engine.ra_errors = getattr(engine, "ra_errors", []) + [(r["file"], repr(e))]
             continue
@@ -363,7 +364,7 @@ def prepare(engine):
         adv["file"] = r["file"]
         adv["entity"] = r["entity"]
         adv["payer_name"] = r["payer_name"]
-        adv["received"] = dt.date.fromisoformat(r["received_date"][:10])
+        adv["received"] = received
         sum_paid = sum(x["paid"] for x in adv["lines"])
         if adv["total"] is None:
             adv["total"] = sum_paid
