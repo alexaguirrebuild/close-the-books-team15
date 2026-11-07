@@ -236,7 +236,7 @@ def motor_confirming(vencimientos, plugin=True):
     eng.emitidas = []
     eng.emit_run_rows = lambda t, filas, rule, ev: eng.emitidas.append((sorted(f["beneficiary"] for f in filas), rule))
     if plugin:
-        proveedores._wrap_confirming(eng)
+        proveedores._wrap_payment_run(eng)
     return eng
 
 
@@ -297,6 +297,80 @@ class TestConfirmingFinDeSemana:
         eng = motor_confirming([martes, martes])
         assert eng.m_payment_run(cargo_confirming(martes, 30000, 2)) is True
         assert eng.emitidas == [(["Prov 0", "Prov 1"], "payment_run_confirming")]
+
+
+def transferencia(e2e, importe, moneda="USD", cuenta="ES01-BANK-EUR", ejecucion="2025-03-07", beneficiario="Pumps Global"):
+    return {"run_id": e2e.split("-")[0], "run_type": "transfers", "end_to_end_id": e2e, "execution_date": ejecucion,
+            "debtor_account_id": cuenta, "beneficiary": beneficiario, "currency": moneda, "transfer_amount": importe,
+            "document_number": f"INV-{e2e}", "document_amount": importe}
+
+
+def motor_transferencias(*filas):
+    from collections import defaultdict
+    eng = Engine.__new__(Engine)
+    eng.run_rows, eng.e2e_rows = defaultdict(list), defaultdict(list)
+    for f in filas:
+        eng.run_rows[f["run_id"]].append(f)
+        eng.e2e_rows[f["end_to_end_id"]].append(f)
+    eng.transfers_by_amount = eng._index_transfers()
+    eng.used_batches = set()
+    eng.emitidas = []
+    eng.emit_run_rows = lambda t, filas, rule, ev: eng.emitidas.append(([f["end_to_end_id"] for f in filas], rule))
+    proveedores._wrap_payment_run(eng)
+    return eng
+
+
+def cargo_fx(eur=-110000, original=100000, moneda="USD", dia=dt.date(2025, 3, 10), texto="TRF.INTERNACIONAL PUMPS GLOBAL"):
+    return SimpleNamespace(amount=eur, account="ES01-BANK-EUR", ccy="EUR", orig_amount=original, orig_ccy=moneda,
+                           date=dia, e2e="", up=texto)
+
+
+class TestImporteOriginal:
+    """ap_fx: el cargo va en la divisa de la cuenta y la transferencia en la del proveedor. Sin e2e ni remesa citada,
+    el motor solo buscaba por el importe en la divisa del banco. En el holdout, 617 de 1.217 cargos de ap_fx solo
+    se identifican por el importe original; los 617 tienen una única transferencia (cuenta, importe, divisa) en ±5
+    días, y en 591 los documentos coinciden con el golden. POLICIES §5.3: la transferencia liquida sus documentos."""
+
+    def test_casa_por_importe_y_divisa_originales(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"))
+        assert eng.m_payment_run(cargo_fx()) is True
+        assert eng.emitidas == [(["PR010025030701-0001"], "payment_run_amount_orig")]
+
+    def test_no_fuerza_con_dos_candidatas(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"),
+                                   transferencia("PR010025030801-0002", "1000.00", ejecucion="2025-03-08", beneficiario="Otro"))
+        assert eng.m_payment_run(cargo_fx()) is False
+        assert eng.emitidas == []
+
+    def test_no_fuerza_otra_divisa(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00", moneda="GBP"))
+        assert eng.m_payment_run(cargo_fx(moneda="USD")) is False
+
+    def test_no_fuerza_otra_cuenta(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00", cuenta="ES02-BANK-EUR"))
+        assert eng.m_payment_run(cargo_fx()) is False
+
+    def test_no_fuerza_fuera_de_la_ventana(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00", ejecucion="2025-02-20"))
+        assert eng.m_payment_run(cargo_fx()) is False
+
+    def test_no_repite_la_misma_transferencia(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"))
+        assert eng.m_payment_run(cargo_fx()) is True
+        assert eng.m_payment_run(cargo_fx()) is False
+        assert len(eng.emitidas) == 1
+
+    def test_sin_importe_original_o_cobro_no_hace_nada(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"))
+        assert eng.m_payment_run(cargo_fx(original=None, moneda=None)) is False
+        assert eng.m_payment_run(cargo_fx(eur=110000)) is False
+        assert eng.emitidas == []
+
+    def test_el_importe_del_banco_sigue_mandando(self):
+        # si la transferencia cuadra por el importe en la divisa del banco, la ruta del motor la coge primero
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1100.00", moneda="EUR"))
+        assert eng.m_payment_run(cargo_fx()) is True
+        assert eng.emitidas == [(["PR010025030701-0001"], "payment_run_amount")]
 
 
 class TestDerivaDeFinal:
