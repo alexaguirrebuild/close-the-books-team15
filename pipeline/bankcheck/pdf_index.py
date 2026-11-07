@@ -11,7 +11,7 @@ import pypdfium2
 from .csvload import load_file_index
 from .db import IngestContext, bulk_insert
 from .remittance.pdf_fmt import read_pdf_text
-from .roots import Layout, nfc
+from .roots import Layout, nfc, rel_key
 
 SOURCE = "pdfs"
 INDEX_NAME = "index.csv"
@@ -32,7 +32,7 @@ def _pdfs_on_disk(folder: Path) -> dict[str, Path]:
         for name in names:
             if name.lower().endswith(".pdf"):
                 path = Path(current) / name
-                found[nfc(os.path.relpath(path, folder))] = path
+                found[rel_key(path, folder)] = path
     return found
 
 

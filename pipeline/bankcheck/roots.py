@@ -42,7 +42,12 @@ class Layout:
 
     def relative(self, path: Path | str) -> str:
         """Provenance path, stable across machines and in NFC form."""
-        return nfc(os.path.relpath(path, self.root))
+        return rel_key(path, self.root)
+
+
+def rel_key(path: Path | str, folder: Path | str) -> str:
+    """Ruta relativa con la forma de index.csv («AU01/RA_x.csv»), también en Windows, donde relpath usa «\\»."""
+    return nfc(Path(os.path.relpath(path, folder)).as_posix())
 
 
 def nfc(text: str) -> str:

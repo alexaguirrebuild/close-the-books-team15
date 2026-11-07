@@ -10,7 +10,7 @@ from pathlib import Path
 from ..csvload import load_file_index
 from ..db import IngestContext, bulk_insert
 from ..issues import FileRecord
-from ..roots import is_excluded, nfc
+from ..roots import is_excluded, nfc, rel_key
 from .common import Advice, check_amounts_storable, check_control
 from .csv_fmt import parse_csv_advice
 from .pdf_fmt import parse_pdf_advice
@@ -56,7 +56,7 @@ def _files_on_disk(folder: Path) -> dict[str, Path]:
         for name in names:
             path = Path(current) / name
             if name != INDEX_NAME and not name.startswith(".") and not is_excluded(path):
-                found[nfc(os.path.relpath(path, folder))] = path
+                found[rel_key(path, folder)] = path
     return found
 
 
