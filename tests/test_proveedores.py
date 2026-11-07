@@ -181,6 +181,30 @@ class TestNumeroCorto:
         r = doc(numero="556", importe="123.45", beneficiario="Valves Coral Bay")
         assert eng.run_doc_item(r, cargo()) is None
 
+    def test_no_fuerza_una_partida_ya_pagada_sin_importe_exacto(self):
+        pagada = factura("API-2023-0000001", numero="556", party="S1", cents=50000, abierto=0)
+        eng = motor_por_tercero([pagada], names={"Valves Coral Bay": "S1"})
+        r = doc(numero="556", importe="123.45", beneficiario="Valves Coral Bay")
+        assert eng.run_doc_item(r, cargo()) is None
+
+    def test_plazo_de_una_abierta_que_cubre_el_importe_vale(self):
+        abierta = factura("API-2025-0000001", numero="556", party="S1", cents=50000)
+        eng = motor_por_tercero([abierta], names={"Valves Coral Bay": "S1"})
+        r = doc(numero="556", importe="250.00", beneficiario="Valves Coral Bay")
+        assert eng.run_doc_item(r, cargo()).id == abierta.id
+
+    def test_no_fuerza_un_numero_de_un_caracter(self):
+        it = factura("API-2025-0000001", numero="7", party="S1")
+        eng = motor_por_tercero([it], names={"Valves Coral Bay": "S1"})
+        assert eng.run_doc_item(doc(numero="7", beneficiario="Valves Coral Bay"), cargo()) is None
+
+    def test_otra_sociedad_del_grupo_vale_porque_la_holding_paga(self):
+        # POLICIES §5.2: la fábrica de pagos (ES00) paga facturas de sus filiales desde sus cuentas
+        filial = factura("API-2025-0000001", numero="556", party="S1", entity="PT01")
+        eng = motor_por_tercero([filial], names={"Valves Coral Bay": "S1"})
+        r = doc(numero="556", beneficiario="Valves Coral Bay", cuenta="ES00-BANK-EUR")
+        assert eng.run_doc_item(r, cargo(cuenta="ES00-BANK-EUR")).id == filial.id
+
     def test_un_abono_corto_solo_con_documento_de_abono(self):
         abono = factura("APC-2025-0000001", numero="77", party="S1", kind="APC")
         eng = motor_por_tercero([abono], names={"Valves Coral Bay": "S1"})
@@ -252,6 +276,20 @@ class TestConfirmingFinDeSemana:
         eng = motor_confirming(venc)
         assert eng.m_payment_run(cargo_confirming(self.LUNES, 150001 + 500, 5)) is False
         assert eng.emitidas == []
+
+    def test_el_grupo_del_sabado_cargado_solo_sigue_cuadrando(self):
+        # revisión: con el día de pago, sábado y lunes se funden; si el banco carga solo el sábado (y son más de 4
+        # proveedores, sin combinatoria), hay que seguir probando la fecha exacta como antes
+        venc = [self.SAB] * 5 + [self.LUNES] * 2
+        eng = motor_confirming(venc)
+        assert eng.m_payment_run(cargo_confirming(self.LUNES, 150000, 5)) is True
+        assert eng.emitidas == [([f"Prov {k}" for k in range(5)], "payment_run_confirming")]
+
+    def test_vence_en_sabado_y_se_carga_el_viernes(self):
+        # revisión: al pasar el vencimiento al lunes, un cargo del viernes quedaba fuera de la ventana (-1..+5)
+        eng = motor_confirming([self.SAB, self.SAB])
+        assert eng.m_payment_run(cargo_confirming(self.VIE, 30000, 2)) is True
+        assert eng.emitidas == [(["Prov 0", "Prov 1"], "payment_run_confirming")]
 
     def test_entre_semana_no_cambia(self):
         martes = dt.date(2025, 3, 11)
