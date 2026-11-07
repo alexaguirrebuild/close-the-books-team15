@@ -202,11 +202,12 @@ class Engine:
         # falta dinero
         if len(invoices) == 1:
             it = invoices[0]
+            # abonos: su saldo abierto (lo que se aplica de verdad), en la divisa de la factura, antes de emitirlos
+            net_credit = sum(c.open if c.ccy == it.ccy else self.ph.fx.conv(c.open, c.ccy, it.ccy, t.date)
+                             for c in credits)
             for c in credits:
                 full(c)
-            cash_item = cash + sum(self.to_bank(c.open, c, t) for c in credits) if False else None
             # importe cobrado para la factura, en su divisa
-            net_credit = sum(c.total for c in credits)
             cash_item = (cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)) + net_credit
             short = it.open - cash_item
             exc = self.explain_short(it, t, short, cash_item)
@@ -291,7 +292,7 @@ class Engine:
             out = [i for i in out if i.party == party] or out
         if amount is not None and len(out) > 1:
             out = [i for i in out if abs(i.open - amount) <= 2 or abs(i.total - amount) <= 2] or out
-        out.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min))
+        out.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min, i.id))
         return out[0] if out else None
 
     def m_dd_batch(self, t):
