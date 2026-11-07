@@ -108,12 +108,20 @@ class Engine:
             return cents_item * abs(t.amount) / t.orig_amount
         return self.ph.fx.conv(cents_item, it.ccy, t.ccy, t.date)
 
+    def to_item(self, cents_bank, it, t):
+        """POLICIES §2-§3: importe aplicado en la divisa de la partida, al cambio real si consta."""
+        if it.ccy == t.ccy:
+            return cents_bank
+        if t.orig_ccy == it.ccy and t.orig_amount and t.amount:
+            return cents_bank * t.orig_amount / abs(t.amount)
+        return self.ph.fx.conv(cents_bank, t.ccy, it.ccy, t.date)
+
     def emit(self, t, it, amount, exc, rule, ev=""):
         amount = int(round(amount))
         self.rows.append(Row(t.id, it.id, amount, "", exc, rule, ev))
         if exc == "RETURNED":
             it.open = min(it.open + amount, it.total)  # una devolución reabre, pero nunca por encima del total
-        else:
+        elif exc != "DUPLICATE_PAYMENT":  # POLICIES §3: el segundo pago no vuelve a liquidar saldo
             it.open -= amount
         self.settled_by[it.id].append((t.id, amount))
         if t.cp_iban and it.party:
@@ -145,7 +153,10 @@ class Engine:
             for r in WITHHOLDING[country]:
                 if abs(short_item - it.total * r) <= max(2, it.total * 0.0005):
                     return "SHORT_WITHHOLDING"
-        cross = (t.orig_ccy is not None) or (country and country not in SEPA)
+        # POLICIES §3: la evidencia bancaria de gastos SHA/BEN también identifica
+        # una transferencia internacional aunque no informe la divisa original.
+        cross = (t.orig_ccy is not None) or (country and country not in SEPA) or re.search(
+            r"/CHGS/|\b(?:SHA|BEN)\b|TRANSFER\.? EN DIV\.", t.up)
         if cross and it.side == "AR":
             short_eur = self.ph.fx.conv(short_item, it.ccy, "EUR", t.date)
             if 0 < short_eur <= 6000 and short_item <= 0.02 * it.total:
@@ -182,7 +193,7 @@ class Engine:
         credits = [it for it in cands if self.sign(it, t) < 0]
 
         def full(it, exc=""):
-            if fx and self.sign(it, t) > 0 and it.ccy != t.ccy and exc in ("", "SHORT_DISCOUNT", "SHORT_WITHHOLDING",
+            if fx and not it.is_credit and it.ccy != t.ccy and exc in ("", "SHORT_DISCOUNT", "SHORT_WITHHOLDING",
                                                                             "SHORT_BANK_CHARGES", "OVERPAYMENT"):
                 exc = "FX_DIFFERENCE"
             self.emit(t, it, it.open, exc, rule, ev)
@@ -202,12 +213,13 @@ class Engine:
         # falta dinero
         if len(invoices) == 1:
             it = invoices[0]
+            # POLICIES §2: compensar solo el saldo abierto de los abonos,
+            # convertido antes de emitirlos (emit modifica ese saldo).
+            net_credit = sum(self.to_bank(c.open, c, t) for c in credits)
             for c in credits:
                 full(c)
-            cash_item = cash + sum(self.to_bank(c.open, c, t) for c in credits) if False else None
             # importe cobrado para la factura, en su divisa
-            net_credit = sum(c.total for c in credits)
-            cash_item = (cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)) + net_credit
+            cash_item = self.to_item(cash + net_credit, it, t)
             short = it.open - cash_item
             exc = self.explain_short(it, t, short, cash_item)
             if exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
@@ -215,13 +227,29 @@ class Engine:
             else:
                 self.emit(t, it, cash_item, "PARTIAL", rule, ev)
             return True
+        # POLICIES §3: un cobro puede mezclar facturas íntegras y otras con
+        # descuento o retención. La diferencia debe cuadrar con las fórmulas
+        # documentadas; un descuento tardío deja abierto su importe (PARTIAL).
+        deductions = self.invoice_deductions(invoices, credits, cash, t)
+        if deductions is not None:
+            for it in cands:
+                paid, exc = deductions.get(it.id, (it.open, ""))
+                if exc == "PARTIAL":
+                    self.emit(t, it, paid, exc, rule, ev)
+                else:
+                    full(it, exc)
+            return True
         # varias facturas: ¿descuento en todas?
         disc_sum, all_disc = 0, True
         for it in invoices:
             term = self.ph.terms.get(it.terms or "")
-            if term and term.get("early_payment_discount_pct"):
+            if term and term.get("early_payment_discount_pct") and it.open == it.total:
                 pct = float(term["early_payment_discount_pct"])
-                disc_sum += it.total - int(round(it.total * pct / 100))
+                paid = it.total - int(round(it.total * pct / 100))
+                if self.discount_ok(it, t, paid) != "SHORT_DISCOUNT":
+                    all_disc = False
+                    break
+                disc_sum += paid
             else:
                 all_disc = False
                 break
@@ -241,10 +269,47 @@ class Engine:
                 full(it)
                 remaining -= need
             else:
-                amt = remaining if it.ccy == t.ccy else self.ph.fx.conv(remaining, t.ccy, it.ccy, t.date)
+                amt = self.to_item(remaining, it, t)
                 self.emit(t, it, amt, "PARTIAL", rule, ev)
                 remaining = 0
         return True
+
+    def invoice_deductions(self, invoices, credits, cash, t):
+        """POLICIES §3: deducciones exactas por factura, sin inferir disputas."""
+        if any(it.ccy != t.ccy for it in invoices + credits):
+            return None
+        gap = sum(it.open for it in invoices) - sum(c.open for c in credits) - cash
+        if gap <= 2 or len(invoices) > 14:
+            return None
+        tolerance = 2 * len(invoices)
+        reach = {0: {}}
+        for it in invoices:
+            if it.open != it.total:
+                continue
+            choices = []
+            term = self.ph.terms.get(it.terms or "")
+            if term and term.get("early_payment_discount_pct"):
+                deduction = int(round(it.total * float(term["early_payment_discount_pct"]) / 100))
+                paid = it.total - deduction
+                exc = self.discount_ok(it, t, paid)
+                choices.append((deduction, paid if exc == "LATE" else it.open,
+                                "PARTIAL" if exc == "LATE" else "SHORT_DISCOUNT"))
+            if it.side == "AR":
+                for rate in WITHHOLDING.get(self.ph.party_country.get(it.party), ()):
+                    choices.append((int(round(it.total * rate)), it.open, "SHORT_WITHHOLDING"))
+            new = {}
+            for sm, allocations in reach.items():
+                for deduction, paid, exc in choices:
+                    ns = sm + deduction
+                    if deduction > 0 and ns <= gap + tolerance and ns not in reach and ns not in new:
+                        new[ns] = {**allocations, it.id: (paid, exc)}
+            reach.update(new)
+            if len(reach) > 100000:
+                return None
+        for delta in sorted(range(-tolerance, tolerance + 1), key=abs):
+            if gap + delta in reach and reach[gap + delta]:
+                return reach[gap + delta]
+        return None
 
     # ------------------------------------------------------------ lotes (POLICIES §5.3)
     def _prep_batches(self):
@@ -326,6 +391,11 @@ class Engine:
         m = re.search(r"(VTM-[A-Z]{2}-\d+)", t.up)
         if m:
             cand = [r for r in self.dd_by_mandate.get(m.group(1), []) if abs(int(round(float(r["amount"]) * 100)) - amt) <= 2]
+        # POLICIES §3 RETURNED y §5.10: el lote citado identifica el recibo
+        # original, incluso si el mismo mandato tiene cuotas iguales posteriores.
+        cited_batches = [bid for bid in re.findall(r"\d{9,12}", t.up) if bid in self.dd_batches]
+        if cand and cited_batches:
+            cand = [r for r in cand if r["batch_id"] in cited_batches]
         if not cand:
             for bid in re.findall(r"\d{9,12}", t.up):
                 cand = [r for r in self.dd_batches.get(bid, []) if abs(int(round(float(r["amount"]) * 100)) - amt) <= 2]
@@ -347,7 +417,9 @@ class Engine:
         # cuotas iguales cada mes: la devuelta es la última cobrada ANTES de la devolución, nunca una futura
         past = [x for x in cand if x.get("collection_date") and
                 0 <= (t.date - dt.date.fromisoformat(x["collection_date"][:10])).days <= 90]
-        r = max(past or cand, key=lambda x: x["collection_date"])
+        if not past:
+            return False
+        r = max(past, key=lambda x: x["collection_date"])
         it = self.item_by_number(r["remittance_info"], t.entity, kinds={"ARI"})
         if not it:
             return False
@@ -657,7 +729,10 @@ class Engine:
         fam = set()
         for p in parties:
             fam |= {p} | self.ph.children.get(p, set())
-        items = [self.items[c] for c in cands if self.items[c].kind in kinds and self.entity_ok(self.items[c], t)]
+        # POLICIES §1, §5.5: una referencia ruidosa no puede liquidar una
+        # factura que todavía no se había emitido.
+        items = [self.items[c] for c in cands if self.items[c].kind in kinds and self.entity_ok(self.items[c], t)
+                 and (self.items[c].issue is None or self.items[c].issue <= t.date)]
         if fam:
             items = [i for i in items if i.party in fam] or items
         if fam and not items:  # referencias cortadas a 16/35/38 caracteres: prefijo del número
@@ -666,7 +741,7 @@ class Engine:
                 for p in fam:
                     for iid in self.ph.by_party.get(p, ()):
                         it = self.items[iid]
-                        if it.open > 0 and it.kind in kinds:
+                        if it.open > 0 and it.kind in kinds and self.entity_ok(it, t) and (it.issue is None or it.issue <= t.date):
                             nn = re.sub(r"[^A-Z0-9]", "", ascii_upper(it.number))
                             if any(nn.startswith(x) and len(x) < len(nn) for x in pref):
                                 items.append(it)
@@ -678,7 +753,7 @@ class Engine:
                 if tok.isdigit() and len(tok) == 6:
                     for iid in self.ph.by_suffix.get(tok, ()):
                         it = self.items[iid]
-                        if it.party in fam and it.kind in kinds:
+                        if it.party in fam and it.kind in kinds and self.entity_ok(it, t) and (it.issue is None or it.issue <= t.date):
                             items.append(it)
         items = list({i.id: i for i in items}.values())
         if not items:
@@ -775,7 +850,7 @@ class Engine:
             exp = self.to_bank(it.open, it, t)
             short = exp - cash
             if 0 < short <= 0.11 * exp:
-                cash_item = cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)
+                cash_item = self.to_item(cash, it, t)
                 exc = self.explain_short(it, t, it.open - cash_item, cash_item)
                 if exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
                     found.setdefault(exc, it)
@@ -789,6 +864,12 @@ class Engine:
                 return self.settle(t, [it.id], f"party_fx_{how}", f"contraparte {party}")
         if re.search(r"A CUENTA|ON ACCOUNT|ACOMPTE|ABSCHLAG|PARCIAL", t.up) and inv:
             return self.settle(t, [inv[0].id], f"party_partial_{how}", f"contraparte {party}")
+        # POLICIES §3 OVERPAYMENT: después de buscar pagos exactos y lotes,
+        # un exceso pequeño identifica una factura solo si la candidata es única.
+        over = [i for i in inv if i.kind == "ARI" and i.ccy == t.ccy
+                and 2 < cash - i.open <= 0.10 * i.open]
+        if len(over) == len(inv) == 1 and not any(self.sign(i, t) < 0 for i in its):
+            return self.settle(t, [over[0].id], f"party_overpayment_{how}", f"contraparte {party}")
         return False
 
     # ------------------------------------------------------------ anulaciones (POLICIES §4)
