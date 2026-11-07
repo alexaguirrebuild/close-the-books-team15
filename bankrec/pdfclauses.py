@@ -313,6 +313,8 @@ def prepare(engine):
                 if c.get("new_iban") and r["party_id"]:
                     ph.party_by_iban.setdefault(c["new_iban"], r["party_id"])
                 continue
+            if it is None:  # proforma: sin partida a la que colgar la cláusula (evita AttributeError en LIVE/FINAL)
+                continue
             c["doc"] = r["document_type"]
             if c.get("new_iban") and r["document_type"] == "supplier_invoice" and r["party_id"]:
                 ph.party_by_iban.setdefault(c["new_iban"], r["party_id"])  # §5.11 proveedor con IBAN nuevo
