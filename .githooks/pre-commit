@@ -1,20 +1,20 @@
 #!/bin/sh
 # Pre-commit del equipo. Vale para cualquiera que commitee: Claude, Codex, Antigravity o una persona.
 # Actívalo una vez con:  git config core.hooksPath .githooks
-#   1. gitleaks sobre lo staged: ningún secreto (token del equipo) entra en git.
+#   1. gitleaks sobre lo staged: ningún secreto (token del equipo) entra en git. Es obligatorio tenerlo instalado.
 #   2. Ningún fichero de datos del reto entra en git.
 # No se salta con --no-verify: si falla, se arregla la causa.
 
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$staged" ] && exit 0
 
-if command -v gitleaks >/dev/null 2>&1; then
-  if ! gitleaks git --staged --no-banner --redact; then
-    echo "pre-commit: gitleaks ha encontrado un posible secreto. Sácalo del commit y llévalo a .env." >&2
-    exit 1
-  fi
-else
-  echo "pre-commit: aviso, gitleaks no está instalado (winget install Gitleaks.Gitleaks / brew install gitleaks)." >&2
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: falta gitleaks y es obligatorio: sin él un token podría entrar en el historial. Instálalo (winget install Gitleaks.Gitleaks / brew install gitleaks) y repite el commit." >&2
+  exit 1
+fi
+if ! gitleaks git --staged --no-banner --redact; then
+  echo "pre-commit: gitleaks ha encontrado un posible secreto. Sácalo del commit y llévalo a .env." >&2
+  exit 1
 fi
 
 if printf '%s\n' "$staged" | grep -qE '(^data/|\.csv\.gz$|\.tar\.gz$|\.parquet$|(^|/)\.env$)'; then

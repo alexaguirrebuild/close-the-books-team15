@@ -29,7 +29,7 @@ def norm(s):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    ap.add_argument("--data", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
     ap.add_argument("--phase", default="live", choices=["sample", "train", "live", "final"])
     ap.add_argument("--out", default="submission.csv.gz")
     a = ap.parse_args()

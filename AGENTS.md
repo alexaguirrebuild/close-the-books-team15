@@ -34,5 +34,6 @@ python -m bankrec.diff --phase sample --segment ar_partial -n 5   # QA: fallos d
 - No se ataca la plataforma: nada de escaneos, fuerza bruta ni intentos de saltarse límites. Solo los flujos oficiales de descarga y envío.
 - Sin golden de LIVE ni de FINAL por ninguna vía.
 - El token del equipo vive solo en `.env` (`HK_TOKEN`). Nunca en código, commits, prompts a otros servicios, capturas ni el vídeo.
+- Antes del primer commit: `git config core.hooksPath .githooks` y `gitleaks` instalado. Es obligatorio: sin él, el gancho no deja hacer commit.
 - Las consultas de estado de un envío van como mucho cada 5 s: toda la sala comparte IP.
 - Límites: 20 envíos LIVE al día, uno cada 180 s, y **un único envío FINAL**. Los envíos los decide una persona, no un agente.

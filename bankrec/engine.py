@@ -755,11 +755,12 @@ class Engine:
                 if acc > cash + 2 and min(vals) > 0:
                     break
         reach = {0: ()}
+        limit = cash + 2 + sum(-x for x in vals if x < 0)
         for j, v in enumerate(vals):
             new = {}
             for sm, comb in reach.items():
                 ns = sm + v
-                if ns not in reach and ns not in new and ns <= cash + 2 + sum(-x for x in vals if x < 0):
+                if ns not in reach and ns not in new and ns <= limit:
                     new[ns] = comb + (j,)
             reach.update(new)
             if len(reach) > 300000:
