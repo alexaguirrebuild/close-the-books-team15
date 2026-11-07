@@ -2,6 +2,7 @@
 
     python scripts/gate.py v-engine            # mide .worktrees/v-engine en sample y holdout y lo compara con out/base/
     python scripts/gate.py v-engine --reuse    # no vuelve a ejecutar el motor: usa los sub_*.csv.gz que ya hay en su out/
+    python scripts/gate.py v-ui --neutral      # rama que no toca el motor (UI, docs): la nota tiene que quedar IGUAL
     python scripts/gate.py --set-base          # mide main (este checkout, limpio) y lo guarda como base en out/base/
 
 PASA solo si se cumplen las tres cosas:
@@ -243,7 +244,7 @@ def set_base() -> None:
 
 
 # ------------------------------------------------------------------ juicio
-def judge(branch: str, reuse: bool) -> int:
+def judge(branch: str, reuse: bool, neutral: bool = False) -> int:
     wt = ROOT / ".worktrees" / branch
     if not wt.exists():
         sys.exit(f"ERROR: no existe {wt}. Crea el worktree: git worktree add -B {branch} .worktrees/{branch} main")
@@ -279,7 +280,9 @@ def judge(branch: str, reuse: bool) -> int:
         bm, cm = base["metrics"], cand["metrics"]
         print(f"\n[{ph}] nota {base['score']:.2f} -> {cand['score']:.2f} ({d:+.2f})   "
               + "  ".join(f"{k} {bm[k]:.4f}->{cm[k]:.4f}" for k in ("allocation_f1", "txn_accuracy", "exception_macro_f1")))
-        if d <= 0:
+        if neutral and abs(d) > 1e-9:
+            reasons.append(f"{ph}: rama neutral (UI, docs) pero la nota cambia ({d:+.2f})")
+        elif not neutral and d <= 0:
             reasons.append(f"{ph}: la nota no sube ({d:+.2f})")
         worse, better = [], []
         for seg in sorted(set(base["segments"]) | set(cand["segments"])):
@@ -321,7 +324,7 @@ def main(argv=None) -> int:
     if len(args) != 1:
         print(__doc__)
         return 2
-    return judge(args[0], "--reuse" in argv)
+    return judge(args[0], "--reuse" in argv, "--neutral" in argv)
 
 
 if __name__ == "__main__":
