@@ -291,6 +291,94 @@ class TestParcialAlLiquidar:
         assert eng.delegated == [["A", "B"]]
 
 
+VENCIDA = dt.date(2025, 5, 30)
+
+
+def vencida(item_id, cents, party="C1", due=VENCIDA, **kwargs):
+    item = invoice(item_id, party=party, cents=cents, **kwargs)
+    item.due = due
+    return item
+
+
+class TestSumaConParcial:
+    """Cobro sin citas que no cuadra con facturas enteras: suma exacta con una de ellas al 40, 50 o 60 %."""
+
+    def test_identifica_las_enteras_y_la_parcial(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000), vencida("C", 3333)])
+        assert eng.m_party_amount(movement(13500))  # A entera y B al 50 %
+        assert filas(eng) == [("A", 10000, ""), ("B", 3500, "PARTIAL")]
+        assert eng.rows[0].rule == "party_due_partial"
+
+    def test_el_cobro_siguiente_cuadra_con_lo_que_quedo_abierto(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000), vencida("C", 3333)])
+        assert eng.m_party_amount(movement(13500))
+        assert eng.m_party_amount(movement(3500))
+        assert eng.items["B"].open == 0
+
+    def test_dos_soluciones_no_se_responde(self):
+        eng = motor_real([vencida("A", 10000), vencida("OTRA", 10000), vencida("B", 7000)])
+        assert not eng.m_party_amount(movement(13500))
+        assert eng.rows == []
+
+    def test_si_nada_encaja_no_se_responde(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000), vencida("C", 3333)])
+        assert not eng.m_party_amount(movement(13777))
+        assert eng.rows == []
+
+    def test_una_factura_aun_no_vencida_no_cuenta(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000, due=DAY + dt.timedelta(days=30)), vencida("C", 3333)])
+        assert not eng.m_party_amount(movement(13500))
+
+    def test_vence_dentro_del_margen_si_cuenta(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000, due=DAY + dt.timedelta(days=3)), vencida("C", 3333)])
+        assert eng.m_party_amount(movement(13500))
+
+    def test_una_sola_factura_al_50_no_basta(self):
+        eng = motor_real([vencida("A", 10000), vencida("C", 3333)])
+        assert not eng.m_party_amount(movement(5000))
+
+    @pytest.mark.parametrize("candidates, answered", [(mismo_importe.MAX_PARTIAL_CANDIDATES, True), (mismo_importe.MAX_PARTIAL_CANDIDATES + 1, False)])
+    def test_con_demasiadas_candidatas_no_se_responde(self, candidates, answered):
+        eng = motor_real([vencida(f"F{n:02d}", 100000 + 1009 * n) for n in range(candidates)])
+        assert bool(eng.m_party_amount(movement(100000 + 50504))) is answered  # F00 entera y F01 al 50 %
+        assert bool(eng.rows) is answered
+
+    def test_dos_clientes_con_solucion_no_se_responde(self):
+        items = [vencida(n, v, party="C1") for n, v in (("A", 10000), ("B", 7000))] + [vencida(n, v, party="C2") for n, v in (("D", 10000), ("E", 7000))]
+        eng = motor_real(items)
+        eng.resolve_parties = lambda t: (["C1", "C2"], "nombre")
+        assert not eng.m_party_amount(movement(13500))
+        assert eng.rows == []
+
+    def test_otra_sociedad_no_cuenta(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000, entity="FR01"), vencida("C", 3333)])
+        assert not eng.m_party_amount(movement(13500))
+
+    def test_otra_divisa_no_cuenta(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000, ccy="USD"), vencida("C", 3333)])
+        eng.ph.fx = SimpleNamespace(conv=lambda cents, frm, to, day: cents * 3)
+        assert not eng.m_party_amount(movement(13500))
+
+    def test_un_abono_no_es_candidata(self):
+        eng = motor_real([vencida("A", 10000), credit_note("ABONO", cents=7000)])
+        assert not eng.m_party_amount(movement(13500))
+
+    def test_un_proveedor_no_entra(self):
+        eng = motor_real([vencida("A", 10000, party="S1", kind="API", side="AP"), vencida("B", 7000, party="S1", kind="API", side="AP")])
+        eng.resolve_parties = lambda t: (["S1"], "nombre")
+        assert not eng.m_party_amount(movement(13500))
+
+    def test_un_cargo_no_entra(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 7000)])
+        assert not eng.m_party_amount(movement(-13500))
+        assert eng.rows == []
+
+    def test_lo_exacto_gana_a_la_parcial(self):
+        eng = motor_real([vencida("A", 10000), vencida("B", 3500), vencida("C", 7000)])
+        assert eng.m_party_amount(movement(13500))  # A y B enteras, no A y C al 50 %
+        assert filas(eng) == [("A", 10000, ""), ("B", 3500, "")]
+
+
 def spy_settle(items):
     """Solo para ver si settle pasa el caso a la regla original."""
     eng = Engine.__new__(Engine)

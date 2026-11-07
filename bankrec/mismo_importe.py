@@ -15,20 +15,24 @@ import re
 from functools import partial
 from itertools import combinations
 
-from .engine import AMOUNT_TOLERANCE_CENTS, MAX_SUBSET_ITEMS
+from .engine import AMOUNT_TOLERANCE_CENTS, DUE_MARGIN_DAYS, MAX_SUBSET_ITEMS
 from .pdfclauses import MONTHS, _text_month
+from .sumas import exact_subsets
 
 YEAR_DIGITS = (2, 4)
 CENTURY = 2000
 PARTIAL_FRACTIONS = (0.4, 0.5, 0.6)
 RECEIVABLE_KINDS = ("ARI", "ARC")
 CENTS = 100
+PARTIAL_TOLERANCE_CENTS = 1  # solo el redondeo de la fracción: con más, una suma casual pasaría por solución única
+MAX_PARTIAL_CANDIDATES = 18
 
 
 def prepare(engine) -> None:
     engine._party_amount = partial(_party_amount, engine, engine._party_amount)
     engine._party_rescue = partial(_party_rescue, engine, engine._party_rescue)
     engine.settle = partial(_settle, engine, engine.settle)
+    engine.m_party_amount = partial(_m_party_amount, engine, engine.m_party_amount)
     if hasattr(engine, "m2_rows"):
         engine.m2_rows = _advices_with_partial(engine)
 
@@ -63,6 +67,50 @@ def _credit_notes_cover(engine, t, party, cited: list, gap: int) -> bool:
     values = [c.open for c in engine.open_items_of(party, t, {"ARC"}) if c.id not in known]
     return any(abs(value - gap) <= AMOUNT_TOLERANCE_CENTS for value in values) or any(
         abs(a + b - gap) <= AMOUNT_TOLERANCE_CENTS for a, b in combinations(values, 2))
+
+
+def _partial_solutions(invoices: list, cash: int) -> list[tuple]:
+    """Las soluciones (parcial, fracción, enteras) que suman el cobro, hasta dos: con dos ya se sabe que no identifica."""
+    found = []
+    for position, item in enumerate(invoices):
+        others = [*invoices[:position], *invoices[position + 1:]]
+        values = [other.open for other in others]
+        for fraction in PARTIAL_FRACTIONS:
+            paid = int(round(item.open * fraction))
+            for chosen in exact_subsets(values, cash - paid, PARTIAL_TOLERANCE_CENTS):
+                found.append((item, paid, [others[index] for index in chosen]))
+            if len(found) > 1:
+                return found[:2]
+    return found
+
+
+def _due_invoices(engine, party, t) -> list:
+    items = engine.open_items_of(party, t, {"ARI"})
+    return [item for item in items if item.ccy == t.ccy and (item.due is None or (item.due - t.date).days <= DUE_MARGIN_DAYS)]
+
+
+def _party_due_partial(engine, t) -> bool:
+    """Cobro de varias facturas que deja una abierta (POLICIES §3 PARTIAL): solo con solución única y un único cliente."""
+    if t.amount <= 0:
+        return False
+    answers = {}
+    for party in dict.fromkeys([*engine.resolve_parties(t)[0], *engine.scan_names(t)]):
+        invoices = _due_invoices(engine, party, t) if "ARI" in engine._party_kinds(party, t) else []
+        if 2 <= len(invoices) <= MAX_PARTIAL_CANDIDATES:
+            solutions = _partial_solutions(invoices, t.amount)
+            if solutions:
+                answers[party] = solutions
+    if len(answers) != 1:
+        return False
+    party, solutions = next(iter(answers.items()))
+    if len(solutions) != 1:
+        return False
+    item, paid, full = solutions[0]
+    return _emit_with_partial(engine, t, full, item, paid, "party_due_partial", f"contraparte {party} · parcial {item.number}")
+
+
+def _m_party_amount(engine, original, t) -> bool:
+    return original(t) or _party_due_partial(engine, t)
 
 
 def _settle(engine, original, t, cands, rule, ev="", party=None) -> bool:
