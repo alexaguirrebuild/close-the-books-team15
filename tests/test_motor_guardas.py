@@ -5,6 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -70,8 +71,9 @@ class TestAssemble:
 
 
 class _Eng:
-    def __init__(self, errores):
+    def __init__(self, errores, vacios=()):
         self.ra_errors = errores
+        self.ra_empty = list(vacios)
 
 
 def test_informa_de_los_avisos_rotos(capsys):
@@ -80,6 +82,12 @@ def test_informa_de_los_avisos_rotos(capsys):
     salida = capsys.readouterr().out
     assert "2 avisos" in salida
     assert "ES01/a.pdf" in salida
+
+
+def test_informa_de_los_avisos_sin_lineas(capsys):
+    report_broken_advices(_Eng([], ["ES01/c.pdf"]))
+
+    assert "1 avisos sin líneas" in capsys.readouterr().out
 
 
 def test_no_dice_nada_si_no_hay_avisos_rotos(capsys):
@@ -118,6 +126,71 @@ class TestDependencias:
 
     def test_carga_los_plugins_por_defecto(self):
         assert [mod.__name__ for mod in load_plugins("remittance,pdfclauses")] == ["bankrec.remittance", "bankrec.pdfclauses"]
+
+
+def _fase(base: Path, nombre: str, *ficheros: str) -> None:
+    (base / nombre).mkdir(parents=True, exist_ok=True)
+    for fichero in ficheros:
+        (base / nombre / fichero).write_bytes(b"")
+
+
+class TestEntradasDeLaFase:
+    def _completa(self, base: Path) -> None:
+        _fase(base, "train", "ar_invoices.csv.gz")
+        _fase(base, "live", "ar_invoices.csv.gz", "open_items_at_start.csv.gz")
+        _fase(base, "final", "open_items_at_start.csv.gz")
+        (base / "final" / "masters_final").mkdir()
+
+    def test_final_completa_pasa(self, tmp_path):
+        self._completa(tmp_path)
+
+        preflight.check_phase_inputs("final", tmp_path)
+
+    @pytest.mark.parametrize(
+        ("quitar", "mensaje"),
+        [
+            ("final/open_items_at_start.csv.gz", "open_items_at_start"),
+            ("final/masters_final", "masters_final"),
+            ("live/ar_invoices.csv.gz", "live"),
+            ("train/ar_invoices.csv.gz", "train"),
+        ],
+    )
+    def test_final_incompleta_para_el_motor_antes_de_generar_nada(self, tmp_path, quitar, mensaje):
+        self._completa(tmp_path)
+        objetivo = tmp_path / quitar
+        objetivo.rmdir() if objetivo.is_dir() else objetivo.unlink()
+
+        with pytest.raises(SystemExit) as parada:
+            preflight.check_phase_inputs("final", tmp_path)
+
+        assert mensaje in str(parada.value)
+
+    def test_live_necesita_train_pero_no_masters_final(self, tmp_path):
+        _fase(tmp_path, "train", "ar_invoices.csv.gz")
+        _fase(tmp_path, "live", "open_items_at_start.csv.gz")
+
+        preflight.check_phase_inputs("live", tmp_path)
+
+    def test_las_fases_con_golden_no_exigen_nada_de_esto(self, tmp_path):
+        preflight.check_phase_inputs("sample", tmp_path)
+        preflight.check_phase_inputs("holdout", tmp_path)
+
+
+def test_un_descuento_tardio_sin_referencia_se_imputa_como_parcial():
+    """POLICIES §3: descuento fuera de plazo es PARTIAL. Antes caía a UNIDENTIFIED."""
+    factura = SimpleNamespace(id="ARI-1", open=10000, ccy="EUR")
+    motor = Engine.__new__(Engine)
+    motor.open_items_of = lambda *_: [factura]
+    motor.sign = lambda *_: 1
+    motor.to_bank = lambda cents, *_: cents
+    motor.best_subset = lambda *_, **__: None
+    motor.explain_short = lambda *_: "LATE"
+    imputadas = []
+    motor.settle = lambda t, ids, rule, ev="", party=None: imputadas.append(ids) or True
+    cobro = SimpleNamespace(amount=9800, ccy="EUR", up="TRANSFERENCIA")
+
+    assert motor._party_amount(cobro, "C1", "iban") is True
+    assert imputadas == [["ARI-1"]]
 
 
 class TestCacheDePdf:

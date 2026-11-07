@@ -11,6 +11,7 @@ import re
 from collections import defaultdict
 from itertools import combinations
 
+from . import duplicados
 from .data import SEPA, Phase, Txn, ascii_upper, name_key, norm_text, num_variants
 
 PAYMENT_FACTORY = {"ES00": {"ES01", "ES02", "PT01"}}
@@ -27,7 +28,7 @@ class Row:
 
 # ---------------------------------------------------------------- categorías sin partida (POLICIES §4)
 NONITEM_RULES = [
-    (r"ZBA SWEEP|CASH ?POOL|BARRIDO|NIVELACION|TRASPASO ENTRE CUENTAS ES00|TRASPASO PROPIO|SWEEP", "CASH_POOL"),
+    (r"ZBA SWEEP|CASH ?POOL|CASH CONCENTRATION|BARRIDO|NIVELACION|TRASPASO ENTRE CUENTAS ES00|TRASPASO PROPIO|SWEEP", "CASH_POOL"),
     (r"NOMINA|PAYROLL|SALARIES|SALAIRES|GEHALT|LOHN", "PAYROLL"),
     (r"SEGURIDAD SOCIAL|SEG\. SOCIAL|SOCIAL CHARGES|URSSAF|TGSS|SOZIALVERS|COTISATIONS", "SOCIAL_SECURITY"),
     (r"DEVOLUCION IMPUESTO|TAX REFUND|DEVOLUCION IVA|REMBOURSEMENT TVA|STEUERERSTATTUNG", "TAX_REFUND"),
@@ -63,6 +64,9 @@ def classify_nonitem(t: Txn):
     return None, ""
 
 
+RUN_ID = re.compile(r"\b[A-Z]{2}\d{10,}\b")
+# LATE: descuento pasado de plazo. Es fórmula exacta y POLICIES §3 lo trata como PARTIAL, que es lo que hace settle().
+EXPLAINED_SHORTFALLS = ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "LATE")
 OPTIONAL_PLUGINS = {"learned"}  # Solo estos pueden faltar: sin un plugin obligatorio se pierden puntos sin aviso.
 
 
@@ -85,11 +89,13 @@ class Engine:
         self.rows: list[Row] = []
         self.settled_by = defaultdict(list)  # item -> [(txn_id, amount)]
         self.iban_learned = {}
+        self.cheque_items = {}
+        self.card_items = {}
         self._prep_batches()
         self.reversal = self._find_reversals()
         self.plugins = []
         import os
-        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", "remittance,pdfclauses,learned")):
+        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", "devoluciones,m2_avisos,remittance,pdfclauses,learned")):
             if hasattr(mod, "prepare"):
                 mod.prepare(self)
             if hasattr(mod, "match"):
@@ -378,6 +384,7 @@ class Engine:
             it = self.item_by_number(r["order_number"], t.entity, kinds={"ARI"}, amount=gross)
             if it:
                 self.emit(t, it, gross, "", "card_settlement", f"liquidación {sid}")
+                self.card_items[(r["card"], gross)] = it  # Por si llega un contracargo (plugin devoluciones).
         return True
 
     def m_cheque(self, t):
@@ -412,6 +419,7 @@ class Engine:
             if it:
                 exc = "PARTIAL" if it.open - amt > 2 else ""
                 self.emit(t, it, min(amt, it.open) if exc == "" else amt, exc, "cheque_deposit", f"remesa {dep}")
+                self.cheque_items[r["cheque_number"]] = it  # Por si llega devuelto (plugin devoluciones).
         return True
 
     def run_doc_item(self, r, t):
@@ -472,6 +480,11 @@ class Engine:
             cache[rid] = out
         return cache[rid]
 
+    @staticmethod
+    def _cited_runs(t):
+        """Ids de remesa del texto. El banco puede partirlos entre dos campos: «PR0101250 | 71007»."""
+        return list(dict.fromkeys(RUN_ID.findall(t.up) + RUN_ID.findall(t.up.replace(" | ", ""))))
+
     def m_payment_run(self, t):
         if t.amount >= 0:
             return False
@@ -479,10 +492,18 @@ class Engine:
         if t.e2e and t.e2e in self.e2e_rows:
             self.emit_run_rows(t, self.e2e_rows[t.e2e], "payment_run_e2e", f"e2e {t.e2e}")
             return True
-        for rid in re.findall(r"\b[A-Z]{2}\d{10,}\b", t.up):
+        for rid in self._cited_runs(t):
             rs = self.run_rows.get(rid)
             if not rs:
                 continue
+            if rs[0]["run_type"] == "aggregated":
+                # Un solo cargo por remesa y cuenta (POLICIES §5.3). La suma no sirve: mezcla divisas. El run_id se repite entre sociedades.
+                own = [r for r in rs if r["debtor_account_id"] == t.account]
+                if not own or (rid, t.account) in self.used_batches:
+                    continue
+                self.used_batches.add((rid, t.account))
+                self.emit_run_rows(t, own, "payment_run_aggregated", f"remesa {rid}")
+                return True
             if rs[0]["run_type"] == "transfers":
                 # un cargo por beneficiario: solo la transferencia de este importe
                 sub = defaultdict(list)
@@ -787,9 +808,9 @@ class Engine:
             if 0 < short <= 0.11 * exp:
                 cash_item = cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)
                 exc = self.explain_short(it, t, it.open - cash_item, cash_item)
-                if exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
+                if exc in EXPLAINED_SHORTFALLS:
                     found.setdefault(exc, it)
-        for exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
+        for exc in EXPLAINED_SHORTFALLS:
             if exc in found:
                 return self.settle(t, [found[exc].id], f"party_short_{how}", f"contraparte {party}")
         for it in inv:
@@ -854,7 +875,8 @@ class Engine:
             if cat:
                 self.emit_cat(t, cat, "", why)
             elif t.amount > 0:
-                self.emit_cat(t, "UNIDENTIFIED", "UNIDENTIFIED", "fallback_receipt")
+                if not (duplicados.settle_duplicate(self, t) and len(self.rows) > n0):
+                    self.emit_cat(t, "UNIDENTIFIED", "UNIDENTIFIED", "fallback_receipt")
             else:
                 self.emit_cat(t, "BANK_FEES", "", "fallback_debit")
         return self.rows

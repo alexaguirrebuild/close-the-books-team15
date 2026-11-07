@@ -81,6 +81,9 @@ def report_broken_advices(eng):
     if broken:
         ejemplos = ", ".join(file for file, _ in broken[:5])
         print(f"  AVISO: {len(broken)} avisos de remesa no se han podido leer: {ejemplos}", flush=True)
+    empty = getattr(eng, "ra_empty", [])
+    if empty:
+        print(f"  AVISO: {len(empty)} avisos sin líneas: {', '.join(empty[:5])}", flush=True)
 
 
 def score(ph, sub_path, golden_path, since=None):
@@ -118,6 +121,7 @@ def main(argv=None):
     ap.add_argument("--since", help="holdout: solo movimientos desde esta fecha (YYYY-MM-DD)")
     ap.add_argument("--no-score", action="store_true")
     a = ap.parse_args(argv)
+    preflight.check_phase_inputs(a.phase, DATA)
     t0 = time.time()
     if a.phase == "holdout":
         a.since = a.since or "2025-01-01"
@@ -125,6 +129,7 @@ def main(argv=None):
     else:
         ph = Phase(a.phase)
     print(f"[{a.phase}] {len(ph.txns)} movimientos, {len(ph.items)} partidas · carga {time.time() - t0:.0f}s", flush=True)
+    print(f"  maestros: {ph.mdir} · remesas de pago {len(ph.runs)} · recibos {len(ph.dd)}", flush=True)
     eng = Engine(ph)
     rows = eng.run()
     report_broken_advices(eng)

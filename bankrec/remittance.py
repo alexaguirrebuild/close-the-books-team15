@@ -358,6 +358,7 @@ def prepare(engine):
             engine.ra_errors = getattr(engine, "ra_errors", []) + [(r["file"], repr(e))]
             continue
         if not adv["lines"]:
+            engine.ra_empty = getattr(engine, "ra_empty", []) + [r["file"]]
             continue
         adv["file"] = r["file"]
         adv["entity"] = r["entity"]
