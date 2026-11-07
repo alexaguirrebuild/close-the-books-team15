@@ -1,6 +1,6 @@
 # Cuadra
 
-Revisión de casaciones bancarias en el navegador: lee los CSV de una carpeta local, indexa con DuckDB-WASM y genera un `submission.csv` validado. Sin backend ni login. Los datos no salen del navegador.
+Revisión de conciliaciones bancarias en el navegador. Lee los datos de una carpeta local, indexa con DuckDB-WASM y comprueba el resultado con las reglas de `FORMAT.md`. Es para revisar, diagnosticar y hacer la demo: el envío de LIVE y FINAL sale del motor del equipo. Sin backend ni login: los datos no salen del navegador.
 
 ## Arrancar
 
@@ -11,79 +11,81 @@ npm run dev        # http://localhost:5173
 
 Usa Chrome o Edge: permiten elegir la carpeta y reabrirla. En otros navegadores se usa el selector de carpetas clásico.
 
-Para probarla sin datos reales, la pantalla inicial ofrece dos conjuntos inventados en `public/sample`, uno con golden y otro sin él. Se regeneran con `npm run sample`.
+Para probarla sin datos, la pantalla inicial ofrece dos conjuntos inventados en `public/sample`, con las mismas columnas que los reales, sin comprimir porque el pre-commit del equipo no admite `.csv.gz`. Se regeneran con `npm run sample`.
 
-## Qué poner en la carpeta
+## Qué carpeta elegir
 
-Se reconocen por nombre, en cualquier subcarpeta:
+La carpeta raíz, con las mismas reglas que el pipeline (`pipeline/bankrec/roots.py`). Cuadra detecta las fases y solo lee la que elijas:
 
-| Fichero | Uso |
-| --- | --- |
-| `bank_transactions.csv` | Obligatorio |
-| `ar_invoices.csv`, `ap_invoices.csv`, `credit_notes.csv` | Al menos uno |
-| `open_items_at_start.csv` | Si existe, marca qué partidas están abiertas |
-| `propuestas.csv` | Salida del pipeline batch |
-| `*golden*.csv`, `*ground_truth*.csv` | Si existe, activa la puntuación |
-| `masters/categories.csv`, `customers.csv`, `suppliers.csv`, `fx_rates.csv`, `payment_terms.csv` | Lista de category, nombres de tercero, conversión y descuentos |
-| `pdfs/*.pdf`, `pdfs_text.csv` | Documentos y su texto indexado |
-
-Los nombres de columna se resuelven por alias en `src/data/schema.ts`. Si falta una obligatoria, la pantalla de carga pide elegirla a mano.
-
-## Indexar los PDF
-
-```bash
-npm run pdf:index -- /ruta/a/la/carpeta
+```
+<raíz>/
+  live/  train/  final/  o  bankrec-docs-and-masters/sample/
+  masters/  o  bankrec-docs-and-masters/masters/
+  out/<fase>/                       lo que escribe el pipeline
 ```
 
-Extrae la capa de texto de `pdfs/` a `pdfs_text.csv`, sin OCR. Las páginas sin texto se listan en `pdfs_sin_texto.txt` para tratarlas una a una, por ejemplo con un LLM.
+`final/masters_final/` sustituye a los maestros generales en FINAL. También se puede elegir directamente una carpeta que sea un único conjunto de datos.
+
+### Propuestas
+
+Dentro de `out/<fase>/`, por este orden: `propuestas*`, el fichero fusionado (`submission*`), `baseline*` y, por último, una etapa suelta. Se puede cambiar en la pantalla de carga.
+
+El fichero fusionado solo lleva las cinco columnas oficiales: la confianza y el origen se toman de `out/<fase>/matches/*.csv.gz`, que el pipeline escribe con `bank_txn_id,item_id,amount,category,exception,source,confidence,advice_id,line_no`. También se lee una columna `reason` si existe.
+
+### Documentos
+
+```bash
+npm run pdf:index -- /ruta/a/live --out /ruta/a/out/live/pdfs_text.csv
+```
+
+Extrae la capa de texto de `pdfs/` y `remittance_advices/`, sin OCR. Con `--out` las carpetas de datos quedan tal como se entregaron.
+
+## Las tres pantallas
+
+- **Resumen**: qué queda por hacer y, con golden, la puntuación y en qué segmentos se pierden movimientos.
+- **Revisión**: la lista y el caso en la misma pantalla. La vista Prioridad ordena por lo que más puede subir la puntuación, que cuenta líneas, pares y excepciones raras, no dinero.
+- **Validar**: comprueba el formato oficial. Solo en TRAIN y `sample` descarga `submission_<fase>.csv.gz`; en LIVE, FINAL o una carpeta sin fase conocida no genera fichero de envío, y lo decidido se pasa con "Descargar mi revisión".
 
 ## Teclado
 
 Pulsa `?` dentro de la app para ver todos los atajos.
 
-| Tecla | Acción en la mesa |
+| Tecla | Acción |
 | --- | --- |
-| `Enter` | Confirmar y pasar al siguiente |
+| `Enter` | Confirmar y seguir. Si falta excepción, la pide |
+| `Shift`+`Enter` | Guardar sin excepción |
 | `1`–`9`, `↑` `↓` `Espacio` | Marcar partidas |
-| `A` `S` `D` | Aplicar una combinación que cuadra |
-| `F` | Cambiar a la partida más antigua (FIFO) |
-| `Tab` | Editar importes |
-| `E`, `G`, `U` | Excepción, category, UNIDENTIFIED |
-| `/`, `O` | Buscar partida, abrir PDF |
-| `J` `K`, `Z` | Saltar, deshacer |
-| `Alt`+`1`…`4` | Panel, cola, mesa, exportar |
+| `A` `S` `D`, `F`, `Tab` | Combinación que cuadra, la más antigua, importes |
+| `E`, `G`, `U` | Excepción, categoría, sin identificar |
+| `/`, `O`, `M` | Buscar partida, abrir documento, más partidas del tercero |
+| `J` `K` | Movimiento siguiente o anterior; el borrador se conserva |
+| `V`, `B`, `L` | Cambiar de vista, buscar movimiento, ocultar la lista |
+| `Shift`+`C` | Confirmar en lote, en la vista Listas |
+| `Z` | Deshacer |
+| `Alt`+`1`…`3` | Resumen, Revisión, Validar |
+
+## Reglas que aplica por ti
+
+Salen de `POLICIES.md` y están en `src/domain/policy.ts`.
+
+- El importe sigue a la excepción: `SHORT_*`, `FX_DIFFERENCE` y `OVERPAYMENT` liquidan el saldo entero; `PARTIAL` y `SHORT_DISPUTE`, lo pagado.
+- La excepción es de cada fila. Al aplicarla a toda la línea, los abonos quedan sin excepción.
+- Una línea lleva partidas o categoría, nunca ambas. `UNIDENTIFIED` es categoría y excepción a la vez.
+- No se ofrece una partida emitida después del movimiento; en las etiquetas nunca ocurre.
 
 ## Decisiones guardadas
 
-Cada decisión se añade a un registro en IndexedDB, asociado a la carpeta y al tamaño y fecha de `bank_transactions.csv`. Si cambia ese fichero, la revisión empieza de cero. Para repartir trabajo, cada persona usa "Descargar mi revisión" y otra "Importar revisión"; lo ya decidido no se pisa.
-
-## Supuestos que hay que contrastar
-
-El formato oficial no estaba disponible al construir esto, así que estos puntos son supuestos:
-
-**Puntuación (`src/domain/score.ts`).** Es un cálculo local de la fórmula publicada, no el scorer oficial. Contrasta `submission.csv` con él.
-
-- Allocation F1 compara pares (movimiento, partida) con importe dentro de max(0,01; 0,5 % del importe golden).
-- Una transacción es correcta si coinciden todas sus filas, su excepción y, sin partida, su category.
-- Exception macro-F1 se calcula por movimiento, sobre las clases que aparecen en golden o en el envío.
-
-**Exportación (`src/data/exportSubmission.ts`).**
-
-- Las filas sin partida llevan en `amount` el valor absoluto del movimiento.
-- `amount` conserva el signo que la partida tiene en su fichero.
-- En un pago corto, `amount` es lo pagado, no el saldo de la partida.
-- Las propuestas sin revisar se exportan por defecto; se puede cambiar en Exportar.
-
-**Otros.**
-
-- `fx_rates.csv`: 1 unidad de base equivale a `rate` unidades de quote; se usa el último tipo hasta la fecha del movimiento.
-- El tercero de un movimiento se deduce de la propuesta, del número impreso o del nombre en el concepto, porque el banco no lo trae como columna.
+Cada decisión se añade a un registro en IndexedDB, asociado a la carpeta, la fase y el tamaño y fecha de `bank_transactions`. Si cambia ese fichero, la revisión empieza de cero; si solo cambian las propuestas, se conserva. Para repartir trabajo, cada persona usa "Descargar mi revisión" y otra "Importar revisión"; lo ya decidido no se pisa.
 
 ## Pruebas
 
 ```bash
-npm test                          # unitarias e integración con DuckDB real
-PW_CHANNEL=chrome npm run test:e2e   # teclado real en Chrome
+npm test                               # unitarias e integración con DuckDB real
+PW_CHANNEL=chrome npm run test:e2e     # teclado real en Chrome
+
+# Con los datos reales, que no están en el repositorio:
+BANKREC_DATA_ROOT=/ruta/raiz npx vitest run src/data/real.test.ts
+BANKREC_DATA_ROOT=/ruta/raiz BANKREC_PHASE=live PW_CHANNEL=chrome npx playwright test -g "real data"
 ```
 
-Para medir a escala: `node scripts/gen-sample.mjs --out public/sample/big --txns 1500000 --items 5500000 --golden`, y abre `/?demo=big&autoload=1`. Bórralo antes de compilar.
+`real.test.ts` pasa el envío por `starter/bankrec_score.py`: el fichero debe ser válido y la puntuación, el diagnóstico y los segmentos de Cuadra deben coincidir con los oficiales. Sin `BANKREC_DATA_ROOT` se omite.
