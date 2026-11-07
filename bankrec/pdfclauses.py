@@ -88,6 +88,16 @@ def _extract_many(paths):
         return [_extract(p) for p in paths]
 
 
+def _report_unread(pdir: Path, unread: list[str]) -> None:
+    """Un PDF que falta no es un PDF ilegible: `train-lite` trae solo una parte de los del índice, y el arreglo es descargar."""
+    absent = sum(1 for f in unread if not (pdir / f).exists())
+    if absent:
+        print(f"  AVISO: {absent} PDF del índice no están en disco en {pdir}: se pierden sus cláusulas. "
+              "Si es train-lite, descarga el train completo: python scripts/download.py train", flush=True)
+    if len(unread) > absent:
+        print(f"  AVISO: {len(unread) - absent} PDF sin texto legible en {pdir}: se pierden sus cláusulas", flush=True)
+
+
 def _load_texts(pdir: Path, phase: str, wanted: list[str]):
     """Devuelve {file: texto} para los ficheros pedidos, con caché en out/pdf_text_<fase>.json."""
     cache_path = OUT / f"pdf_text_{phase}.json"
@@ -102,9 +112,7 @@ def _load_texts(pdir: Path, phase: str, wanted: list[str]):
     missing = [f for f in wanted if f not in cache]
     if missing:
         texts = _extract_many([str(pdir / f) for f in missing])
-        unread = sum(1 for tx in texts if not tx)
-        if unread:
-            print(f"  AVISO: {unread} PDF sin texto legible en {pdir}: se pierden sus cláusulas", flush=True)
+        _report_unread(pdir, [f for f, tx in zip(missing, texts) if not tx])
         for f, tx in zip(missing, texts):
             if tx:
                 cache[f] = tx

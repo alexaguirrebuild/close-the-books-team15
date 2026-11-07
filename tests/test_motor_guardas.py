@@ -221,13 +221,38 @@ class TestCacheDePdf:
 
         assert json.loads((tmp_path / "pdf_text_final.json").read_text(encoding="utf-8")) == {}
 
-    def test_avisa_de_cuantos_pdf_quedan_sin_texto(self, tmp_path, monkeypatch, capsys):
+    def test_avisa_de_cuantos_pdf_estan_en_disco_y_no_dan_texto(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setattr(pdfclauses, "OUT", tmp_path)
-        monkeypatch.setattr(pdfclauses, "_extract_many", lambda paths: ["" for _ in paths])
+        monkeypatch.setattr(pdfclauses, "_extract_many", lambda rutas: ["" for _ in rutas])
+        (tmp_path / "a.pdf").write_bytes(b"x")
+        (tmp_path / "b.pdf").write_bytes(b"x")
 
-        pdfclauses._load_texts(Path("/pdfs"), "final", ["a.pdf", "b.pdf"])
+        pdfclauses._load_texts(tmp_path, "final", ["a.pdf", "b.pdf"])
 
-        assert "2 PDF" in capsys.readouterr().out
+        salida = capsys.readouterr().out
+        assert "2 PDF sin texto legible" in salida
+        assert "no están en disco" not in salida
+
+    def test_un_pdf_que_no_esta_en_disco_no_se_cuenta_como_ilegible(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(pdfclauses, "OUT", tmp_path)
+        monkeypatch.setattr(pdfclauses, "_extract_many", lambda rutas: ["" for _ in rutas])
+        (tmp_path / "a.pdf").write_bytes(b"x")
+
+        pdfclauses._load_texts(tmp_path, "train", ["a.pdf", "no-esta-1.pdf", "no-esta-2.pdf"])
+
+        salida = capsys.readouterr().out
+        assert "2 PDF del índice no están en disco" in salida
+        assert "train completo" in salida
+        assert "1 PDF sin texto legible" in salida
+
+    def test_sin_faltantes_no_avisa(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(pdfclauses, "OUT", tmp_path)
+        monkeypatch.setattr(pdfclauses, "_extract_many", lambda rutas: ["texto" for _ in rutas])
+        (tmp_path / "a.pdf").write_bytes(b"x")
+
+        pdfclauses._load_texts(tmp_path, "final", ["a.pdf"])
+
+        assert "AVISO" not in capsys.readouterr().out
 
 
 class TestDeterminismo:
