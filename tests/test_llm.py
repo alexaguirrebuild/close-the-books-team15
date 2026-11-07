@@ -1,5 +1,7 @@
 """Cliente de la API y lectura de PDF con modelo: apagado por defecto, con tope, con caché y sin fiarse de lo que no esté en el texto."""
+import io
 import json
+import urllib.error
 
 import pytest
 
@@ -24,6 +26,8 @@ def api(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "clave-de-prueba")
     monkeypatch.setattr(llm, "CACHE", tmp_path / "cache")
     monkeypatch.setattr(llm, "calls", 0)
+    monkeypatch.setattr(llm, "asked", 0)
+    monkeypatch.setattr(llm, "down", False)
     sent = Sent()
 
     def post(payload, key):
@@ -76,10 +80,78 @@ class TestCliente:
         monkeypatch.setattr(llm, "_post", boom)
         assert llm.ask("x") is None
 
-    def test_el_motivo_del_fallo_se_recuerda_sin_la_clave(self, api, monkeypatch):
-        import io
-        import urllib.error
+    def test_dos_ejecuciones_responden_a_las_mismas_preguntas(self, api, monkeypatch):
+        monkeypatch.setenv("BANKREC_LLM_MAX_CALLS", "2")
+        api.reply = "respuesta"
 
+        def ejecucion():
+            monkeypatch.setattr(llm, "asked", 0)
+            monkeypatch.setattr(llm, "calls", 0)
+            return [llm.ask(pregunta) for pregunta in ("a", "b", "c")]
+
+        primera = ejecucion()
+        assert primera == ["respuesta", "respuesta", None]
+        assert ejecucion() == primera
+
+    def test_una_respuesta_de_la_cache_tambien_gasta_tope(self, api, monkeypatch):
+        monkeypatch.setenv("BANKREC_LLM_MAX_CALLS", "1")
+        assert llm.ask("a") is not None
+        assert llm.ask("a") is None
+        assert len(api) == 1
+
+    @pytest.mark.parametrize("tope", ["", "abc"])
+    def test_un_tope_mal_escrito_vale_como_el_de_por_defecto(self, api, monkeypatch, tope):
+        monkeypatch.setenv("BANKREC_LLM_MAX_CALLS", tope)
+        assert llm.ask("a") is not None
+
+    @pytest.mark.parametrize("fallo", [OSError("sin red"), TimeoutError("colgada"), urllib.error.URLError("sin ruta")])
+    def test_tras_un_fallo_de_red_no_se_vuelve_a_llamar(self, api, monkeypatch, fallo):
+        intentos = []
+
+        def sin_red(*a):
+            intentos.append(a)
+            raise fallo
+        monkeypatch.setattr(llm, "_post", sin_red)
+        assert [llm.ask(pregunta) for pregunta in "abcde"] == [None] * 5
+        assert len(intentos) == 1
+
+    def test_tras_un_fallo_de_red_la_cache_sigue_respondiendo(self, api, monkeypatch):
+        api.reply = "guardada"
+        assert llm.ask("a") == "guardada"
+
+        def sin_red(*a):
+            raise TimeoutError("colgada")
+        monkeypatch.setattr(llm, "_post", sin_red)
+        assert llm.ask("b") is None
+        assert llm.ask("a") == "guardada"
+
+    @pytest.mark.parametrize("codigo", [401, 500])
+    def test_un_error_http_no_apaga_el_modelo(self, api, monkeypatch, codigo):
+        def rechaza(*a):
+            raise urllib.error.HTTPError("u", codigo, "error", {}, io.BytesIO(b"{}"))
+        monkeypatch.setattr(llm, "_post", rechaza)
+        assert llm.ask("a") is None
+        monkeypatch.setattr(llm, "_post", lambda *a: {"content": [{"type": "text", "text": "ya"}]})
+        assert llm.ask("b") == "ya"
+
+    def test_una_respuesta_que_no_es_json_no_apaga_el_modelo(self, api, monkeypatch):
+        def ilegible(*a):
+            raise ValueError("no es JSON")
+        monkeypatch.setattr(llm, "_post", ilegible)
+        assert llm.ask("a") is None
+        monkeypatch.setattr(llm, "_post", lambda *a: {"content": [{"type": "text", "text": "ya"}]})
+        assert llm.ask("b") == "ya"
+
+    def test_un_fallo_al_escribir_la_cache_no_apaga_el_modelo_ni_paga_dos_veces(self, api, monkeypatch, tmp_path):
+        ocupado = tmp_path / "es-un-fichero"
+        ocupado.write_text("x")
+        monkeypatch.setattr(llm, "CACHE", ocupado / "cache")
+        assert llm.ask("a") is None
+        assert len(api) == 1
+        monkeypatch.setattr(llm, "CACHE", tmp_path / "cache")
+        assert llm.ask("b") is not None
+
+    def test_el_motivo_del_fallo_se_recuerda_sin_la_clave(self, api, monkeypatch):
         def denied(*a):
             raise urllib.error.HTTPError("u", 401, "Unauthorized", {}, io.BytesIO(b'{"error": {"type": "authentication_error", "message": "invalid x-api-key"}}'))
         monkeypatch.setattr(llm, "_post", denied)
