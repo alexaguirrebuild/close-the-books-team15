@@ -26,3 +26,18 @@ cache/
 .DS_Store
 .claude-flow/
 /bankrec-docs-and-masters/sample/
+
+# Pipeline bankrec: almacén e informes
+/out/
+*.duckdb
+*.duckdb.tmp*
+.pytest_cache/
+.coverage
+
+# Ruido de hooks locales
+.swarm/
+ruvector.db
+agentdb.rvf*
+.claude/settings.local.json
+.claude/proven-config.json
+.claude/.proven-config-version
