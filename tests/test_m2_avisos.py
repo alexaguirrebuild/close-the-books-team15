@@ -54,6 +54,18 @@ class TestPrepare:
 
         assert set(engine.m2_rows) == {"T1"}
 
+    def test_ignora_filas_con_confianza_menor_que_uno(self, fichero):
+        escribe(
+            fichero,
+            ["T1", "ARI-1", "100.00", "", "", "m2", "1.0", "A", "1"],
+            ["T2", "ARI-2", "200.00", "", "", "m2", "0.8", "B", "1"],
+        )
+        engine = motor("live")
+
+        m2_avisos.prepare(engine)
+
+        assert set(engine.m2_rows) == {"T1"}
+
     def test_en_live_y_final_sin_fichero_para_el_motor(self, fichero):
         with pytest.raises(SystemExit) as parada:
             m2_avisos.prepare(motor("live"))

@@ -33,7 +33,7 @@ def prepare(engine) -> None:
         return
     grouped = defaultdict(list)
     for row in rows(path):
-        if row["item_id"]:
+        if row["item_id"] and float(row.get("confidence") or 1) >= 1.0:
             grouped[row["bank_txn_id"]].append(row)
     engine.m2_rows = dict(grouped)
     print(f"  avisos enlazados: {len(grouped)} movimientos · {path}", flush=True)

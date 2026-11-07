@@ -45,7 +45,7 @@ class ControlResult:
 
 
 def _plain_number(text: str) -> str:
-    """Whichever separator comes last is the decimal one; a lone comma before 3 digits groups thousands."""
+    """Whichever separator comes last is the decimal one; a lone comma or dot before 3 digits groups thousands."""
     last_comma, last_dot = text.rfind(","), text.rfind(".")
     if last_comma >= 0 and last_dot >= 0:
         decimal_mark, group_mark = (",", ".") if last_comma > last_dot else (".", ",")
@@ -55,8 +55,10 @@ def _plain_number(text: str) -> str:
         if digits_after == THOUSANDS_DIGITS or text.count(",") > 1:
             return text.replace(",", "")
         return text.replace(",", ".")
-    if text.count(".") > 1:
-        return text.replace(".", "")
+    if last_dot >= 0:
+        digits_after = len(text) - last_dot - 1
+        if digits_after == THOUSANDS_DIGITS or text.count(".") > 1:
+            return text.replace(".", "")
     return text
 
 

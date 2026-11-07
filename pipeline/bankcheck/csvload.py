@@ -118,9 +118,9 @@ def _report_bad_values(ctx: IngestContext, spec: CsvSpec) -> None:
 
 
 def _record_files(ctx: IngestContext, spec: CsvSpec, paths: Sequence[Path], segment_of: SegmentOf) -> None:
-    rows = dict(ctx.con.execute("SELECT filename, count(*) FROM _raw GROUP BY 1").fetchall())
+    rows = dict(ctx.con.execute(r"SELECT replace(filename, '\', '/'), count(*) FROM _raw GROUP BY 1").fetchall())
     for path in paths:
-        count = rows.get(str(path), 0)
+        count = rows.get(path.as_posix(), rows.get(str(path), 0))
         ctx.manifest.add(FileRecord(ctx.layout.relative(path), spec.source_type, segment_of(path), path.stat().st_size, count, "ok"))
         if not count:
             ctx.issues.warn("EMPTY_FILE", spec.source_type, "fichero sin filas", file=ctx.layout.relative(path))
@@ -128,7 +128,8 @@ def _record_files(ctx: IngestContext, spec: CsvSpec, paths: Sequence[Path], segm
 
 def _typed_select(spec: CsvSpec, root: Path) -> str:
     casts = [f"TRY_CAST({name} AS {spec.typed[name]}) AS {name}" if name in spec.typed else name for name in spec.columns]
-    source = f"replace(filename, {lit(str(root) + '/')}, '') AS src_file"
+    prefix = lit(root.as_posix().rstrip("/") + "/")
+    source = rf"replace(replace(filename, '\', '/'), {prefix}, '') AS src_file"
     return ", ".join([*casts, source])
 
 

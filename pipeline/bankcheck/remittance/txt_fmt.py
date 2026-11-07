@@ -6,10 +6,10 @@ from decimal import Decimal
 
 from .common import Advice, AdviceLine, clean, parse_amount, parse_date
 
-SUBJECT = re.compile(r"^Subject:\s*(?:Payment advice|Aviso de pago)\s+(.+?)\s*$", re.MULTILINE)
-SENTENCE_EN = re.compile(r"payment of\s+(-?[\d.,]+)\s+([A-Z]{3})\s+on\s+(\d{2}/\d{2}/\d{4})")
-SENTENCE_ES = re.compile(r"importe de\s+(-?[\d.,]+)\s+([A-Z]{3})\s+con fecha\s+(\d{2}/\d{2}/\d{4})")
-TABLE_LINE = re.compile(r"^\s{2,}(\S+)\s+(\d{2}/\d{2}/\d{2,4})\s+(-?[\d.,]+)(?:\s+(-?[\d.,]+)\s*(.*?))?\s*$")
+SUBJECT = re.compile(r"^Subject:\s*(?:Payment advice|Aviso de pago|Avis de paiement|Zahlungsavis)?\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
+SENTENCE_EN = re.compile(r"payment of\s+(-?[\d.,]+)\s+([A-Z]{3})(?:\s+on\s+(\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2}))?", re.IGNORECASE)
+SENTENCE_ES = re.compile(r"importe de\s+(-?[\d.,]+)\s+([A-Z]{3})(?:\s+con fecha\s+(\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2}))?", re.IGNORECASE)
+TABLE_LINE = re.compile(r"^\s*((?=.*\d)\S+)\s+(\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2})\s+(-?[\d.,]+)(?:\s+(-?[\d.,]+)\s*(.*?))?\s*$")
 
 
 def _line(match: re.Match[str]) -> AdviceLine:
@@ -38,17 +38,15 @@ def parse_txt_advice(text: str) -> Advice:
     lines: list[AdviceLine] = []
     problems: list[str] = []
     for number, raw in enumerate(text.splitlines(), start=1):
-        if not raw.startswith("  "):
-            continue
         match = TABLE_LINE.match(raw)
         if match:
             lines.append(_line(match))
-        else:
+        elif raw.startswith(("  ", "\t")) and raw.strip():
             problems.append(f"línea {number} sin leer: {raw.strip()[:60]}")
     return Advice(
         payment_ref=subject.group(1) if subject else None,
-        payment_date=parse_date(sentence.group(3), month_first=english is not None),
-        currency=sentence.group(2),
+        payment_date=parse_date(sentence.group(3), month_first=english is not None) if sentence.group(3) else None,
+        currency=sentence.group(2).upper(),
         control_amount=parse_amount(sentence.group(1)),
         layout="txt_en" if english else "txt_es",
         lines=tuple(lines),
