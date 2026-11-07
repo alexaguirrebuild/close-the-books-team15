@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..roots import PHASES, DataRootNotFound, Layout, resolve_layout
+from ..roots import DATA_DIRNAME, PHASES, DataRootNotFound, Layout, resolve_layout
 from .baseline import write_baseline
 from .official import SCORER_SHA256
 from .score import PHASES_WITH_GOLDEN, golden_as_submission, print_score, score_submission_file
@@ -158,7 +158,8 @@ def _render_markdown(report: dict) -> str:
 
 
 def _reports_folder(root: Path) -> Path:
-    return root / "out" / "verification"
+    project = root.parent if root.name == DATA_DIRNAME else root  # out/ vive fuera de data/, como en resolve_layout.
+    return project / "out" / "verification"
 
 
 def _clear_reports(root: Path) -> None:

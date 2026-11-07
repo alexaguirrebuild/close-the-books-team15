@@ -10,6 +10,7 @@ from bankcheck.roots import resolve_layout
 from bankcheck.submission import verify as verify_module
 from bankcheck.submission.score import score_submission_file
 from bankcheck.submission.validate import validate_submission
+from bankcheck.submission.verify import _reports_folder as verify_reports_folder
 from bankcheck.submission.verify import EXIT_OK, EXIT_PROBLEMS, main
 
 T1, T2, T3 = "BT-2025-0000001", "BT-2025-0000002", "BT-2025-0000003"
@@ -229,3 +230,9 @@ class TestAgainstTheRealSample:
         assert result["score"] == 100.0
         assert report["ok"] is True
         assert not report["warnings"]
+
+
+def test_with_a_data_folder_the_reports_go_to_the_project_out_folder(tmp_path: Path) -> None:
+    """roots.py keeps out/ and cache/ outside data/; the verification report must land next to them."""
+    assert verify_reports_folder(tmp_path / "data") == tmp_path / "out" / "verification"
+    assert verify_reports_folder(tmp_path / "repo") == tmp_path / "repo" / "out" / "verification"
