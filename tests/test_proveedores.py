@@ -126,6 +126,69 @@ class TestNoCambiaLoQueYaFunciona:
         assert eng.run_doc_item(doc(), cargo()) is None
 
 
+def motor_por_tercero(items, party_by_iban=None, names=None):
+    """Motor con índice por tercero, como Phase.by_party."""
+    eng = motor(items, party_by_iban=party_by_iban, names=names)
+    by_party = {}
+    for it in items:
+        by_party.setdefault(it.party, []).append(it.id)
+    eng.ph.by_party = by_party
+    return eng
+
+
+class TestNumeroCorto:
+    """Facturas de proveedor con número de 2-3 dígitos («556»): num_variants no genera ninguna variante (exige 4),
+    así que el documento de la remesa se saltaba en silencio. En el holdout, 540 pares. POLICIES §5.3: el cargo
+    de la remesa liquida sus documentos. Evidencia exigida: tercero del beneficiario + número idéntico + única."""
+
+    def test_numero_corto_del_tercero_del_beneficiario(self):
+        it = factura("API-2025-0000001", numero="556", party="S1", cents=12345)
+        eng = motor_por_tercero([it], names={"Valves Coral Bay": "S1"})
+        r = doc(numero="556", importe="123.45", beneficiario="Valves Coral Bay")
+        assert eng.run_doc_item(r, cargo()).id == it.id
+
+    def test_por_iban_del_beneficiario(self):
+        it = factura("API-2025-0000001", numero="88", party="S1")
+        eng = motor_por_tercero([it], party_by_iban={"AU1234": "S1"})
+        assert eng.run_doc_item(doc(numero="88", iban="AU 1234"), cargo()).id == it.id
+
+    def test_no_fuerza_sin_tercero_identificado(self):
+        it = factura("API-2025-0000001", numero="556", party="S1")
+        eng = motor_por_tercero([it], names={})
+        assert eng.run_doc_item(doc(numero="556", beneficiario="Desconocido"), cargo()) is None
+
+    def test_no_fuerza_la_de_otro_tercero(self):
+        ajena = factura("API-2025-0000001", numero="556", party="S2")
+        eng = motor_por_tercero([ajena], names={"Valves Coral Bay": "S1"})
+        assert eng.run_doc_item(doc(numero="556", beneficiario="Valves Coral Bay"), cargo()) is None
+
+    def test_no_fuerza_un_numero_distinto(self):
+        it = factura("API-2025-0000001", numero="557", party="S1")
+        eng = motor_por_tercero([it], names={"Valves Coral Bay": "S1"})
+        assert eng.run_doc_item(doc(numero="556", beneficiario="Valves Coral Bay"), cargo()) is None
+
+    def test_dos_del_mismo_numero_decide_el_importe_exacto(self):
+        a = factura("API-2024-0000001", numero="556", party="S1", cents=50000)
+        b = factura("API-2025-0000002", numero="556", party="S1", cents=12345)
+        eng = motor_por_tercero([a, b], names={"Valves Coral Bay": "S1"})
+        r = doc(numero="556", importe="123.45", beneficiario="Valves Coral Bay")
+        assert eng.run_doc_item(r, cargo()).id == b.id
+
+    def test_dos_del_mismo_numero_sin_importe_exacto_no_responde(self):
+        a = factura("API-2024-0000001", numero="556", party="S1", cents=50000)
+        b = factura("API-2025-0000002", numero="556", party="S1", cents=60000)
+        eng = motor_por_tercero([a, b], names={"Valves Coral Bay": "S1"})
+        r = doc(numero="556", importe="123.45", beneficiario="Valves Coral Bay")
+        assert eng.run_doc_item(r, cargo()) is None
+
+    def test_un_abono_corto_solo_con_documento_de_abono(self):
+        abono = factura("APC-2025-0000001", numero="77", party="S1", kind="APC")
+        eng = motor_por_tercero([abono], names={"Valves Coral Bay": "S1"})
+        assert eng.run_doc_item(doc(numero="77", beneficiario="Valves Coral Bay"), cargo()) is None
+        r = doc(numero="77", beneficiario="Valves Coral Bay", tipo="CREDIT_NOTE")
+        assert eng.run_doc_item(r, cargo()).id == abono.id
+
+
 class TestDerivaDeFinal:
     """POLICIES §6: Moncayo pasa de Norma 43 a camt.053 (2025-10-01) y en 2026 llega ZA01 con numeración «KWI…».
     Textos reales de LIVE: el cargo de confirming debe seguir encontrando su remesa en los dos formatos."""
