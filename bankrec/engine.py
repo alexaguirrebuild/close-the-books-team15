@@ -564,7 +564,8 @@ class Engine:
         best = max(scored.values(), default=0)
         if not best:
             return []
-        return [p for p, v in sorted(scored.items(), key=lambda x: -x[1]) if v >= best - 5]
+        # desempate por id: sin él, el orden de un set de str cambia con PYTHONHASHSEED (sample 83,77-83,84 según semilla)
+        return [p for p, v in sorted(scored.items(), key=lambda x: (-x[1], x[0])) if v >= best - 5]
 
     def resolve_name(self, raw):
         c = self.resolve_names(raw)
