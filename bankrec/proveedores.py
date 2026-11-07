@@ -182,9 +182,8 @@ def _wrap_dd_batch(engine) -> None:
       mandato, que elige la cuota MÁS ANTIGUA abierta del mismo importe. Se busca el sufijo citado entre las
       partidas del cliente del mandato, con candidata única.
     - Re-presentado (re_presentation=Y): liquida la misma factura aunque figure cerrada (devolución no vista)."""
-    orig_item_by_number = engine.item_by_number
     orig_dd_batch = engine.m_dd_batch
-    current = {"rows": None}
+    current = {"rows": None, "prev": None}  # prev: item_by_number vigente al entrar (puede ser de otro plugin)
 
     def receipts_citing(number):
         return [r for r in current["rows"] or () if r.get("remittance_info") == number]
@@ -212,7 +211,7 @@ def _wrap_dd_batch(engine) -> None:
         return cands[0] if len(cands) == 1 else None
 
     def item_by_number(number, entity=None, party=None, kinds=None, amount=None):
-        it = orig_item_by_number(number, entity, party=party, kinds=kinds, amount=amount)
+        it = current["prev"](number, entity, party=party, kinds=kinds, amount=amount)
         receipts = receipts_citing(number)
         if it is None and receipts:
             it = by_cited_suffix(number, receipts, kinds, amount)
@@ -223,13 +222,16 @@ def _wrap_dd_batch(engine) -> None:
 
     def m_dd_batch(t):
         rows = [r for bid in DD_BATCH_ID.findall(t.up or "") for r in engine.dd_batches.get(bid, ())]
-        current["rows"] = rows or None
-        engine.item_by_number = item_by_number if rows else orig_item_by_number
+        if not rows:
+            return orig_dd_batch(t)
+        prev = engine.item_by_number  # el vigente ahora: si otro plugin lo envolvió después, se respeta y se restaura
+        current["rows"], current["prev"] = rows, prev
+        engine.item_by_number = item_by_number
         try:
             return orig_dd_batch(t)
         finally:
-            engine.item_by_number = orig_item_by_number
-            current["rows"] = None
+            engine.item_by_number = prev
+            current["rows"] = current["prev"] = None
 
     engine.m_dd_batch = m_dd_batch
 

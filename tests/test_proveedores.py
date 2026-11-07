@@ -785,3 +785,24 @@ class TestIntegridadDelPlugin:
         assert proveedores.DD_BATCH_ID.findall("X 1234567890123 Y") == []
         assert proveedores.CHEQUE_DEPOSIT_ID.findall("REMISE DE CHEQUES RCH25033102694 4 CHQ") == ["RCH25033102694"]
         assert proveedores.CHEQUE_DEPOSIT_ID.findall("DEPOSIT LBX20250331 | ABCLBX20250331") == ["LBX20250331"]
+
+
+class TestConvivenciaConOtrosPlugins:
+    """Los plugins posteriores (mismo_importe, nombres_cortados, cobros_cortos…) pueden envolver los mismos métodos.
+    m_dd_batch sustituye item_by_number mientras procesa una remesa: al acabar debe dejar el que había EN ESE
+    MOMENTO, no el que guardó al preparar (borraría la envoltura del plugin posterior)."""
+
+    def test_la_envoltura_de_un_plugin_posterior_sobrevive_a_una_remesa(self):
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=21175)
+        eng = motor_adeudos([citada], [recibo("FV25-0631481")])
+        llamadas = []
+        previo = eng.item_by_number
+
+        def de_otro_plugin(*a, **k):
+            llamadas.append(a[0])
+            return previo(*a, **k)
+
+        eng.item_by_number = de_otro_plugin  # un plugin cargado después de proveedores
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert eng.item_by_number is de_otro_plugin
+        assert llamadas == ["FV25-0631481"]  # y durante la remesa también se usó
