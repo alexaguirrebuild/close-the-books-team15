@@ -71,3 +71,47 @@ def test_abono_de_otra_sociedad_no_se_usa():
     eng = engine([item("INV", "ARI", 10000), item("N1", "ARC", 1000), item("N2", "ARC", 1500), other])
     eng.settle(movement(5500), ["INV"], "refs", party="C1")
     assert "N3" not in {r.item for r in eng.rows}
+
+
+# --- referencias truncadas: lo citado no explica todo el cobro (POLICIES §2, abono compensado, y §1 un cobro liquida varias partidas)
+def _base():
+    return [item("A", "ARI", 93376), item("B", "ARI", 236194), item("C", "ARI", 209354), item("D", "ARI", 500000),
+            item("N", "ARC", 20935)]
+
+
+def test_completa_lo_citado_con_el_resto_exacto_y_un_abono():
+    eng = engine(_base())
+    assert eng.settle(movement(517989), ["A"], "ref", party="C1")   # 933,76 + 2361,94 + 2093,54 - 209,35
+    assert paid(eng) == {("A", ""), ("B", ""), ("C", ""), ("N", "")}
+
+
+def test_completa_sin_abono_si_solo_hay_facturas():
+    eng = engine([i for i in _base() if i.id != "N"])
+    assert eng.settle(movement(538924), ["A"], "ref", party="C1")   # A + B + C
+    assert paid(eng) == {("A", ""), ("B", ""), ("C", "")}
+
+
+def test_no_completa_si_hay_dos_soluciones():
+    eng = engine(_base() + [item("C2", "ARI", 209354)])
+    eng.settle(movement(538924), ["A"], "ref", party="C1")
+    assert {r.item for r in eng.rows} == {"A"}
+
+
+def test_no_completa_si_nada_cuadra():
+    eng = engine(_base())
+    eng.settle(movement(539999), ["A"], "ref", party="C1")
+    assert {r.item for r in eng.rows} == {"A"}
+
+
+def test_no_completa_con_facturas_de_otra_sociedad():
+    other = item("C", "ARI", 209354)
+    other.entity = "DE01"
+    eng = engine([item("A", "ARI", 93376), item("B", "ARI", 236194), other])
+    eng.settle(movement(538924), ["A"], "ref", party="C1")
+    assert "C" not in {r.item for r in eng.rows}
+
+
+def test_sin_sobrante_no_toca_nada():
+    eng = engine(_base())
+    assert eng.settle(movement(93376), ["A"], "ref", party="C1")
+    assert {r.item for r in eng.rows} == {"A"}
