@@ -159,6 +159,7 @@ def _render_markdown(report: dict) -> str:
 
 
 def _reports_folder(root: Path) -> Path:
+    """The reports go to out/verification of the project, outside data/."""
     absolute = Path(os.path.abspath(root))  # `--data-root .` no tiene nombre. abspath no sigue enlaces, y data/ puede serlo.
     project = absolute.parent if absolute.name == DATA_DIRNAME else absolute  # out/ vive fuera de data/, como en resolve_layout.
     return project / "out" / "verification"

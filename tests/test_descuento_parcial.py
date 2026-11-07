@@ -9,6 +9,7 @@ TERMS = {"T10": {"early_payment_discount_pct": "2", "discount_days": "10"}, "T30
 
 
 def motor(*items) -> Engine:
+    """Motor mínimo con estas partidas, sin cargar ninguna fase."""
     engine = Engine.__new__(Engine)
     engine.ph = SimpleNamespace(terms=TERMS, party_country={}, fx=None)
     engine.items = {i.id: i for i in items}

@@ -215,6 +215,7 @@ class TestSelfCheck:
 class TestAgainstTheRealSample:
     @pytest.fixture
     def sample(self):
+        """The real sample phase; skipped when its data or its warehouse is missing."""
         try:
             layout = resolve_layout("sample", data_root=REPO_ROOT)
         except DataRootNotFound:

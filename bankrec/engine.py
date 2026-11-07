@@ -76,6 +76,7 @@ PLUGIN_ORDER = (("m2_avisos", "mismo_importe"),)
 
 
 def load_plugins(names: str) -> list:
+    """Los módulos de los plugins pedidos, tras comprobar que su orden funciona (`PLUGIN_ORDER`)."""
     requested = [n for n in names.split(",") if n]
     for first, then in PLUGIN_ORDER:
         if first in requested and then in requested and requested.index(first) > requested.index(then):
@@ -111,6 +112,7 @@ MAX_SUBSET_ITEMS = 14
 
 class Engine:
     def __init__(self, ph: Phase):
+        """Índices de la fase, estado de las partidas y plugins en el orden de `BANKREC_PLUGINS`."""
         self.ph = ph
         self.items = ph.items
         self.rows: list[Row] = []
@@ -183,6 +185,7 @@ class Engine:
         return terms[0]
 
     def discount_ok(self, it, t, cash_item):
+        """`SHORT_DISCOUNT` si el cobro es el importe con descuento y llega a plazo, `LATE` si llega tarde; None si es otro importe."""
         terms = self._discount_terms(it)
         if not terms or abs(cash_item - terms[0]) > 2:
             return None
@@ -832,6 +835,7 @@ class Engine:
         return self._unique_completion(others, missing, MAX_COMPLETION_ITEMS, t) or self._complete_with_due(t, cited, others, missing)
 
     def _unique_completion(self, candidates, missing, max_candidates, t):
+        """Las candidatas que suman lo que falta, solo si la combinación es única; si no, None."""
         if not candidates or len(candidates) > max_candidates:
             return None
         values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in candidates]

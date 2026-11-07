@@ -27,6 +27,7 @@ def movement(amount=CASH, up=""):
 
 
 def engine(items, named=("C1",), scanned=()):
+    """Motor con `settle` simulado: registra lo que se elige."""
     eng = Engine.__new__(Engine)
     by_party = {}
     for item in sorted(items, key=lambda i: (i.issue, i.id)):
@@ -92,9 +93,11 @@ class TestMesDeServicio:
     ISSUES = {"FEB": dt.date(2025, 2, 3), "MAR": dt.date(2025, 3, 3), "ABR": dt.date(2025, 4, 3)}
 
     def cuotas(self, party="C1"):
+        """Las cuotas del mismo importe, una por mes de emisión."""
         return [invoice(name, party=party, issue=issue) for name, issue in self.ISSUES.items()]
 
     def elegida(self, up, items=None, **kwargs):
+        """La partida que elige el motor para un cobro con ese texto."""
         eng = engine(items if items is not None else self.cuotas(), **kwargs)
         assert eng.m_party_amount(movement(up=up))
         return eng.settled[0][0]
@@ -150,6 +153,7 @@ class TestAvisoConParcial:
     """La factura que queda abierta se paga al 40, 50 o 60 %: 56 de 56 avisos de ar_n_to_m en el holdout."""
 
     def preparado(self, lines, cash=7000, items=None):
+        """Motor con estas líneas de aviso ya pasadas por `prepare`."""
         eng = Engine.__new__(Engine)
         known = items if items is not None else [invoice(line["item_id"], cents=int(round(float(line["amount"]) * 100))) for line in lines]
         eng.items = {item.id: item for item in known}
@@ -233,6 +237,7 @@ def motor_real(items):
 
 
 def filas(eng):
+    """Las filas emitidas en orden estable: (partida, importe, excepción)."""
     return sorted((row.item, row.amount, row.exception) for row in eng.rows)
 
 

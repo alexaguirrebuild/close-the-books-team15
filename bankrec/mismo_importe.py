@@ -26,6 +26,7 @@ MAX_PARTIAL_CANDIDATES = 18
 
 
 def prepare(engine) -> None:
+    """Envuelve las reglas del motor y marca las parciales de los avisos. Va detrás de `m2_avisos`: lo exige `load_plugins`."""
     engine._party_amount = partial(_party_amount, engine, engine._party_amount)
     engine._party_rescue = partial(_party_rescue, engine, engine._party_rescue)
     engine.settle = partial(_settle, engine, engine.settle)
@@ -48,10 +49,12 @@ def _line_cents(line: dict) -> int:
 
 
 def _is_receivable_in(item, t) -> bool:
+    """Partida de cobro en la divisa del movimiento. Evita llamar a `engine.sign` con una de otro lado, que lanza KeyError."""
     return bool(item) and item.kind in RECEIVABLE_KINDS and item.ccy == t.ccy
 
 
 def _emit_with_partial(engine, t, full: list, partial_item, paid: int, rule: str, evidence: str) -> bool:
+    """Las enteras salen por su saldo y la parcial por lo que llegó."""
     for item in full:
         engine.emit(t, item, item.open, "", rule, evidence)
     engine.emit(t, partial_item, paid, "PARTIAL", rule, evidence)
@@ -82,6 +85,7 @@ def _partial_solutions(invoices: list, cash: int) -> list[tuple]:
 
 
 def _due_invoices(engine, party, t) -> list:
+    """Facturas abiertas del cliente en la divisa del cobro, vencidas o dentro de `DUE_MARGIN_DAYS`."""
     items = engine.open_items_of(party, t, {"ARI"})
     return [item for item in items if item.ccy == t.ccy and (item.due is None or (item.due - t.date).days <= DUE_MARGIN_DAYS)]
 
@@ -107,10 +111,12 @@ def _party_due_partial(engine, t) -> bool:
 
 
 def _m_party_amount(engine, original, t) -> bool:
+    """La regla del motor y, si no responde, la suma exacta con una parcial."""
     return original(t) or _party_due_partial(engine, t)
 
 
 def _settle(engine, original, t, cands, rule, ev="", party=None) -> bool:
+    """Si las facturas suman más que el cobro y una sola encaja como parcial, esa queda abierta; si no, decide el motor."""
     items = [engine.items[c] for c in dict.fromkeys(cands)]
     invoices = [item for item in items if item.kind == "ARI"]
     if t.amount <= 0 or len(invoices) < 2 or not all(_is_receivable_in(item, t) for item in items):
@@ -140,6 +146,7 @@ def _advice_with_partial(engine, t, lines: list[dict]) -> list[dict]:
 
 
 def _advices_with_partial(engine) -> dict:
+    """`m2_rows` con la parcial marcada en los avisos de los movimientos de esta fase."""
     movements = {t.id: t for t in engine.ph.txns if t.id in engine.m2_rows}
     return {txn_id: _advice_with_partial(engine, movements[txn_id], lines) if txn_id in movements else lines
             for txn_id, lines in engine.m2_rows.items()}
@@ -156,6 +163,7 @@ def _month_with_year(t) -> tuple[int, int] | None:
 
 
 def _service_month(engine, item) -> tuple[int, int] | None:
+    """Mes de servicio (año, mes): el de la cláusula del PDF o, si no la hay, el anterior a la emisión."""
     clause = (getattr(engine, "clauses", None) or {}).get(item.id) or {}
     if clause.get("month"):
         return clause["month"]
@@ -180,10 +188,12 @@ def pick_same_amount(engine, t, invoices: list):
 
 
 def _same_amount(engine, items, t) -> list:
+    """Las partidas cuyo saldo, en la divisa del banco, es el importe del cobro."""
     return [item for item in items if abs(engine.to_bank(item.open, item, t) - abs(t.amount)) <= AMOUNT_TOLERANCE_CENTS]
 
 
 def _invoices(engine, items, t) -> list:
+    """Las partidas que suman al cobro, sin las que restan."""
     return [item for item in items if engine.sign(item, t) > 0]
 
 
@@ -194,6 +204,7 @@ def _exact_subset(engine, items, t) -> list | None:
 
 
 def _party_amount(engine, original, t, party, how) -> bool:
+    """Entre partidas de importe exacto elige factura, nunca un abono suelto; sin ninguna de ese importe decide el motor."""
     if t.amount <= 0:
         return original(t, party, how)
     items = engine.open_items_of(party, t, engine._party_kinds(party, t))
@@ -208,6 +219,7 @@ def _party_amount(engine, original, t, party, how) -> bool:
 
 
 def _party_rescue(engine, original, t, tried) -> bool:
+    """Terceros aún sin probar: responde solo si un único cliente da solución, primero por importe exacto y luego por suma."""
     if t.amount <= 0:
         return original(t, tried)
     exact, subsets = {}, {}

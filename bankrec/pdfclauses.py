@@ -452,6 +452,7 @@ HINT = re.compile(r"PLAZO|ECHEANCE|INSTALMENT|INSTALLMENT|RATE \d|RETENTION|RETE
 
 
 def match(engine, t):
+    """Cobros de facturas con plazos, retención en garantía o anticipo a deducir, y mes de servicio (POLICIES §3 PARTIAL y §5.6-§5.11)."""
     cl = getattr(engine, "clauses", None)
     if not cl:
         return False
