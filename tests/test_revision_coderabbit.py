@@ -6,6 +6,8 @@ from collections import defaultdict
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from bankrec import pdfclauses, remittance
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -70,7 +72,10 @@ def _path_sin_gitleaks(tmp_path: Path) -> str:
     for nombre in ("git", "grep", "sh", "printf"):
         ruta = subprocess.run(["sh", "-c", f"command -v {nombre}"], capture_output=True, text=True).stdout.strip()
         if ruta.startswith("/"):
-            (binarios / nombre).symlink_to(ruta)
+            try:
+                (binarios / nombre).symlink_to(ruta)
+            except OSError:  # Windows sin privilegio de enlaces: no se puede aislar PATH, el gancho se prueba en macOS/Linux
+                pytest.skip("enlaces simbólicos no disponibles")
     return str(binarios)
 
 
