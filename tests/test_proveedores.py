@@ -4,6 +4,7 @@ Reglas del plugin bankrec/proveedores.py, que envuelve métodos del motor sin ed
 """
 import datetime as dt
 import os
+import re
 import subprocess
 import sys
 from collections import defaultdict
@@ -568,7 +569,7 @@ def motor_adeudos(items, recibos, mandato_cliente="C1"):
         for v in num_variants(i.number):
             by_num[v].add(i.id)
         by_party[i.party].append(i.id)
-    eng.ph = SimpleNamespace(by_num=by_num, by_party=by_party, children={}, party_by_iban={})
+    eng.ph = SimpleNamespace(by_num=by_num, by_party=by_party, by_suffix={}, children={}, party_by_iban={})
     eng.dd_batches = {"0325051665": recibos}
     eng.mandate_party = {"VTM-ES-0006972": mandato_cliente}
     eng.rows, eng.settled_by, eng.iban_learned, eng.used_batches = [], defaultdict(list), {}, set()
@@ -623,3 +624,49 @@ class TestReciboRepresentado:
         eng = motor_adeudos([otra], [recibo("FV25-9999999", re_presentado="Y")])
         eng.m_dd_batch(abono_remesa())
         assert [r.item for r in eng.rows] in ([], [otra.id])  # sin cita válida, el motor sigue su camino de siempre
+
+
+def motor_adeudos_sufijo(items, recibos):
+    eng = motor_adeudos(items, recibos)
+    from collections import defaultdict
+    by_suffix = defaultdict(set)
+    for i in items:
+        dg = re.sub(r"\D", "", i.number)
+        by_suffix[dg[-6:].rjust(6, "0")].add(i.id)
+    eng.ph.by_suffix = by_suffix
+    return eng
+
+
+class TestReciboConReferenciaCortada:
+    """El banco cita el recibo como «RECIBO 503648», sin el prefijo de la factura «1102503648». num_variants no lo
+    casa (0 de 3.000 en el holdout; 9.497 recibos así en 2025) y el motor caía al mandato, que elige la cuota MÁS
+    ANTIGUA abierta del mismo importe: mal si hay una vieja abierta (p. ej. devuelta). POLICIES §5.3: el recibo
+    liquida la factura que cita. Evidencia: sufijo citado + cliente del mandato + candidata única."""
+
+    def test_usa_el_sufijo_citado_y_no_la_cuota_mas_antigua(self):
+        vieja = cobro("ARI-2024-4687359", "1102418829", abierto=21175, issue=dt.date(2024, 10, 1))
+        citada = cobro("ARI-2025-1572292", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        eng = motor_adeudos_sufijo([vieja, citada], [recibo("RECIBO 503648")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [r.item for r in eng.rows] == [citada.id]
+
+    def test_no_fuerza_el_sufijo_de_otro_cliente(self):
+        vieja = cobro("ARI-2024-4687359", "1102418829", abierto=21175, issue=dt.date(2024, 10, 1))
+        ajena = cobro("ARI-2025-1572292", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        ajena.party = "C2"
+        eng = motor_adeudos_sufijo([vieja, ajena], [recibo("RECIBO 503648")])
+        eng.m_dd_batch(abono_remesa())
+        assert ajena.id not in [r.item for r in eng.rows]
+
+    def test_dos_del_cliente_con_el_mismo_sufijo_no_elige_por_sufijo(self):
+        a = cobro("ARI-2024-0000001", "1102403648", abierto=21175, issue=dt.date(2024, 3, 1))
+        b = cobro("ARI-2025-0000002", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        eng = motor_adeudos_sufijo([a, b], [recibo("RECIBO 503648")])
+        eng.m_dd_batch(abono_remesa())
+        assert len(eng.rows) <= 1  # sin candidata única por sufijo, el motor sigue su camino de siempre
+
+    def test_referencia_completa_no_cambia(self):
+        citada = cobro("ARI-2025-1572292", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        eng = motor_adeudos_sufijo([citada], [recibo("1102503648")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [r.item for r in eng.rows] == [citada.id]

@@ -177,27 +177,54 @@ def _by_original_amount(engine, index, t) -> bool:
 
 
 def _wrap_dd_batch(engine) -> None:
-    """POLICIES §5.10: un recibo devuelto se vuelve a presentar (re_presentation=Y) y liquida la misma factura.
-    Si el motor no vio la devolución, la factura figura cerrada y m_dd_batch la cambiaba por otra abierta del
-    cliente con el mismo importe. Aquí, en un recibo re-presentado, la factura citada se mantiene aunque figure
-    cerrada; el resto de m_dd_batch queda igual."""
+    """Recibos de una remesa de adeudos (POLICIES §5.3, §5.10). El resto de m_dd_batch queda igual.
+    - Referencia cortada «RECIBO 503648»: num_variants no la casa (9.497 recibos en 2025) y el motor caía al
+      mandato, que elige la cuota MÁS ANTIGUA abierta del mismo importe. Se busca el sufijo citado entre las
+      partidas del cliente del mandato, con candidata única.
+    - Re-presentado (re_presentation=Y): liquida la misma factura aunque figure cerrada (devolución no vista)."""
     orig_item_by_number = engine.item_by_number
     orig_dd_batch = engine.m_dd_batch
     current = {"rows": None}
 
+    def receipts_citing(number):
+        return [r for r in current["rows"] or () if r.get("remittance_info") == number]
+
+    def by_cited_suffix(number, receipts, kinds, amount):
+        """«RECIBO 503648»: sufijo citado entre las partidas del cliente del mandato (o del IBAN). Única, o única por
+        importe exacto; si no, None y el motor sigue su camino."""
+        digits = re.sub(r"\D", "", number or "")
+        if len(digits) < 5:
+            return None
+        parties = set()
+        for r in receipts:
+            p = engine.mandate_party.get(ascii_upper(r.get("mandate_id") or "")) or \
+                engine.ph.party_by_iban.get((r.get("debtor_iban") or "").replace(" ", ""))
+            if p:
+                parties.add(p)
+        if len(parties) != 1:
+            return None
+        party = parties.pop()
+        cands = [engine.items[i] for i in engine.ph.by_suffix.get(digits[-6:].rjust(6, "0"), ())
+                 if engine.items[i].party == party and (not kinds or engine.items[i].kind in kinds)
+                 and re.sub(r"\D", "", engine.items[i].number or "").endswith(digits)]
+        if len(cands) > 1 and amount is not None:
+            cands = [i for i in cands if abs(i.open - amount) <= 2 or abs(i.total - amount) <= 2]
+        return cands[0] if len(cands) == 1 else None
+
     def item_by_number(number, entity=None, party=None, kinds=None, amount=None):
         it = orig_item_by_number(number, entity, party=party, kinds=kinds, amount=amount)
-        rows = current["rows"]
-        if it is not None and it.open <= 0 and rows is not None and any(
-                r.get("re_presentation") == "Y" and r.get("remittance_info") == number for r in rows):
+        receipts = receipts_citing(number)
+        if it is None and receipts:
+            it = by_cited_suffix(number, receipts, kinds, amount)
+        if it is not None and it.open <= 0 and any(r.get("re_presentation") == "Y" for r in receipts):
             # m_dd_batch descarta una factura con open <= 0: se presenta abierta solo para esta consulta
             return _ReopenedView(it)
         return it
 
     def m_dd_batch(t):
         rows = [r for bid in DD_BATCH_ID.findall(t.up or "") for r in engine.dd_batches.get(bid, ())]
-        current["rows"] = rows if any(r.get("re_presentation") == "Y" for r in rows) else None
-        engine.item_by_number = item_by_number if current["rows"] else orig_item_by_number
+        current["rows"] = rows or None
+        engine.item_by_number = item_by_number if rows else orig_item_by_number
         try:
             return orig_dd_batch(t)
         finally:
