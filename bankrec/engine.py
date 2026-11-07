@@ -112,7 +112,7 @@ UNKNOWN_DATE_DAYS = 10 ** 6  # un lote sin fecha es el último candidato, pero n
 
 
 def to_cents(value) -> int:
-    """Importe de un fichero auxiliar: vacío o mal formado cuenta como cero. La ingesta ya informa de ello como BAD_VALUE."""
+    """Importe de un fichero auxiliar: vacío o mal formado cuenta como cero. El motor no avisa: lo hace la ingesta, con BAD_VALUE, si se ha ejecutado."""
     try:
         return cents(value)
     except ValueError:
@@ -186,6 +186,7 @@ class Engine:
             self._undo_log = None
 
     def _undo_since(self, n_rows: int) -> None:
+        """Deshace lo que pasó por `emit` y `rows`. Lo que el plugin haya escrito por su cuenta, como `used_batches`, se queda."""
         for item, open_before, n_settled, iban, learned in reversed(self._undo_log):
             item.open = open_before
             del self.settled_by[item.id][n_settled:]

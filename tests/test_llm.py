@@ -24,6 +24,7 @@ class Sent(list):
 def api(monkeypatch, tmp_path):
     monkeypatch.setenv("BANKREC_LLM", "1")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "clave-de-prueba")
+    monkeypatch.delenv("BANKREC_LLM_MAX_CALLS", raising=False)
     monkeypatch.setattr(llm, "CACHE", tmp_path / "cache")
     monkeypatch.setattr(llm, "calls", 0)
     monkeypatch.setattr(llm, "asked", 0)
