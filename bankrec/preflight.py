@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -27,11 +28,14 @@ def check_dependencies() -> None:
 
 
 def ensure_deterministic(argv: list[str]) -> None:
-    """El orden de los sets depende de esta semilla y Python solo la lee al arrancar, así que hay que relanzar."""
+    """El orden de los sets depende de esta semilla y Python solo la lee al arrancar, así que hay que relanzar.
+
+    Con subprocess y no con os.execv: en Windows os.execv no espera al hijo (el proceso sale con 0 al instante) y no
+    pone comillas a los argumentos, así que con un espacio en la ruta del intérprete el motor no llegaba a ejecutarse."""
     if os.environ.get(HASH_SEED_VARIABLE) == HASH_SEED:
         return
-    os.environ[HASH_SEED_VARIABLE] = HASH_SEED
-    os.execv(sys.executable, [sys.executable, "-m", "bankrec.run", *argv])
+    env = {**os.environ, HASH_SEED_VARIABLE: HASH_SEED}
+    raise SystemExit(subprocess.call([sys.executable, "-m", "bankrec.run", *argv], env=env))
 
 
 def check_phase_inputs(phase: str, data: Path) -> None:
