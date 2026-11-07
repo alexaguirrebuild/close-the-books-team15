@@ -3,7 +3,9 @@ import builtins
 import gzip
 import json
 import os
+import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -209,7 +211,7 @@ class TestCacheDePdf:
         textos = pdfclauses._load_texts(Path("/pdfs"), "final", ["a.pdf", "b.pdf"])
 
         assert textos == {"a.pdf": "leido", "b.pdf": "texto"}
-        assert pedidos == ["/pdfs/a.pdf"]
+        assert [Path(x) for x in pedidos] == [Path("/pdfs/a.pdf")]  # Path: en Windows el separador es «\»
 
     def test_no_guarda_vacios_en_la_cache(self, tmp_path, monkeypatch):
         monkeypatch.setattr(pdfclauses, "OUT", tmp_path)
@@ -229,21 +231,45 @@ class TestCacheDePdf:
 
 
 class TestDeterminismo:
-    def test_fija_la_semilla_y_se_relanza_si_no_esta(self, monkeypatch):
+    def test_fija_la_semilla_se_relanza_y_sale_con_el_codigo_del_hijo(self, monkeypatch):
         llamadas = []
         monkeypatch.delenv("PYTHONHASHSEED", raising=False)
-        monkeypatch.setattr(os, "execv", lambda exe, argv: llamadas.append((exe, argv)))
+        monkeypatch.setattr(os, "execv", lambda *_: pytest.fail("os.execv no espera al hijo en Windows"))
+        monkeypatch.setattr(subprocess, "call", lambda argv, env: llamadas.append((argv, env["PYTHONHASHSEED"])) or 3)
 
-        preflight.ensure_deterministic(["--phase", "live"])
+        with pytest.raises(SystemExit) as salida:
+            preflight.ensure_deterministic(["--phase", "live"])
 
-        assert os.environ["PYTHONHASHSEED"] == "0"
-        assert llamadas == [(sys.executable, [sys.executable, "-m", "bankrec.run", "--phase", "live"])]
+        assert salida.value.code == 3
+        assert llamadas == [([sys.executable, "-m", "bankrec.run", "--phase", "live"], "0")]
 
     def test_no_se_relanza_si_ya_esta_fijada(self, monkeypatch):
         monkeypatch.setenv("PYTHONHASHSEED", "0")
         monkeypatch.setattr(os, "execv", lambda *_: pytest.fail("no debía relanzarse"))
+        monkeypatch.setattr(subprocess, "call", lambda *_, **__: pytest.fail("no debía relanzarse"))
 
         preflight.ensure_deterministic([])
+
+
+class TestRelanzamientoReal:
+    """Sin PYTHONHASHSEED, el motor se relanza a sí mismo. Con os.execv eso fallaba en Windows cuando la ruta del
+    intérprete tenía un espacio: el proceso salía con 0 al instante y el hijo moría con «can't open file». No se
+    escribía ningún fichero. Aquí se lanza un intérprete de verdad desde una carpeta con espacios."""
+
+    def test_con_espacios_en_la_ruta_el_motor_arranca_y_devuelve_su_codigo(self, tmp_path):
+        venv = tmp_path / "carpeta con espacios" / "venv"
+        subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(venv)], check=True, capture_output=True)
+        python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        entorno = {k: v for k, v in os.environ.items() if k != "PYTHONHASHSEED"}
+        # El venv vacío ve el motor y las dependencias obligatorias (pypdf, openpyxl) de este intérprete.
+        entorno["PYTHONPATH"] = os.pathsep.join([str(ROOT), sysconfig.get_paths()["purelib"]])
+
+        # Una fase que no existe hace que argparse pare con 2 antes de cargar datos: así se ve que el hijo llegó a arrancar.
+        resultado = subprocess.run([str(python), "-m", "bankrec.run", "--phase", "fase con espacios"], cwd=tmp_path,
+                                   env=entorno, capture_output=True, text=True, timeout=120)
+
+        assert resultado.returncode == 2, resultado.stderr
+        assert "'fase con espacios'" in resultado.stderr  # el argumento con espacios llega entero
 
 
 @pytest.mark.skipif(not (DATA / "sample" / "golden_allocations.csv.gz").exists(), reason="hace falta data/sample")
