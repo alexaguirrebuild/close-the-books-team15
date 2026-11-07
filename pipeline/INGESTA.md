@@ -223,15 +223,7 @@ No se puede comprobar hasta las 18:00.
 
 ## 7. Procedimiento de las 18:00
 
-Desde la raíz del repo, sin hacer doble clic en el archivo:
-
-```bash
-curl -fO https://hackathon.usetalky.com/data/v1/bankrec-final.tar.gz
-shasum -a 256 bankrec-final.tar.gz     # comparar con /config.json
-tar -tzf bankrec-final.tar.gz | head   # debe empezar por final/
-tar -xzf bankrec-final.tar.gz
-uv run --project pipeline bankcheck ingest --phase final
-```
+El procedimiento completo está en [`docs/RUNBOOK_FINAL.md`](../docs/RUNBOOK_FINAL.md): `scripts/download.py final` y `scripts/final_run.py`.
 
 Cuenta con 40 s de ingesta si la máquina está libre. Con otros dos pipelines en marcha, LIVE tardó 117 s.
 
