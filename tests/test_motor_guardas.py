@@ -209,7 +209,7 @@ class TestCacheDePdf:
         textos = pdfclauses._load_texts(Path("/pdfs"), "final", ["a.pdf", "b.pdf"])
 
         assert textos == {"a.pdf": "leido", "b.pdf": "texto"}
-        assert pedidos == ["/pdfs/a.pdf"]
+        assert [Path(x) for x in pedidos] == [Path("/pdfs/a.pdf")]  # Path: en Windows el separador es «\»
 
     def test_no_guarda_vacios_en_la_cache(self, tmp_path, monkeypatch):
         monkeypatch.setattr(pdfclauses, "OUT", tmp_path)
