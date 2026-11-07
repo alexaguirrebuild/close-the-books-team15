@@ -189,6 +189,77 @@ class TestNumeroCorto:
         assert eng.run_doc_item(r, cargo()).id == abono.id
 
 
+def remesa_confirming(vencimientos, rid="CF010025011055"):
+    """Un proveedor (e2e) por vencimiento; importe de cada transferencia = 100,00 × (k + 1)."""
+    rs = []
+    for k, _ in enumerate(vencimientos):
+        rs.append({"run_id": rid, "run_type": "confirming", "end_to_end_id": f"{rid}-000{k}", "execution_date": "2025-01-02",
+                   "debtor_account_id": "ES01-BANK-EUR", "beneficiary": f"Prov {k}", "currency": "EUR",
+                   "transfer_amount": f"{(k + 1) * 100}.00", "document_number": f"INV{k}", "document_amount": f"{(k + 1) * 100}.00"})
+    return rs
+
+
+def motor_confirming(vencimientos, plugin=True):
+    # dos proveedores más que vencen días después: como en una remesa real, el total del fichero no cuadra con el cargo
+    relleno = [max(vencimientos) + dt.timedelta(days=10)] * 2
+    rs = remesa_confirming(list(vencimientos) + relleno)
+    vencimientos = list(vencimientos) + relleno
+    eng = Engine.__new__(Engine)
+    eng.run_rows, eng.e2e_rows, eng.transfers_by_amount, eng.used_batches = {rs[0]["run_id"]: rs}, {}, {}, set()
+    due = {r["document_number"]: d for r, d in zip(rs, vencimientos)}
+    eng.run_doc_item = lambda r, t: SimpleNamespace(due=due[r["document_number"]])
+    eng.emitidas = []
+    eng.emit_run_rows = lambda t, filas, rule, ev: eng.emitidas.append((sorted(f["beneficiary"] for f in filas), rule))
+    if plugin:
+        proveedores._wrap_confirming(eng)
+    return eng
+
+
+def cargo_confirming(dia, centimos, n):
+    return SimpleNamespace(amount=-centimos, account="ES01-BANK-EUR", e2e="", date=dia, ccy="EUR", orig_amount=None,
+                           orig_ccy=None, up=f"PAGO CONFIRMING | REMESA CF010025011055 {n} PROVEEDORES")
+
+
+class TestConfirmingFinDeSemana:
+    """POLICIES §5.3: el confirming carga a cada proveedor en el vencimiento más tardío de sus facturas, y lo que
+    vence en sábado o domingo se paga el lunes. En el holdout, 3.037 de 3.200 grupos de proveedor cuadran así
+    (el resto, festivos). El motor agrupaba por la fecha exacta: un lunes con vencimientos de sábado, domingo y
+    lunes no cuadraba nunca, y con más de 4 proveedores tampoco lo rescataba la combinatoria."""
+
+    LUNES = dt.date(2025, 3, 10)
+    SAB, DOM, VIE = dt.date(2025, 3, 8), dt.date(2025, 3, 9), dt.date(2025, 3, 7)
+
+    def test_lunes_junta_sabado_domingo_y_lunes(self):
+        venc = [self.SAB, self.SAB, self.DOM, self.LUNES, self.LUNES]
+        eng = motor_confirming(venc)
+        assert eng.m_payment_run(cargo_confirming(self.LUNES, 150000, 5)) is True
+        assert eng.emitidas == [([f"Prov {k}" for k in range(5)], "payment_run_confirming")]
+
+    def test_sin_el_plugin_no_cuadraba(self):
+        venc = [self.SAB, self.SAB, self.DOM, self.LUNES, self.LUNES]
+        eng = motor_confirming(venc, plugin=False)
+        eng.m_payment_run(cargo_confirming(self.LUNES, 150000, 5))
+        assert eng.emitidas == []
+
+    def test_no_mete_el_viernes_en_el_lunes(self):
+        venc = [self.VIE, self.SAB, self.LUNES]  # importes 100, 200, 300
+        eng = motor_confirming(venc)
+        assert eng.m_payment_run(cargo_confirming(self.LUNES, 50000, 2)) is True
+        assert eng.emitidas == [(["Prov 1", "Prov 2"], "payment_run_confirming")]
+
+    def test_no_fuerza_si_el_importe_no_cuadra(self):
+        venc = [self.SAB, self.DOM, self.LUNES, self.LUNES, self.LUNES]
+        eng = motor_confirming(venc)
+        assert eng.m_payment_run(cargo_confirming(self.LUNES, 150001 + 500, 5)) is False
+        assert eng.emitidas == []
+
+    def test_entre_semana_no_cambia(self):
+        martes = dt.date(2025, 3, 11)
+        eng = motor_confirming([martes, martes])
+        assert eng.m_payment_run(cargo_confirming(martes, 30000, 2)) is True
+        assert eng.emitidas == [(["Prov 0", "Prov 1"], "payment_run_confirming")]
+
+
 class TestDerivaDeFinal:
     """POLICIES §6: Moncayo pasa de Norma 43 a camt.053 (2025-10-01) y en 2026 llega ZA01 con numeración «KWI…».
     Textos reales de LIVE: el cargo de confirming debe seguir encontrando su remesa en los dos formatos."""

@@ -66,8 +66,28 @@ def _short_number_item(self, r, t, party, kinds, amt):
     return cands[0] if len(cands) == 1 else None
 
 
+def _next_business_day(d):
+    """Sábado y domingo pasan al lunes. Los festivos no: dependen del país y no hay calendario en los datos."""
+    while d.weekday() >= 5:
+        d += dt.timedelta(days=1)
+    return d
+
+
+def _wrap_confirming(engine) -> None:
+    """POLICIES §5.3 confirming: el banco carga a cada proveedor en su vencimiento más tardío, pero lo que vence en
+    fin de semana se paga el lunes. El motor agrupaba por la fecha exacta y un lunes con vencimientos de sábado,
+    domingo y lunes no cuadraba (holdout: 3.037 de 3.200 grupos de proveedor siguen esta regla)."""
+    orig = engine._confirming_due
+
+    def confirming_due(rid, rs, t):
+        return {e: (_next_business_day(v[0]), v[1], v[2]) for e, v in orig(rid, rs, t).items()}
+
+    engine._confirming_due = confirming_due
+
+
 def prepare(engine) -> None:
     engine.run_doc_item = types.MethodType(run_doc_item, engine)
+    _wrap_confirming(engine)
 
 
 def match(engine, t) -> bool:
