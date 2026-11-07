@@ -1,0 +1,144 @@
+"""Mismo importe: qué partida se elige cuando el cobro no cita ninguna, y cuándo no se responde."""
+import datetime as dt
+from types import SimpleNamespace
+
+import pytest
+
+from bankrec import mismo_importe
+from bankrec.data import Item
+from bankrec.engine import Engine
+
+DAY = dt.date(2025, 6, 10)
+CASH = 10000
+
+
+def invoice(item_id, party="C1", cents=CASH, issue=dt.date(2025, 5, 1), kind="ARI", side="AR", entity="ES01", ccy="EUR"):
+    return Item(id=item_id, kind=kind, side=side, entity=entity, number=item_id, party=party, ccy=ccy, total=cents, open=cents, issue=issue)
+
+
+def credit_note(item_id, party="C1", cents=CASH, issue=dt.date(2025, 1, 1)):
+    return invoice(item_id, party, cents, issue, kind="ARC")
+
+
+def movement(amount=CASH, up=""):
+    return SimpleNamespace(id="T1", amount=amount, entity="ES01", ccy="EUR", date=DAY, up=up, orig_ccy=None, orig_amount=None)
+
+
+def engine(items, named=("C1",), scanned=()):
+    eng = Engine.__new__(Engine)
+    by_party = {}
+    for item in sorted(items, key=lambda i: (i.issue, i.id)):
+        by_party.setdefault(item.party, []).append(item.id)
+    eng.items = {item.id: item for item in items}
+    eng.ph = SimpleNamespace(children={}, by_party=by_party, fx=None, txns=[])
+    eng.settled = []
+    eng.settle = lambda t, ids, rule, ev="", party=None: eng.settled.append((list(ids), rule)) or True
+    eng.resolve_parties = lambda t: (list(named), "nombre" if named else "")
+    eng.scan_names = lambda t: list(scanned)
+    mismo_importe.prepare(eng)
+    return eng
+
+
+class TestAbonoSuelto:
+    def test_entre_factura_y_abono_mas_antiguo_se_elige_la_factura(self):
+        eng = engine([credit_note("ABONO"), invoice("FACTURA")])
+        assert eng.m_party_amount(movement())
+        assert eng.settled == [(["FACTURA"], "party_amount_nombre")]
+
+    def test_si_solo_coincide_un_abono_no_se_responde(self):
+        eng = engine([credit_note("ABONO"), invoice("OTRA", cents=7777)])
+        assert not eng.m_party_amount(movement())
+        assert eng.settled == []
+
+    def test_si_solo_coincide_un_abono_vale_la_factura_neta_de_ese_abono(self):
+        eng = engine([credit_note("ABONO"), invoice("FACTURA", cents=2 * CASH)])
+        assert eng.m_party_amount(movement())
+        assert sorted(eng.settled[0][0]) == ["ABONO", "FACTURA"]
+        assert eng.settled[0][1] == "party_subset_nombre"
+
+    def test_el_rescate_tampoco_liquida_un_abono_suelto(self):
+        eng = engine([credit_note("ABONO", party="C2"), invoice("OTRA", party="C2", cents=7777)], named=[], scanned=["C2"])
+        assert not eng.m_party_amount(movement())
+        assert eng.settled == []
+
+    def test_el_rescate_elige_la_factura_y_no_el_abono(self):
+        eng = engine([credit_note("ABONO", party="C2"), invoice("FACTURA", party="C2")], named=["C1"], scanned=["C2"])
+        assert eng.m_party_amount(movement())
+        assert eng.settled == [(["FACTURA"], "party_rescue_exact")]
+
+    def test_el_proveedor_que_devuelve_su_abono_sigue_igual(self):
+        refund = invoice("APC1", party="S1", kind="APC", side="AP")
+        eng = engine([refund], named=["S1"])
+        assert eng.m_party_amount(movement())
+        assert eng.settled == [(["APC1"], "party_amount_nombre")]
+
+    def test_el_abono_pagado_al_cliente_por_transferencia_sigue_igual(self):
+        eng = engine([credit_note("ABONO")])
+        assert eng.m_party_amount(movement(-CASH))
+        assert eng.settled == [(["ABONO"], "party_amount_nombre")]
+
+    def test_dos_clientes_con_factura_exacta_en_el_rescate_no_se_fuerza(self):
+        items = [invoice("A", party="C2"), invoice("B", party="C3")]
+        eng = engine(items, named=[], scanned=["C2", "C3"])
+        assert eng._party_rescue(movement(), []) is False
+        assert eng.settled == []
+
+
+class TestMesDeServicio:
+    """Las cuotas se facturan a primeros del mes siguiente: el servicio de marzo se emite en abril (POLICIES §5.6)."""
+
+    ISSUES = {"FEB": dt.date(2025, 2, 3), "MAR": dt.date(2025, 3, 3), "ABR": dt.date(2025, 4, 3)}
+
+    def cuotas(self, party="C1"):
+        return [invoice(name, party=party, issue=issue) for name, issue in self.ISSUES.items()]
+
+    def elegida(self, up, items=None, **kwargs):
+        eng = engine(items if items is not None else self.cuotas(), **kwargs)
+        assert eng.m_party_amount(movement(up=up))
+        return eng.settled[0][0]
+
+    @pytest.mark.parametrize("text", ["TT IN JOHN SERVICE MARCH 2025", "SERVICIOS MARZO 2025", "MANT. MAR 25", "WARTUNG MAERZ 2025"])
+    def test_el_mes_en_cualquier_idioma_elige_su_factura(self, text):
+        assert self.elegida(text) == ["ABR"]
+
+    def test_el_anio_del_texto_separa_dos_eneros(self):
+        items = [invoice("ENE24", issue=dt.date(2024, 1, 3)), invoice("ENE25", issue=dt.date(2025, 1, 3))]
+        assert self.elegida("/REMI/MANT. DIC 24", items) == ["ENE25"]
+
+    def test_sin_anio_gana_la_mas_antigua_de_ese_mes(self):
+        items = [invoice("JUN24", issue=dt.date(2024, 6, 3)), invoice("JUN25", issue=dt.date(2025, 6, 3)), invoice("ENE", issue=dt.date(2024, 1, 3))]
+        assert self.elegida("SERVICIOS MAYO", items) == ["JUN24"]
+
+    def test_enero_se_refiere_al_servicio_de_diciembre_del_anio_anterior(self):
+        items = [invoice("DIC", issue=dt.date(2024, 12, 2)), invoice("ENE", issue=dt.date(2025, 1, 2))]
+        assert self.elegida("SERVICE DECEMBER 2024", items) == ["ENE"]
+
+    def test_el_mes_de_la_clausula_del_pdf_manda_sobre_la_fecha_de_emision(self):
+        eng = engine(self.cuotas())
+        eng.clauses = {"MAR": {"month": (2025, 3)}, "ABR": {"month": (2025, 4)}}
+        assert eng.m_party_amount(movement(up="SERVICE MARCH 2025"))
+        assert eng.settled[0][0] == ["MAR"]
+
+    def test_tambien_elige_por_mes_en_el_rescate(self):
+        assert self.elegida("SERVICE MARCH 2025", self.cuotas("C2"), named=["C1"], scanned=["C2"]) == ["ABR"]
+
+    def test_sin_mes_gana_la_mas_antigua(self):
+        assert self.elegida("TT IN JOHN ACCOUNT PAYMENT") == ["FEB"]
+
+    def test_si_ninguna_es_de_ese_mes_gana_la_mas_antigua(self):
+        assert self.elegida("SERVICE AUGUST 2025") == ["FEB"]
+
+    def test_una_sola_factura_se_paga_aunque_el_mes_sea_otro(self):
+        assert self.elegida("SERVICE AUGUST 2025", [invoice("UNICA")]) == ["UNICA"]
+
+    @pytest.mark.parametrize("text", ["PAGO SEPA ABC", "MARTINEZ Y ASOCIADOS", "TT IN DECORA 25"])
+    def test_lo_que_no_es_un_mes_no_elige(self, text):
+        assert self.elegida(text) == ["FEB"]
+
+    def test_un_nombre_que_parece_un_mes_no_tapa_el_mes_con_anio(self):
+        items = [invoice("JUN", issue=dt.date(2024, 6, 3)), invoice("NOV", issue=dt.date(2024, 11, 3))]
+        assert self.elegida("TT IN JOHN MAY SERVICE OCTOBER 2024", items) == ["NOV"]
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
