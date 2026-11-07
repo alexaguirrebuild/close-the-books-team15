@@ -95,11 +95,17 @@ def _load_texts(pdir: Path, phase: str, wanted: list[str]):
             cache = json.loads(cache_path.read_text(encoding="utf-8"))
         except Exception:
             cache = {}
+    # Un texto vacío es un fallo de lectura, no un resultado: guardarlo dejaría ese PDF vacío en todas las ejecuciones siguientes.
+    cache = {f: tx for f, tx in cache.items() if tx}
     missing = [f for f in wanted if f not in cache]
     if missing:
         texts = _extract_many([str(pdir / f) for f in missing])
+        unread = sum(1 for tx in texts if not tx)
+        if unread:
+            print(f"  AVISO: {unread} PDF sin texto legible en {pdir}: se pierden sus cláusulas", flush=True)
         for f, tx in zip(missing, texts):
-            cache[f] = tx
+            if tx:
+                cache[f] = tx
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             cache_path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")

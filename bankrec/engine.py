@@ -5,6 +5,7 @@ POLICIES.md manda: los nombres de reglas citan su apartado.
 """
 from __future__ import annotations
 
+import importlib
 import datetime as dt
 import re
 from collections import defaultdict
@@ -62,6 +63,21 @@ def classify_nonitem(t: Txn):
     return None, ""
 
 
+OPTIONAL_PLUGINS = {"learned"}  # Solo estos pueden faltar: sin un plugin obligatorio se pierden puntos sin aviso.
+
+
+def load_plugins(names: str) -> list:
+    loaded = []
+    for name in [n for n in names.split(",") if n]:
+        module_name = f"bankrec.{name}"
+        try:
+            loaded.append(importlib.import_module(module_name))
+        except ModuleNotFoundError as error:
+            if name not in OPTIONAL_PLUGINS or error.name != module_name:
+                raise
+    return loaded
+
+
 class Engine:
     def __init__(self, ph: Phase):
         self.ph = ph
@@ -72,14 +88,8 @@ class Engine:
         self._prep_batches()
         self.reversal = self._find_reversals()
         self.plugins = []
-        import importlib
         import os
-        names = os.environ.get("BANKREC_PLUGINS", "remittance,pdfclauses,learned").split(",")
-        for name in [n for n in names if n]:
-            try:
-                mod = importlib.import_module(f"bankrec.{name}")
-            except ModuleNotFoundError:
-                continue
+        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", "remittance,pdfclauses,learned")):
             if hasattr(mod, "prepare"):
                 mod.prepare(self)
             if hasattr(mod, "match"):

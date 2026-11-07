@@ -20,6 +20,7 @@ import time
 from collections import Counter, OrderedDict
 from pathlib import Path
 
+from . import preflight
 from .data import DATA, Phase
 from .engine import Engine
 
@@ -39,16 +40,19 @@ def assemble(ph, rows, since=None):
     out = []
     for tid, rs in by_txn.items():
         items = [r for r in rs if r.item]
-        if items:
-            merged = OrderedDict()
-            for r in items:
-                if r.item in merged:
-                    merged[r.item].amount += r.amount
-                else:
-                    merged[r.item] = r
-            out.extend(merged.values())
-        elif rs:
-            out.append(rs[0])
+        merged = OrderedDict()
+        for r in items:
+            if r.item in merged:
+                merged[r.item].amount += r.amount
+            else:
+                merged[r.item] = r
+        # FORMAT: amount es lo liquidado. Una fila a cero no liquida nada y en el golden no existe.
+        settled = [r for r in merged.values() if r.amount > 0]
+        no_item = [r for r in rs if not r.item]
+        if settled:
+            out.extend(settled)
+        elif no_item:
+            out.append(no_item[0])
         else:
             from .engine import Row
             out.append(Row(tid, "", None, "UNIDENTIFIED", "UNIDENTIFIED", "missing"))
@@ -70,6 +74,13 @@ def write(rows, path, explain_path=None):
             for r in rows:
                 amt = "" if not r.item else f"{max(r.amount, 0) / 100:.2f}"
                 w.writerow([r.txn, r.item, amt, r.category, r.exception, r.rule, r.evidence])
+
+
+def report_broken_advices(eng):
+    broken = getattr(eng, "ra_errors", [])
+    if broken:
+        ejemplos = ", ".join(file for file, _ in broken[:5])
+        print(f"  AVISO: {len(broken)} avisos de remesa no se han podido leer: {ejemplos}", flush=True)
 
 
 def score(ph, sub_path, golden_path, since=None):
@@ -100,6 +111,8 @@ def score(ph, sub_path, golden_path, since=None):
 
 
 def main(argv=None):
+    preflight.ensure_deterministic(sys.argv[1:] if argv is None else argv)
+    preflight.check_dependencies()
     ap = argparse.ArgumentParser()
     ap.add_argument("--phase", default="sample", choices=["sample", "train", "holdout", "live", "final"])
     ap.add_argument("--since", help="holdout: solo movimientos desde esta fecha (YYYY-MM-DD)")
@@ -114,6 +127,7 @@ def main(argv=None):
     print(f"[{a.phase}] {len(ph.txns)} movimientos, {len(ph.items)} partidas · carga {time.time() - t0:.0f}s", flush=True)
     eng = Engine(ph)
     rows = eng.run()
+    report_broken_advices(eng)
     since = dt.date.fromisoformat(a.since) if a.since else None
     rows = assemble(ph, rows, since)
     tag = "holdout" if a.phase == "holdout" else a.phase + (f"_since{a.since}" if a.since else "")

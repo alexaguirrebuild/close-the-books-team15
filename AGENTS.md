@@ -14,7 +14,7 @@ python -m bankrec.run --phase train --since 2025-01-01    # holdout de TRAIN, im
 python -m bankrec.run --phase live --no-score             # genera out/sub_live.csv.gz (NO envía)
 python -m bankrec.diff --phase sample --segment ar_partial -n 5   # QA: fallos de un segmento, nuestra respuesta frente a la buena
 ```
-- Sin dependencias: el motor corre con la librería estándar de Python 3.11 o superior. Opcional: `pypdf` y `openpyxl` para los PDF y los xlsx.
+- Dependencias obligatorias: `pypdf` y `openpyxl`. Sin ellas se pierden los avisos en PDF y XLSX (en `sample`, de 83,77 a 79,92), así que `bankrec.run` se niega a arrancar. Con `uv run python -m bankrec.run ...` se instalan solas.
 - Los datos van en `data/<fase>/` y `data/masters/`. **Nunca se suben a git.** Se descargan con `python scripts/download.py live train-lite`.
 - El evaluador oficial está en `vendor/bankrec_score.py`. No se toca: es el mismo código que corre el servidor.
 
