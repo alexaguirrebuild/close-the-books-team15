@@ -9,9 +9,11 @@ import importlib
 import datetime as dt
 import re
 from collections import defaultdict
+from functools import lru_cache
 from itertools import combinations
 
 from . import duplicados
+from .sumas import exact_subsets
 from .data import SEPA, Phase, Txn, ascii_upper, name_key, norm_text, num_variants
 
 PAYMENT_FACTORY = {"ES00": {"ES01", "ES02", "PT01"}}
@@ -80,6 +82,18 @@ def load_plugins(names: str) -> list:
             if name not in OPTIONAL_PLUGINS or error.name != module_name:
                 raise
     return loaded
+
+
+AMOUNT_TOLERANCE_CENTS = 2
+CITED_MIN_DIGITS = 4
+MAX_COMPLETION_ITEMS = 18
+DUE_MARGIN_DAYS = 3
+MAX_DUE_CANDIDATES = 26
+
+
+@lru_cache(maxsize=None)
+def plain_number(number):
+    return re.sub(r"[^A-Z0-9]", "", ascii_upper(number))
 
 
 MAX_PARTIES_TRIED = 4
@@ -745,6 +759,8 @@ class Engine:
                         if it.party in fam and it.kind in kinds:
                             items.append(it)
         items = list({i.id: i for i in items}.values())
+        if not self._adds_up(items, t) and self._settle_cited(t, parties, kinds):
+            return True
         if not items:
             return False
         open_items = [i for i in items if i.open > 0]
@@ -761,8 +777,64 @@ class Engine:
             return False
         if len(open_items) > 1:
             open_items = self.best_subset(open_items, abs(t.amount), t) or open_items
+        extra = self._complete_cited(t, open_items, party or open_items[0].party)
+        if extra:
+            return self.settle(t, [i.id for i in [*open_items, *extra]], "ref_completed", "refs + resto por suma exacta",
+                               party=party or open_items[0].party)
         return self.settle(t, [i.id for i in open_items], "ref", "refs " + ",".join(i.number for i in open_items[:5]),
                            party=party or open_items[0].party)
+
+    def _complete_cited(self, t, cited, party):
+        """El banco corta la lista de facturas (POLICIES §5.5): el resto del cobro se busca entre las demás partidas abiertas
+        del cliente. Solo con solución única y pocas candidatas: con más, varias combinaciones suman lo mismo."""
+        if t.amount <= 0:
+            return None
+        missing = abs(t.amount) - sum(self.sign(i, t) * self.to_bank(i.open, i, t) for i in cited)
+        if missing <= AMOUNT_TOLERANCE_CENTS:
+            return None
+        known = {i.id for i in cited}
+        others = [i for i in self.open_items_of(party, t, {"ARI", "ARC"}) if i.id not in known]
+        if not others or len(others) > MAX_COMPLETION_ITEMS:
+            return None
+        values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in others]
+        solutions = exact_subsets(values, int(round(missing)), AMOUNT_TOLERANCE_CENTS)
+        return [others[position] for position in solutions[0]] if len(solutions) == 1 else None
+
+    def _adds_up(self, items, t):
+        open_items = [i for i in items if i.open > 0]
+        return bool(open_items) and abs(sum(self.sign(i, t) * self.to_bank(i.open, i, t) for i in open_items) - abs(t.amount)) <= AMOUNT_TOLERANCE_CENTS
+
+    def _settle_cited(self, t, parties, kinds):
+        """Trozos de número en el texto (POLICIES §5.5: sin prefijo, cortados, sin ceros) de facturas abiertas de un cliente
+        identificado. Solo valen si suman exactamente el cobro y un único cliente cuadra: una cita sola no basta."""
+        tokens = {tok for tok in re.findall(r"[A-Z0-9]+", t.up) if sum(ch.isdigit() for ch in tok) >= CITED_MIN_DIGITS}
+        if not tokens:
+            return False
+        hits = {}
+        for party in dict.fromkeys([*parties, *self.scan_names(t)]):
+            cited = [i for i in self.open_items_of(party, t, kinds) if any(tok in plain_number(i.number) for tok in tokens)]
+            picks = self._exact_with_credits(cited, party, t) if cited else None
+            if picks:
+                hits[party] = picks
+        if len(hits) != 1:
+            return False
+        party, picks = next(iter(hits.items()))
+        return self.settle(t, [i.id for i in picks], "ref_cited", "citas " + ",".join(i.number for i in picks[:5]), party=party)
+
+    def _exact_with_credits(self, cited, party, t):
+        """Las citadas que suman el cobro, o las que lo superan justo en abonos no citados (settle los añade)."""
+        cash = abs(t.amount)
+        exact = self.best_subset(cited, cash, t)
+        if exact:
+            return exact
+        invoices = [i for i in cited if self.sign(i, t) > 0]
+        gap = sum(self.to_bank(i.open, i, t) for i in invoices) - cash
+        if gap <= AMOUNT_TOLERANCE_CENTS or not invoices:
+            return None
+        credits = [self.to_bank(c.open, c, t) for c in self.open_items_of(party, t, {"ARC"} if t.amount > 0 else {"APC"})]
+        if any(abs(c - gap) <= AMOUNT_TOLERANCE_CENTS for c in credits) or any(abs(a + b - gap) <= AMOUNT_TOLERANCE_CENTS for a, b in combinations(credits, 2)):
+            return invoices
+        return None
 
     def best_subset(self, items, cash, t, max_n=40):
         """Qué partidas suman exactamente el importe. Orden de preferencia: todas, las más antiguas (FIFO), DP."""
@@ -807,7 +879,27 @@ class Engine:
         for party in tried:
             if self._party_amount(t, party, how):
                 return True
-        return self._party_rescue(t, tried)
+        return self._party_rescue(t, tried) or self._party_due_subset(t)
+
+    def _party_due_subset(self, t):
+        """Cobro de varias facturas sin citas: casi nadie paga antes de vencer, y eso acota las candidatas hasta que la suma
+        exacta identifica. Solo con solución única y un único cliente; si no, el cobro no se fuerza (POLICIES §3)."""
+        if t.amount <= 0:
+            return False
+        hits = {}
+        for party in dict.fromkeys([*self.resolve_parties(t)[0], *self.scan_names(t)]):
+            due = [i for i in self.open_items_of(party, t, {"ARI", "ARC"})
+                   if i.due is None or (i.due - t.date).days <= DUE_MARGIN_DAYS]
+            if not 2 <= len(due) <= MAX_DUE_CANDIDATES:
+                continue
+            values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in due]
+            solutions = exact_subsets(values, abs(t.amount), AMOUNT_TOLERANCE_CENTS)
+            if len(solutions) == 1 and len(solutions[0]) > 1:
+                hits[party] = [due[position] for position in solutions[0]]
+        if len(hits) != 1:
+            return False
+        party, picks = next(iter(hits.items()))
+        return self.settle(t, [i.id for i in picks], "party_due_subset", f"contraparte {party} · vencidas por suma exacta", party=party)
 
     def _party_rescue(self, t, tried):
         """Terceros que el camino normal no llegó a probar: homónimos de más y nombres que solo ve scan_names.

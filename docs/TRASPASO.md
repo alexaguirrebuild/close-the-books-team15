@@ -2,9 +2,9 @@
 
 Quien recibe este repo (Claude, Codex, Antigravity o una persona) lee esto antes que nada y lo sobrescribe al terminar su parte. Si algo falla dos veces, se escribe aquí y se para.
 
-- **Último que escribió:** Claude (PC de Pablo), sábado 7-nov, 13:20.
+- **Último que escribió:** Claude (PC de Pablo), sábado 7-nov, 13:40.
 - **Rama de integración:** `origin/Dev`. Toda rama nueva sale de ahí. `team15-dev` no comparte historia con `Dev` y no sirve de base.
-- **Referencia para superar:** holdout **89,26**, en `Dev`.
+- **Referencia para superar:** holdout **89,91**, en `Dev`.
 - **Última nota oficial:** LIVE **88,63** con `648cc9c`. Los envíos los decide una persona.
 - **Horario:** las reglas nuevas acaban a las 16:30; ensayo a las 17:00; código congelado a las 17:30; FINAL de 18:00 a 19:30.
 
@@ -72,7 +72,8 @@ De los 9.206 falsos UNIDENTIFIED, 8.990 son cobros que sí tienen partidas (`ar_
 | holdout tras cccc17e | 87,31 | F1 0,916 · acierto 0,890 · excepciones 0,740 |
 | holdout tras 648cc9c | 89,07 | F1 0,920 · acierto 0,900 · excepciones 0,802 |
 | LIVE con 648cc9c | 88,63 | F1 0,917 · acierto 0,897 · excepciones 0,794 |
-| holdout tras 6bfb068 | **89,26** | F1 0,921 · acierto 0,903 · excepciones 0,807. **Referencia actual** |
+| holdout tras 6bfb068 | 89,26 | F1 0,921 · acierto 0,903 · excepciones 0,807 |
+| holdout con `mejoras-citas` | **89,91** | F1 0,926 · acierto 0,913 · excepciones 0,811 · `unidentified` 0,9925. **Referencia actual** |
 
 ## Cuidado
 
