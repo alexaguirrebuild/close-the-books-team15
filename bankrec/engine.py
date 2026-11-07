@@ -272,10 +272,26 @@ class Engine:
             self.run_rows[r["run_id"]].append(r)
             self.e2e_rows[r["end_to_end_id"]].append(r)
         self.transfers_by_amount = defaultdict(list)
+        self.transfers_by_ent_amount = defaultdict(list)
         for e2e, rs in self.e2e_rows.items():
             r0 = rs[0]
-            self.transfers_by_amount[(r0["debtor_account_id"], int(round(float(r0["transfer_amount"]) * 100)))].append(e2e)
+            a = int(round(float(r0["transfer_amount"]) * 100))
+            self.transfers_by_amount[(r0["debtor_account_id"], a)].append(e2e)
+            self.transfers_by_ent_amount[(r0["debtor_account_id"].split("-")[0], a)].append(e2e)
         self.used_batches = set()
+        # devoluciones (POLICIES §3 RETURNED): tarjeta por últimos 4 dígitos y cheque por número
+        self.card_by_last4 = defaultdict(list)
+        for r in list(getattr(ph, "cards_prev", [])) + list(ph.cards):
+            m = re.search(r"(\d{4})\s*$", r.get("card") or "")
+            if m:
+                self.card_by_last4[m.group(1)].append(r)
+        self.cheque_by_num = defaultdict(list)
+        for r in list(getattr(ph, "cheques_prev", [])) + list(ph.cheques):
+            n = re.sub(r"\D", "", r.get("cheque_number") or "").lstrip("0")
+            if n:
+                self.cheque_by_num[n].append(r)
+        self.cheque_item = {}  # (depósito, nº cheque) -> partida que liquidó
+        self._by_method = None
 
     def item_by_number(self, number, entity=None, party=None, kinds=None, amount=None):
         cands = set()
@@ -402,6 +418,188 @@ class Engine:
             if it:
                 exc = "PARTIAL" if it.open - amt > 2 else ""
                 self.emit(t, it, min(amt, it.open) if exc == "" else amt, exc, "cheque_deposit", f"remesa {dep}")
+                self.cheque_item[(dep, r.get("cheque_number"))] = it.id
+        return True
+
+    # ------------------------------------------------------------ devoluciones (POLICIES §3 RETURNED)
+    RX_CHARGEBACK = re.compile(r"CHARGEBACK|CONTRACARGO|IMPAYE CARTE|RUE?CKBELASTUNG KARTE")
+    RX_CHEQUE_RET = re.compile(r"CHEQUE IMPAYE|CHEQUE DEVUELTO|CHEQUE RECHAZADO|CHEQUE DEVOLVIDO|RETURNED ITEM|"
+                               r"RETURNED CHEQUE|RETURNED CHECK|CHQ IMPAYE|SCHECKRUE?CKGABE")
+    RX_TRF_RET = re.compile(r"DEVOLUCION (?:DE )?TRANSFERENCIA|RETOUR VIREMENT|VIREMENT REJETE|RUE?CKUE?BERWEISUNG|"
+                            r"\bRETURN [A-Z]{2}\d\d\b|DEVOLUCAO (?:DE )?TRANSFERENCIA|TRANSFER RETURNED")
+
+    def _method_items(self, entity, method, amt):
+        """Facturas de cliente de una entidad por forma de pago e importe total (índice perezoso)."""
+        if self._by_method is None:
+            self._by_method = defaultdict(list)
+            for it in self.items.values():
+                if it.kind == "ARI" and it.method in ("card", "cheque"):
+                    self._by_method[(it.entity, it.method, it.total)].append(it)
+        out = []
+        for d in (0, 1, -1, 2, -2):
+            out += self._by_method.get((entity, method, amt + d), [])
+        return out
+
+    def _returned_pick(self, its, t):
+        """Entre varias candidatas, la ya cobrada (saldo 0) más reciente anterior a la devolución."""
+        its = [i for i in its if (i.issue or t.date) <= t.date]
+        if not its:
+            return None
+        return max(its, key=lambda i: (i.open <= 0, i.issue or dt.date.min, i.id))
+
+    def m_card_chargeback(self, t):
+        """Contracargo de tarjeta: los 4 últimos dígitos y el importe llevan al pedido de la liquidación."""
+        if t.amount >= 0 or not self.RX_CHARGEBACK.search(t.up):
+            return False
+        amt = -t.amount
+        it, ev = None, ""
+        m = re.search(r"\*{3,}\s?(\d{4})\b", t.up)
+        if m:
+            rs = [r for r in self.card_by_last4.get(m.group(1), ())
+                  if abs(int(round(float(r["gross"]) * 100)) - amt) <= 2 and r["account_id"].split("-")[0] == t.entity
+                  and (r.get("settlement_date") or "")[:10] <= t.date.isoformat()]
+            for r in sorted(rs, key=lambda x: x.get("settlement_date") or "", reverse=True):
+                gross = int(round(float(r["gross"]) * 100))
+                it = self.item_by_number(r["order_number"], t.entity, kinds={"ARI"}, amount=gross)
+                if it:
+                    ev = f"tarjeta ****{m.group(1)} pedido {r['order_number']}"
+                    break
+        if not it:
+            it = self._returned_pick(self._method_items(t.entity, "card", amt), t)
+            ev = "tarjeta: pedido por importe"
+        if not it:
+            return False
+        self.emit(t, it, amt if it.ccy == t.ccy else it.total, "RETURNED", "card_chargeback", ev)
+        return True
+
+    def _cheque_row_item(self, r, t):
+        amt = int(round(float(r["amount"]) * 100))
+        iid = self.cheque_item.get((r.get("deposit_id"), r.get("cheque_number")))
+        if iid:
+            return self.items[iid]
+        stub = re.sub(r"\D", "", r.get("stub_reference") or "")
+        if len(stub) >= 5:
+            for iid in self.ph.by_suffix.get(stub[-6:].rjust(6, "0"), set()) | self.ph.by_num.get(stub, set()):
+                c = self.items[iid]
+                if c.kind == "ARI" and self.entity_ok(c, t) and abs(c.total - amt) <= 2:
+                    return c
+        p = self.resolve_name(r.get("drawer") or "")
+        if p:
+            its = [self.items[i] for i in self.ph.by_party.get(p, ()) if self.items[i].kind == "ARI"
+                   and abs(self.items[i].total - amt) <= 2]
+            return self._returned_pick(its, t)
+        return None
+
+    def m_cheque_return(self, t):
+        """Cheque impagado: el número de cheque lleva al depósito y a la factura que pagó."""
+        if t.amount >= 0 or not self.RX_CHEQUE_RET.search(t.up):
+            return False
+        amt = -t.amount
+        it, ev = None, ""
+        for num in re.findall(r"(?:CHK|CHQ|CHEQUE(?: IMPAYE| DEVUELTO| RECHAZADO)?|SCHECK)\s*(?:N[O.]?\s*)?(\d{5,10})", t.up):
+            rs = [r for r in self.cheque_by_num.get(num.lstrip("0"), ())
+                  if abs(int(round(float(r["amount"]) * 100)) - amt) <= 2 and r["account_id"].split("-")[0] == t.entity]
+            for r in sorted(rs, key=lambda x: x.get("deposit_date") or "", reverse=True):
+                it = self._cheque_row_item(r, t)
+                if it:
+                    ev = f"cheque {num} depósito {r.get('deposit_id')}"
+                    break
+            if it:
+                break
+        if not it:
+            it = self._returned_pick(self._method_items(t.entity, "cheque", amt), t)
+            ev = "cheque: factura por importe"
+        if not it:
+            return False
+        self.emit(t, it, amt if it.ccy == t.ccy else it.total, "RETURNED", "cheque_return", ev)
+        return True
+
+    def m_transfer_return(self, t):
+        """Nuestra transferencia a un proveedor devuelta por su banco: reabre todos los documentos de esa transferencia."""
+        if t.amount <= 0 or not self.RX_TRF_RET.search(t.up):
+            return False
+        amt = t.amount
+        e2e = None
+        for m in re.findall(r"PR\d{12}-\d{4}", " ".join((t.up, t.e2e or ""))):
+            if m in self.e2e_rows:
+                e2e = m
+                break
+        if not e2e:
+            cand = list(dict.fromkeys(self.transfers_by_amount.get((t.account, amt), []) +
+                                      self.transfers_by_ent_amount.get((t.entity, amt), [])))
+            best = None
+            for e in cand:
+                r0 = self.e2e_rows[e][0]
+                d = (t.date - dt.date.fromisoformat(r0["execution_date"][:10])).days
+                if not 0 <= d <= 90:
+                    continue
+                nm = name_key(r0["beneficiary"]).split()
+                hit = sum(1 for w in nm[:3] if len(w) > 2 and w in t.up)
+                key = (hit, r0["debtor_account_id"] == t.account, -d)
+                if best is None or key > best[0]:
+                    best = (key, e)
+            e2e = best[1] if best else None
+        if not e2e:
+            return False
+        n = 0
+        for r in self.e2e_rows[e2e]:
+            it = self.run_doc_item(r, t)
+            if not it:
+                continue
+            a = abs(int(round(float(r["document_amount"]) * 100)))
+            if it.ccy != r["currency"]:
+                a = self.ph.fx.conv(a, r["currency"], it.ccy, t.date)
+            self.emit(t, it, a, "RETURNED", "transfer_return", f"transferencia devuelta {e2e}")
+            n += 1
+        return n > 0
+
+    # ------------------------------------------------------------ retenciones en garantía (POLICIES §3, §5.8)
+    RX_RETENTION = re.compile(r"RETENTION RELEASE|RELEASE OF RETENTION|LIBERACION (?:DE )?(?:LA )?RETENCION|"
+                              r"RET\. ?GARANTIA|DEVOLUCION (?:DE )?(?:LA )?GARANTIA|LIBERATION (?:DE )?(?:LA )?RETENUE|"
+                              r"FREIGABE (?:DES )?EINBEHALT|LIBERACAO (?:DA )?RETENCAO")
+
+    def m_retention_release(self, t):
+        """El banco dice que es la liberación de la retención: el resto de la factura queda cobrado del todo y la fila
+        va sin excepción (nunca PARTIAL); con otra divisa, FX_DIFFERENCE."""
+        if t.amount <= 0 or not self.RX_RETENTION.search(t.up):
+            return False
+        cash = t.amount
+        parties, _ = self.resolve_parties(t)
+        if not parties:
+            parties = self.scan_names(t)
+        fam = set()
+        for p in parties:
+            fam |= {p} | self.ph.children.get(p, set())
+        cands = set()
+        for tok in t.tokens:
+            cands |= self.ph.by_num.get(tok, set())
+            if tok.isdigit() and len(tok) >= 6:
+                cands |= self.ph.by_suffix.get(tok[-6:], set())
+        its = [self.items[c] for c in cands]
+        its = [i for i in its if i.kind == "ARI" and self.entity_ok(i, t) and (i.issue or t.date) <= t.date]
+        if fam:
+            its = [i for i in its if i.party in fam] or (its if len(its) == 1 else [])
+            if not its:
+                its = [i for p in fam for i in self.open_items_of(p, t, {"ARI"})]
+        if not its:
+            return False
+
+        def fit(i):
+            cash_item = cash if i.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, i.ccy, t.date)
+            tol = 2 if i.ccy == t.ccy else 0.03 * cash_item
+            if i.open > 0 and abs(i.open - cash_item) <= tol:
+                return 0  # lo que queda abierto es justo la retención
+            if i.total and 0.045 <= cash_item / i.total <= 0.105:
+                return 1  # 5-10 % del total
+            return 9
+
+        best = min(its, key=lambda i: (fit(i), -(i.open > 0), i.issue or dt.date.min, i.id))
+        if fit(best) == 9 and len(its) > 1:
+            return False
+        fx = best.ccy != t.ccy
+        amount = best.open if fx and best.open > 0 else (cash if not fx else self.ph.fx.conv(cash, t.ccy, best.ccy, t.date))
+        self.emit(t, best, amount, "FX_DIFFERENCE" if fx else "", "retention_release",
+                  f"liberación de retención {best.number}")
         return True
 
     def run_doc_item(self, r, t):
@@ -814,7 +1012,9 @@ class Engine:
                 self.emit_cat(t, "BANK_REVERSAL", "", "reversal_pair")
                 continue
             done = False
-            for m in (self.m_dd_batch, self.m_dd_return, self.m_card, self.m_cheque, self.m_payment_run):
+            for m in (self.m_retention_release, self.m_dd_batch, self.m_card_chargeback, self.m_cheque_return,
+                      self.m_transfer_return,
+                      self.m_dd_return, self.m_card, self.m_cheque, self.m_payment_run):
                 if m(t):
                     done = len(self.rows) > n0
                     if done:

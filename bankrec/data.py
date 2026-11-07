@@ -182,6 +182,9 @@ class Phase:
         self.dd = self._prev_csvs("direct_debit_batches") + self._csvs("direct_debit_batches")
         self.cards = self._csvs("card_settlements")
         self.cheques = self._csvs("cheque_deposits")
+        # solo para devoluciones (contracargos y cheques impagados de operaciones del mes anterior)
+        self.cards_prev = self._prev_csvs("card_settlements", months=3)
+        self.cheques_prev = self._prev_csvs("cheque_deposits", months=3)
         self.runs = self._prev_csvs("payment_runs") + self._csvs("payment_runs")
         self._index()
 
