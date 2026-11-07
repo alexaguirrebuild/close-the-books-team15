@@ -3,6 +3,8 @@ import { detectLayouts, filesOfLayout, phaseOfEngineFile, shouldEnter, type Phas
 
 const live: PhaseLayout = { phase: 'live', phaseDir: 'live', mastersDir: 'bankrec-docs-and-masters/masters', outDir: 'out/live' }
 
+const source = (path: string) => ({ path, open: async () => new File([], path) })
+
 describe('detectLayouts', () => {
   test('finds the phases next to the documentation folder, like the pipeline does', () => {
     const layouts = detectLayouts([
@@ -45,7 +47,6 @@ describe('detectLayouts', () => {
 })
 
 describe('filesOfLayout', () => {
-  const source = (path: string) => ({ path, open: async () => new File([], path) })
 
   test('keeps the phase, the masters and its output, and nothing from other phases', () => {
     const paths = filesOfLayout(live, [
@@ -81,6 +82,24 @@ describe('filesOfLayout', () => {
       source('final/masters_final/fx_rates.csv'),
     ]).map((s) => s.path)
     expect(paths).toEqual(['final/masters_final/fx_rates.csv', 'bankrec-docs-and-masters/masters/fx_rates.csv'])
+  })
+})
+
+describe('engine runs of TRAIN', () => {
+  const train: PhaseLayout = { ...live, phase: 'train', phaseDir: 'train', outDir: 'out/train' }
+  const kept = (layout: PhaseLayout, names: string[]) => filesOfLayout(layout, names.map((name) => source(`out/${name}`))).map((s) => s.path)
+
+  test('finds the full run, the holdout and the --since runs, which are all parts of TRAIN', () => {
+    const names = ['explain_train.csv.gz', 'sub_train.csv.gz', 'explain_holdout.csv.gz', 'sub_holdout.csv.gz', 'explain_train_since2025-01-01.csv.gz', 'sub_train_since2025-01-01.csv.gz']
+    expect(kept(train, names)).toEqual(names.map((name) => `out/${name}`))
+  })
+
+  test('leaves out copies with another suffix and the temporary files of a run', () => {
+    expect(kept(train, ['sub_train_v2.csv.gz', 'explain_holdout_old.csv.gz', 'explain_train_since2025.csv.gz', '_txns.csv.gz', '_golden_holdout.csv.gz', 'sub_live.csv.gz'])).toEqual([])
+  })
+
+  test('does not bring them into any other phase', () => {
+    expect(kept(live, ['explain_holdout.csv.gz', 'explain_train_since2025-01-01.csv.gz'])).toEqual([])
   })
 })
 

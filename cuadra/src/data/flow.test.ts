@@ -125,6 +125,27 @@ describe('engine output', () => {
     expect(plan.files.proposals?.mapping).toMatchObject({ source: 'rule', reason: 'evidence' })
   })
 
+  test('a full run of TRAIN beats one over a part of it, even when that one is newer', async () => {
+    for (const partial of ['out/explain_holdout.csv.gz', 'out/explain_train_since2025-01-01.csv.gz']) {
+      const plan = await buildPlan('demo', [
+        ...sources({ 'propuestas.csv': null }),
+        output('out/sub_train.csv.gz', OFFICIAL, 1),
+        output(partial, EXPLAINED, 9),
+      ])
+      expect(plan.files.proposals?.path).toBe('out/sub_train.csv.gz')
+      expect(plan.proposalOptions).toContain(partial)
+    }
+  })
+
+  test('the holdout is used when it is the only run, and a manual choice is respected', async () => {
+    const holdout = output('out/explain_holdout.csv.gz', EXPLAINED, 1)
+    const full = output('out/explain_train.csv.gz', EXPLAINED, 9)
+    const base = sources({ 'propuestas.csv': null })
+    expect((await buildPlan('demo', [...base, holdout])).files.proposals?.path).toBe('out/explain_holdout.csv.gz')
+    const chosen = await buildPlan('demo', [...base, full, holdout], { proposalPath: 'out/explain_holdout.csv.gz' })
+    expect(chosen.files.proposals?.path).toBe('out/explain_holdout.csv.gz')
+  })
+
   test('does not mix old stages into a file that already says where each row came from', async () => {
     const plan = await buildPlan('demo', [
       ...sources({ 'propuestas.csv': null }),

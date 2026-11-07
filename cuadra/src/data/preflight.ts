@@ -77,15 +77,20 @@ async function planFile(role: FileRole, source: SourceFile): Promise<PlannedFile
 
 const isStage = (path: string) => /(^|\/)matches\//.test(path)
 const ENGINE_RULE_COLUMN = /^(rule|regla)$/i
+const PARTIAL_RUN = /^(sub|explain)_(holdout|train_since)/
 
-/** The most finished file wins: named proposals and the engine's explained rows, then the merged submission, then the baseline. */
+/**
+ * The most finished file wins: named proposals and the engine's explained rows, then the merged submission, then the baseline.
+ * A run over a part of TRAIN comes after all of them: picked on its own it would leave most of the phase without proposals.
+ */
 function proposalRank(path: string): number {
   const name = (path.split('/').at(-1) ?? '').toLowerCase()
-  if (isStage(path)) return 3
+  if (isStage(path)) return 4
+  if (PARTIAL_RUN.test(name)) return 3
   if (/^(propuestas|proposals|explain_)/.test(name)) return 0
   if (/^(submission|sub_|merged)/.test(name)) return 1
   if (/^baseline/.test(name)) return 2
-  return 4
+  return 5
 }
 
 async function pickProposal(candidates: SourceFile[], wanted: string | null | undefined): Promise<SourceFile | null> {

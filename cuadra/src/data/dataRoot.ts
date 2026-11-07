@@ -37,8 +37,11 @@ export function detectLayouts(paths: string[]): PhaseLayout[] {
 
 const isInside = (path: string, dir: string | null) => dir !== null && (path === dir || path.startsWith(`${dir}/`))
 
-/** The engine writes one pair of files per phase directly under out/, next to its temporary files. */
-const engineOutput = (phase: PhaseName) => new RegExp(String.raw`^out/(sub|explain)_${phase}\.csv(\.gz)?$`, 'i')
+/** TRAIN has more kinds of run. Exact names only: anything with another suffix is a copy, and a copy is chosen by hand. */
+const ENGINE_RUNS: Partial<Record<PhaseName, string>> = { train: String.raw`train(?:_since\d{4}-\d{2}-\d{2})?|holdout` }
+
+/** The engine writes one pair of files per run directly under out/, next to its temporary files. */
+const engineOutput = (phase: PhaseName) => new RegExp(String.raw`^out/(?:sub|explain)_(?:${ENGINE_RUNS[phase] ?? phase})\.csv(?:\.gz)?$`, 'i')
 
 const ENGINE_FILE_NAME = /^(?:sub|explain)_(sample|train|holdout|live|final)(?=[._]|$)/i
 
