@@ -518,3 +518,70 @@ class TestFilasRotasNoTumbanElLote:
         eng.dd_batches, eng.dd_by_mandate, eng.card_sets, eng.run_rows, eng.e2e_rows = {}, {}, {}, {}, {}
         proveedores._drop_broken_rows(eng)
         assert eng.cheque_deps["RCH1"] == filas and eng.lote2_dropped == []
+
+
+def motor_adeudos(items, recibos, mandato_cliente="C1"):
+    from collections import defaultdict
+    eng = Engine.__new__(Engine)
+    eng.items = {i.id: i for i in items}
+    by_num, by_party = defaultdict(set), defaultdict(list)
+    from bankrec.data import num_variants
+    for i in items:
+        for v in num_variants(i.number):
+            by_num[v].add(i.id)
+        by_party[i.party].append(i.id)
+    eng.ph = SimpleNamespace(by_num=by_num, by_party=by_party, children={}, party_by_iban={})
+    eng.dd_batches = {"0325051665": recibos}
+    eng.mandate_party = {"VTM-ES-0006972": mandato_cliente}
+    eng.rows, eng.settled_by, eng.iban_learned, eng.used_batches = [], defaultdict(list), {}, set()
+    proveedores._wrap_dd_batch(eng)
+    return eng
+
+
+def recibo(numero, importe="211.75", re_presentado="N"):
+    return {"batch_id": "0325051665", "batch_total": importe, "amount": importe, "remittance_info": numero,
+            "mandate_id": "VTM-ES-0006972", "debtor_iban": "", "re_presentation": re_presentado}
+
+
+def abono_remesa(importe=21175):
+    return SimpleNamespace(id="T9", amount=importe, entity="ES01", date=DAY, cp_iban="",
+                           up="ABONO REMESA SEPA CORE 0325051665 | PRESENTADA 250516 1 RECIBOS")
+
+
+def cobro(item_id, numero, abierto, issue=dt.date(2025, 4, 1)):
+    return Item(id=item_id, kind="ARI", side="AR", entity="ES01", number=numero, party="C1", ccy="EUR",
+                total=21175, open=abierto, issue=issue)
+
+
+class TestReciboRepresentado:
+    """POLICIES §5.10: un recibo devuelto se vuelve a presentar en otra remesa (re_presentation=Y) y liquida la
+    MISMA factura. Si el motor no vio la devolución, la factura figura cerrada y m_dd_batch la cambiaba por otra
+    abierta del cliente con el mismo importe: fila equivocada. Holdout: los 5 re-presentados de 3 remesas
+    revisadas siguen la secuencia cobro -> RETURNED -> re-presentación de la misma factura."""
+
+    def test_representado_liquida_su_factura_aunque_figure_cerrada(self):
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=0)
+        otra = cobro("ARI-2025-0000002", "FV25-0000002", abierto=21175, issue=dt.date(2025, 3, 1))
+        eng = motor_adeudos([citada, otra], [recibo("FV25-0631481", re_presentado="Y")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [(r.item, r.amount) for r in eng.rows] == [(citada.id, 21175)]
+
+    def test_representado_con_factura_reabierta_igual_que_antes(self):
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=21175)
+        eng = motor_adeudos([citada], [recibo("FV25-0631481", re_presentado="Y")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [(r.item, r.amount, r.exception) for r in eng.rows] == [(citada.id, 21175, "")]
+
+    def test_no_representado_con_factura_cerrada_sigue_buscando_por_mandato(self):
+        # comportamiento previo del motor: sin la marca, una factura cerrada se cambia por la abierta del mandato
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=0)
+        otra = cobro("ARI-2025-0000002", "FV25-0000002", abierto=21175, issue=dt.date(2025, 3, 1))
+        eng = motor_adeudos([citada, otra], [recibo("FV25-0631481", re_presentado="N")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [r.item for r in eng.rows] == [otra.id]
+
+    def test_representado_sin_factura_citada_no_inventa(self):
+        otra = cobro("ARI-2025-0000002", "FV25-0000002", abierto=21175)
+        eng = motor_adeudos([otra], [recibo("FV25-9999999", re_presentado="Y")])
+        eng.m_dd_batch(abono_remesa())
+        assert [r.item for r in eng.rows] in ([], [otra.id])  # sin cita válida, el motor sigue su camino de siempre
