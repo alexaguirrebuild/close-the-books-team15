@@ -82,6 +82,10 @@ def load_plugins(names: str) -> list:
     return loaded
 
 
+MAX_PARTIES_TRIED = 4
+MAX_SUBSET_ITEMS = 14
+
+
 class Engine:
     def __init__(self, ph: Phase):
         self.ph = ph
@@ -769,18 +773,46 @@ class Engine:
         parties, how = self.resolve_parties(t)
         if not parties:
             parties, how = self.scan_names(t), "nombre_texto"
-        for party in parties[:4]:
+        tried = parties[:MAX_PARTIES_TRIED]
+        for party in tried:
             if self._party_amount(t, party, how):
                 return True
+        return self._party_rescue(t, tried)
+
+    def _party_rescue(self, t, tried):
+        """Terceros que el camino normal no llegó a probar: homónimos de más y nombres que solo ve scan_names.
+        Solo con evidencia exacta y un único candidato: POLICIES §3 UNIDENTIFIED pide no forzar."""
+        cash = abs(t.amount)
+        exact, subsets = {}, {}
+        for party in dict.fromkeys([*self.resolve_parties(t)[0], *self.scan_names(t)]):
+            if party in tried:
+                continue
+            its = self.open_items_of(party, t, self._party_kinds(party, t))
+            same = [i for i in its if abs(self.to_bank(i.open, i, t) - cash) <= 2]
+            if same:
+                exact[party] = same[:1]
+            elif 1 < len(its) <= MAX_SUBSET_ITEMS:  # con más, muchas combinaciones suman lo mismo: no identifica
+                sub = self.best_subset(its, cash, t, max_n=MAX_SUBSET_ITEMS)
+                if sub:
+                    subsets[party] = sub
+        for found, rule in ((exact, "party_rescue_exact"), (subsets, "party_rescue_subset")):
+            if found:
+                if len(found) > 1:
+                    return False
+                party, picks = next(iter(found.items()))
+                return self.settle(t, [i.id for i in picks], rule, f"contraparte {party}", party=party)
         return False
 
-    def _party_amount(self, t, party, how):
-        kinds = {"ARI", "ARC"} if t.amount > 0 else {"API", "APC"}
+    @staticmethod
+    def _party_kinds(party, t):
         if party.startswith("S") and t.amount > 0:
-            kinds = {"APC"}  # el proveedor nos devuelve un abono suyo (POLICIES §4, último punto)
-        elif party.startswith("C") and t.amount < 0:
-            kinds = {"ARC"}  # rappel o abono pagado al cliente por transferencia
-        its = self.open_items_of(party, t, kinds)
+            return {"APC"}  # el proveedor nos devuelve un abono suyo (POLICIES §4, último punto)
+        if party.startswith("C") and t.amount < 0:
+            return {"ARC"}  # rappel o abono pagado al cliente por transferencia
+        return {"ARI", "ARC"} if t.amount > 0 else {"API", "APC"}
+
+    def _party_amount(self, t, party, how):
+        its = self.open_items_of(party, t, self._party_kinds(party, t))
         if not its:
             return False
         cash = abs(t.amount)
@@ -795,7 +827,7 @@ class Engine:
                     same = pick
             return self.settle(t, [same[0].id], f"party_amount_{how}", f"contraparte {party}", party=party)
         sub = self.best_subset([i for i in its if self.sign(i, t) > 0] + [i for i in its if self.sign(i, t) < 0], cash, t,
-                               max_n=14)
+                               max_n=MAX_SUBSET_ITEMS)
         if sub:
             return self.settle(t, [i.id for i in sub], f"party_subset_{how}", f"contraparte {party}")
         inv = [i for i in its if self.sign(i, t) > 0]
