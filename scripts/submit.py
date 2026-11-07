@@ -41,12 +41,15 @@ def require_https(url: str) -> None:
 
 
 def token() -> str:
-    tok = os.environ.get("HK_TOKEN", "")
+    tok = os.environ.get("HK_TOKEN", "").strip().strip("\"'")
     env = ROOT / ".env"
     if not tok and env.exists():
-        for line in env.read_text(encoding="utf-8").splitlines():
+        for raw in env.read_text(encoding="utf-8-sig").splitlines():
+            line = raw.strip()
+            if line.startswith("export "):
+                line = line[len("export "):].strip()
             if line.startswith("HK_TOKEN="):
-                tok = line.split("=", 1)[1].strip()
+                tok = line.split("=", 1)[1].strip().strip("\"'")
     if not tok:
         sys.exit("Falta HK_TOKEN (en .env o en el entorno).")
     return tok

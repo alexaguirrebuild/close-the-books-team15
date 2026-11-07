@@ -31,8 +31,12 @@ def main(a="final", b="live"):
     for title, x, y in (("CATEGORÍA", ca, cb), ("EXCEPCIÓN", ea, eb), ("REGLA", ra, rb)):
         print(f"\n{title:22s} {a:>9s} {b:>9s}   (% sobre movimientos)")
         for k in sorted(set(x) | set(y), key=lambda k: -(x[k] + y[k])):
-            pa, pb = 100 * x[k] / na, 100 * y[k] / nb
-            flag = "  <-- revisar" if abs(pa - pb) > max(2.0, 0.5 * max(pa, pb)) else ""
+            pa = 100 * x[k] / na if na else 0.0
+            pb = 100 * y[k] / nb if nb else 0.0
+            drift = abs(pa - pb) > max(2.0, 0.5 * max(pa, pb))
+            if title == "EXCEPCIÓN" and ((pa == 0) != (pb == 0) or (min(pa, pb) > 0 and max(pa, pb) / min(pa, pb) >= 2.0)):
+                drift = True
+            flag = "  <-- revisar" if drift else ""
             print(f"  {k[:22]:22s} {pa:8.2f}% {pb:8.2f}%{flag}")
 
 

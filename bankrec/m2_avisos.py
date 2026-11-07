@@ -32,9 +32,15 @@ def prepare(engine) -> None:
         print(f"  AVISO: sin filas de avisos enlazados en {path}", flush=True)
         return
     grouped = defaultdict(list)
+    ra_used = getattr(engine, "ra_used", None)
+    if ra_used is None:
+        ra_used = set()
+        engine.ra_used = ra_used
     for row in rows(path):
         if row["item_id"] and float(row.get("confidence") or 1) >= 1.0:
             grouped[row["bank_txn_id"]].append(row)
+            if row.get("advice_id"):
+                ra_used.add(row["advice_id"])
     engine.m2_rows = dict(grouped)
     print(f"  avisos enlazados: {len(grouped)} movimientos · {path}", flush=True)
 
@@ -43,7 +49,13 @@ def match(engine, t) -> bool:
     lines = engine.m2_rows.get(t.id)
     if not lines:
         return False
+    ra_used = getattr(engine, "ra_used", None)
+    if ra_used is None:
+        ra_used = set()
+        engine.ra_used = ra_used
     for line in lines:
+        if line.get("advice_id"):
+            ra_used.add(line["advice_id"])
         amount = cents(line["amount"])
         evidence = f"aviso {line['advice_id']}"
         item = engine.items.get(line["item_id"])
