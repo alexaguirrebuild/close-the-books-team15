@@ -6,11 +6,12 @@ import random
 import zipfile
 from pathlib import Path
 
+import duckdb
 import openpyxl
 import pytest
 
 from bankcheck.csvload import CsvSpec, load_csv
-from bankcheck.db import IngestContext, building_path, open_build
+from bankcheck.db import IngestContext, building_path, failed_path, open_build
 from bankcheck.ingest import run_ingest
 from bankcheck.issues import IssueLog, Manifest
 from bankcheck.roots import IndexUnreadable, read_file_index
@@ -26,6 +27,21 @@ TRUNCATED_SHARE = 0.6
 
 def files_with(root_path: Path, code: str) -> list[str]:
     return [row[0] for row in query(root_path, f"SELECT file FROM ingest_issue WHERE code = '{code}' ORDER BY 1")]
+
+
+def query_failed_build(root_path: Path, sql: str) -> list[tuple]:
+    """Una tabla principal vacía no se publica ni con --allow-errors: el diagnóstico queda en el almacén apartado."""
+    warehouse = layout_of(root_path).warehouse_path
+    assert not warehouse.exists()
+    con = duckdb.connect(str(failed_path(warehouse)), read_only=True)
+    try:
+        return con.execute(sql).fetchall()
+    finally:
+        con.close()
+
+
+def files_in_failed_build(root_path: Path, code: str) -> list[str]:
+    return [row[0] for row in query_failed_build(root_path, f"SELECT file FROM ingest_issue WHERE code = '{code}' ORDER BY 1")]
 
 
 def add_advice(root_path: Path, name: str, content: bytes) -> str:
@@ -266,9 +282,10 @@ class TestUnreadableTables:
         result = run_ingest(layout_of(root), allow_errors=True)
 
         assert result.ok is False
-        assert files_with(root, "FILE_UNREADABLE") == ["live/ar_invoices.csv.gz"]
-        assert query(root, "SELECT count(*) FROM ar_invoice") == [(0,)]
-        assert query(root, "SELECT count(*) FROM ap_invoice") == [(1,)]
+        assert result.published is False
+        assert files_in_failed_build(root, "FILE_UNREADABLE") == ["live/ar_invoices.csv.gz"]
+        assert query_failed_build(root, "SELECT count(*) FROM ar_invoice") == [(0,)]
+        assert query_failed_build(root, "SELECT count(*) FROM ap_invoice") == [(1,)]
 
     @pytest.mark.parametrize(
         ("content", "code"),
@@ -285,7 +302,8 @@ class TestUnreadableTables:
         result = run_ingest(layout_of(root), allow_errors=True)
 
         assert result.ok is False
-        assert files_with(root, code) == ["live/ar_invoices.csv.gz"]
+        assert result.published is False
+        assert files_in_failed_build(root, code) == ["live/ar_invoices.csv.gz"]
 
     def test_a_gzip_whose_second_member_is_truncated_is_reported(self, root: Path) -> None:
         path = root / "live" / "ar_invoices.csv.gz"
@@ -295,7 +313,8 @@ class TestUnreadableTables:
         result = run_ingest(layout_of(root), allow_errors=True)
 
         assert result.ok is False
-        assert files_with(root, "FILE_UNREADABLE") == ["live/ar_invoices.csv.gz"]
+        assert result.published is False
+        assert files_in_failed_build(root, "FILE_UNREADABLE") == ["live/ar_invoices.csv.gz"]
 
     def test_one_bad_file_among_many_is_named_and_the_others_load(self, root: Path, tmp_path: Path) -> None:
         ctx = IngestContext(layout_of(root), open_build(tmp_path / "t.duckdb"), IssueLog(), Manifest())

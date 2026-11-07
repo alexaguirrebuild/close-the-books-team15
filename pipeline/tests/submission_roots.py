@@ -78,8 +78,9 @@ def build_phase(
     (root / "starter").mkdir(exist_ok=True)
     shutil.copyfile(REAL_SCORER, root / "starter" / REAL_SCORER.name)
     _write_raw_files(root / phase, txns, items, opening)
-    _write_warehouse(root / "cache" / "warehouse" / f"{phase}.duckdb", txns, items, ingest_errors)
-    return resolve_layout(phase, data_root=root)
+    layout = resolve_layout(phase, data_root=root)
+    _write_warehouse(layout.warehouse_path, txns, items, ingest_errors)
+    return layout
 
 
 def run_on_warehouse(layout: Layout, statement: str) -> None:

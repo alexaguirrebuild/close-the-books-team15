@@ -22,11 +22,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
-    data = tmp_path / "data"
-    train = build_phase(data, "train", TXNS, ITEMS)
+    base = tmp_path / "repo"  # Una carpeta llamada data/ movería out/ y cache/ a su padre (roots.py) y estas rutas mirarían otro sitio.
+    train = build_phase(base, "train", TXNS, ITEMS)
     write_golden(train, GOLDEN)
-    build_phase(data, "live", TXNS, ITEMS)
-    return data
+    build_phase(base, "live", TXNS, ITEMS)
+    return base
 
 
 def saved_report(root: Path) -> dict:
