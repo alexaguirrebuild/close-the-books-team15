@@ -1,4 +1,5 @@
 """Mismo importe: qué partida se elige cuando el cobro no cita ninguna, y cuándo no se responde."""
+import collections
 import datetime as dt
 from types import SimpleNamespace
 
@@ -21,7 +22,7 @@ def credit_note(item_id, party="C1", cents=CASH, issue=dt.date(2025, 1, 1)):
 
 
 def movement(amount=CASH, up=""):
-    return SimpleNamespace(id="T1", amount=amount, entity="ES01", ccy="EUR", date=DAY, up=up, orig_ccy=None, orig_amount=None)
+    return SimpleNamespace(id="T1", amount=amount, entity="ES01", ccy="EUR", date=DAY, up=up, orig_ccy=None, orig_amount=None, cp_iban="")
 
 
 def engine(items, named=("C1",), scanned=()):
@@ -202,6 +203,104 @@ class TestAvisoConParcial:
         eng.items, eng.ph = {}, SimpleNamespace(txns=[])
         mismo_importe.prepare(eng)
         assert not hasattr(eng, "m2_rows")
+
+    def test_una_factura_de_proveedor_en_un_cobro_no_tumba_el_motor(self):
+        lines = [aviso("A", "40.00"), aviso("API1", "60.00")]
+        items = [invoice("A", cents=4000), invoice("API1", cents=6000, kind="API", side="AP")]
+        assert self.preparado(lines, items=items).m2_rows["T1"] == lines
+
+    def test_en_un_cargo_no_cambia(self):
+        lines = [aviso("API1", "40.00"), aviso("API2", "60.00")]
+        items = [invoice("API1", cents=4000, kind="API", side="AP"), invoice("API2", cents=6000, kind="API", side="AP")]
+        assert self.preparado(lines, cash=-7000, items=items).m2_rows["T1"] == lines
+
+
+def motor_real(items):
+    """Con settle y emit de verdad: lo que se comprueba son las filas que salen."""
+    eng = Engine.__new__(Engine)
+    by_party = {}
+    for item in sorted(items, key=lambda i: (i.issue, i.id)):
+        by_party.setdefault(item.party, []).append(item.id)
+    eng.items = {item.id: item for item in items}
+    eng.ph = SimpleNamespace(children={}, by_party=by_party, fx=None, terms={}, txns=[])
+    eng.rows, eng.iban_learned = [], {}
+    eng.settled_by = collections.defaultdict(list)
+    eng.resolve_parties = lambda t: (["C1"], "nombre")
+    eng.scan_names = lambda t: []
+    mismo_importe.prepare(eng)
+    return eng
+
+
+def filas(eng):
+    return sorted((row.item, row.amount, row.exception) for row in eng.rows)
+
+
+class TestParcialAlLiquidar:
+    """Con el conjunto ya elegido: la parcial es la factura que encaja en la fracción, no la más nueva."""
+
+    def test_la_parcial_no_tiene_por_que_ser_la_mas_nueva(self):
+        items = [invoice("ANTIGUA", cents=8000, issue=dt.date(2025, 1, 1)), invoice("NUEVA", cents=3000, issue=dt.date(2025, 5, 1))]
+        eng = motor_real(items)
+        assert eng.settle(movement(7000), ["ANTIGUA", "NUEVA"], "ref")  # faltan 40: ANTIGUA al 50 %
+        assert filas(eng) == [("ANTIGUA", 4000, "PARTIAL"), ("NUEVA", 3000, "")]
+        assert items[0].open == 4000 and items[1].open == 0
+
+    def test_un_abono_citado_se_descuenta_y_lleva_su_fila(self):
+        items = [invoice("ANTIGUA", cents=8000, issue=dt.date(2025, 1, 1)), invoice("NUEVA", cents=4000, issue=dt.date(2025, 5, 1)), credit_note("ABONO", cents=2000)]
+        eng = motor_real(items)
+        assert eng.settle(movement(6000), ["ANTIGUA", "NUEVA", "ABONO"], "ref")  # 100 menos 60: ANTIGUA al 50 %
+        assert filas(eng) == [("ABONO", 2000, ""), ("ANTIGUA", 4000, "PARTIAL"), ("NUEVA", 4000, "")]
+
+    def test_si_dos_encajan_sigue_la_regla_de_siempre(self):
+        items = [invoice("A", cents=6000, issue=dt.date(2025, 1, 1)), invoice("B", cents=6000, issue=dt.date(2025, 5, 1))]
+        eng = motor_real(items)
+        assert eng.settle(movement(9000), ["A", "B"], "ref")
+        assert filas(eng) == [("A", 6000, ""), ("B", 3000, "PARTIAL")]
+
+    def test_si_ninguna_encaja_sigue_la_regla_de_siempre(self):
+        items = [invoice("A", cents=6000, issue=dt.date(2025, 1, 1)), invoice("B", cents=6000, issue=dt.date(2025, 5, 1))]
+        eng = motor_real(items)
+        assert eng.settle(movement(11000), ["A", "B"], "ref")
+        assert filas(eng) == [("A", 6000, ""), ("B", 5000, "PARTIAL")]
+
+    def test_un_abono_sin_citar_que_cubre_la_diferencia_gana_a_la_parcial(self):
+        items = [invoice("A", cents=8000, issue=dt.date(2025, 1, 1)), invoice("B", cents=3000, issue=dt.date(2025, 5, 1)), credit_note("ABONO", cents=4000)]
+        eng = motor_real(items)
+        assert eng.settle(movement(7000), ["A", "B"], "ref", party="C1")
+        assert filas(eng) == [("A", 8000, ""), ("ABONO", 4000, ""), ("B", 3000, "")]
+
+    def test_si_el_importe_cuadra_no_hay_parcial(self):
+        items = [invoice("A", cents=8000), invoice("B", cents=3000)]
+        eng = motor_real(items)
+        assert eng.settle(movement(11000), ["A", "B"], "ref")
+        assert filas(eng) == [("A", 8000, ""), ("B", 3000, "")]
+
+    def test_otra_divisa_sigue_la_regla_de_siempre(self):
+        eng = spy_settle([invoice("A", cents=8000), invoice("B", cents=3000, ccy="USD")])
+        assert eng.settle(movement(7000), ["A", "B"], "ref")
+        assert eng.delegated == [["A", "B"]]
+
+    def test_una_sola_factura_sigue_la_regla_de_siempre(self):
+        eng = spy_settle([invoice("A", cents=8000)])
+        assert eng.settle(movement(4000), ["A"], "ref")
+        assert eng.delegated == [["A"]]
+
+    def test_un_cargo_sigue_la_regla_de_siempre(self):
+        eng = spy_settle([invoice("A", cents=8000, kind="API", side="AP"), invoice("B", cents=3000, kind="API", side="AP")])
+        assert eng.settle(movement(-7000), ["A", "B"], "ref")
+        assert eng.delegated == [["A", "B"]]
+
+
+def spy_settle(items):
+    """Solo para ver si settle pasa el caso a la regla original."""
+    eng = Engine.__new__(Engine)
+    eng.items = {item.id: item for item in items}
+    eng.ph = SimpleNamespace(children={}, by_party={}, fx=None, terms={}, txns=[])
+    eng.rows = []
+    eng.delegated = []
+    eng.settle = lambda t, ids, rule, ev="", party=None: eng.delegated.append(list(ids)) or True
+    mismo_importe.prepare(eng)
+    return eng
 
 
 if __name__ == "__main__":

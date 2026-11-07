@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from functools import partial
+from itertools import combinations
 
 from .engine import AMOUNT_TOLERANCE_CENTS, MAX_SUBSET_ITEMS
 from .pdfclauses import MONTHS, _text_month
@@ -20,12 +21,14 @@ from .pdfclauses import MONTHS, _text_month
 YEAR_DIGITS = (2, 4)
 CENTURY = 2000
 PARTIAL_FRACTIONS = (0.4, 0.5, 0.6)
+RECEIVABLE_KINDS = ("ARI", "ARC")
 CENTS = 100
 
 
 def prepare(engine) -> None:
     engine._party_amount = partial(_party_amount, engine, engine._party_amount)
     engine._party_rescue = partial(_party_rescue, engine, engine._party_rescue)
+    engine.settle = partial(_settle, engine, engine.settle)
     if hasattr(engine, "m2_rows"):
         engine.m2_rows = _advices_with_partial(engine)
 
@@ -43,10 +46,44 @@ def _line_cents(line: dict) -> int:
     return int(round(float(line["amount"]) * CENTS))
 
 
+def _is_receivable_in(item, t) -> bool:
+    return bool(item) and item.kind in RECEIVABLE_KINDS and item.ccy == t.ccy
+
+
+def _emit_with_partial(engine, t, full: list, partial_item, paid: int, rule: str, evidence: str) -> bool:
+    for item in full:
+        engine.emit(t, item, item.open, "", rule, evidence)
+    engine.emit(t, partial_item, paid, "PARTIAL", rule, evidence)
+    return True
+
+
+def _credit_notes_cover(engine, t, party, cited: list, gap: int) -> bool:
+    """Lo que `settle` resuelve con abonos sin citar (POLICIES §2): si cuadran la diferencia, no hay parcial."""
+    known = {item.id for item in cited}
+    values = [c.open for c in engine.open_items_of(party, t, {"ARC"}) if c.id not in known]
+    return any(abs(value - gap) <= AMOUNT_TOLERANCE_CENTS for value in values) or any(
+        abs(a + b - gap) <= AMOUNT_TOLERANCE_CENTS for a, b in combinations(values, 2))
+
+
+def _settle(engine, original, t, cands, rule, ev="", party=None) -> bool:
+    items = [engine.items[c] for c in dict.fromkeys(cands)]
+    invoices = [item for item in items if item.kind == "ARI"]
+    if t.amount <= 0 or len(invoices) < 2 or not all(_is_receivable_in(item, t) for item in items):
+        return original(t, cands, rule, ev, party)
+    credits = [item for item in items if item.kind == "ARC"]
+    values = [max(item.open, 0) for item in invoices]
+    shortfall = sum(values) - sum(max(c.open, 0) for c in credits) - t.amount
+    position = partial_position(values, shortfall)
+    if position is None or (party and _credit_notes_cover(engine, t, party, items, shortfall)):
+        return original(t, cands, rule, ev, party)
+    full = [*credits, *(item for index, item in enumerate(invoices) if index != position)]
+    return _emit_with_partial(engine, t, full, invoices[position], values[position] - shortfall, rule, ev)
+
+
 def _advice_with_partial(engine, t, lines: list[dict]) -> list[dict]:
     """Las líneas de un aviso que suma más que el cobro, con la parcial marcada. Si no se identifica, las mismas líneas."""
     items = [engine.items.get(line["item_id"]) for line in lines]
-    if any(line["exception"] for line in lines) or not all(item and item.ccy == t.ccy for item in items):
+    if t.amount <= 0 or any(line["exception"] for line in lines) or not all(_is_receivable_in(item, t) for item in items):
         return lines
     signed = [_line_cents(line) * engine.sign(item, t) for line, item in zip(lines, items)]
     shortfall = sum(signed) - abs(t.amount)
