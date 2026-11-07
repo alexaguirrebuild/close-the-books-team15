@@ -5,6 +5,9 @@ por ser el más antiguo deja la factura abierta y arrastra el error a los cobros
 
 Entre facturas de importe exacto manda el mes de servicio que nombra el texto y, si no lo hay, la más antigua. El plugin
 `pdfclauses` solo lo mira cuando `resolve_party` da un cliente; aquí vale también si el nombre sale de `scan_names`.
+
+Cuando un cobro de varias facturas deja una abierta, de esa factura llega el 40, 50 o 60 % exacto (POLICIES §3 PARTIAL;
+medido en TRAIN: 925 de 925 en ar_n_to_m, casi nunca en otros segmentos). Es evidencia exacta de cuál es la parcial.
 """
 from __future__ import annotations
 
@@ -16,11 +19,48 @@ from .pdfclauses import MONTHS, _text_month
 
 YEAR_DIGITS = (2, 4)
 CENTURY = 2000
+PARTIAL_FRACTIONS = (0.4, 0.5, 0.6)
+CENTS = 100
 
 
 def prepare(engine) -> None:
     engine._party_amount = partial(_party_amount, engine, engine._party_amount)
     engine._party_rescue = partial(_party_rescue, engine, engine._party_rescue)
+    if hasattr(engine, "m2_rows"):
+        engine.m2_rows = _advices_with_partial(engine)
+
+
+def partial_position(values: list[int], shortfall: int) -> int | None:
+    """La única posición cuyo importe, menos lo que falta, es la fracción exacta de una parcial. Con dos o más, ninguna."""
+    if shortfall <= AMOUNT_TOLERANCE_CENTS:
+        return None
+    hits = [position for position, value in enumerate(values) if value - shortfall > 0
+            and any(abs(value - shortfall - value * fraction) <= AMOUNT_TOLERANCE_CENTS for fraction in PARTIAL_FRACTIONS)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _line_cents(line: dict) -> int:
+    return int(round(float(line["amount"]) * CENTS))
+
+
+def _advice_with_partial(engine, t, lines: list[dict]) -> list[dict]:
+    """Las líneas de un aviso que suma más que el cobro, con la parcial marcada. Si no se identifica, las mismas líneas."""
+    items = [engine.items.get(line["item_id"]) for line in lines]
+    if any(line["exception"] for line in lines) or not all(item and item.ccy == t.ccy for item in items):
+        return lines
+    signed = [_line_cents(line) * engine.sign(item, t) for line, item in zip(lines, items)]
+    shortfall = sum(signed) - abs(t.amount)
+    position = partial_position(signed, shortfall)
+    if position is None:
+        return lines
+    paid = {"amount": f"{(signed[position] - shortfall) / CENTS:.2f}", "exception": "PARTIAL"}
+    return [{**line, **paid} if index == position else line for index, line in enumerate(lines)]
+
+
+def _advices_with_partial(engine) -> dict:
+    movements = {t.id: t for t in engine.ph.txns if t.id in engine.m2_rows}
+    return {txn_id: _advice_with_partial(engine, movements[txn_id], lines) if txn_id in movements else lines
+            for txn_id, lines in engine.m2_rows.items()}
 
 
 def _text_year(text: str) -> int | None:

@@ -140,5 +140,69 @@ class TestMesDeServicio:
         assert self.elegida("TT IN JOHN MAY SERVICE OCTOBER 2024", items) == ["NOV"]
 
 
+def aviso(item_id, amount, exception=""):
+    return {"bank_txn_id": "T1", "item_id": item_id, "amount": amount, "exception": exception, "advice_id": "A1"}
+
+
+class TestAvisoConParcial:
+    """La factura que queda abierta se paga al 40, 50 o 60 %: 56 de 56 avisos de ar_n_to_m en el holdout."""
+
+    def preparado(self, lines, cash=7000, items=None):
+        eng = Engine.__new__(Engine)
+        known = items if items is not None else [invoice(line["item_id"], cents=int(round(float(line["amount"]) * 100))) for line in lines]
+        eng.items = {item.id: item for item in known}
+        eng.ph = SimpleNamespace(txns=[movement(cash)])
+        eng.m2_rows = {"T1": lines}
+        mismo_importe.prepare(eng)
+        return eng
+
+    def test_la_linea_parcial_lleva_lo_que_llego_y_su_excepcion(self):
+        lines = [aviso("A", "40.00"), aviso("B", "60.00")]  # faltan 30: B al 50 %
+        rows = self.preparado(lines).m2_rows["T1"]
+        assert [(r["item_id"], r["amount"], r["exception"]) for r in rows] == [("A", "40.00", ""), ("B", "30.00", "PARTIAL")]
+
+    def test_no_modifica_las_filas_originales(self):
+        lines = [aviso("A", "40.00"), aviso("B", "60.00")]
+        self.preparado(lines)
+        assert lines == [aviso("A", "40.00"), aviso("B", "60.00")]
+
+    def test_si_la_suma_es_el_cobro_no_cambia(self):
+        lines = [aviso("A", "30.00"), aviso("B", "40.00")]
+        assert self.preparado(lines).m2_rows["T1"] == lines
+
+    def test_si_alguna_linea_trae_excepcion_no_cambia(self):
+        lines = [aviso("A", "40.00", "SHORT_DISPUTE"), aviso("B", "60.00")]
+        assert self.preparado(lines).m2_rows["T1"] == lines
+
+    def test_otra_divisa_no_cambia(self):
+        lines = [aviso("A", "40.00"), aviso("B", "60.00")]
+        items = [invoice("A", cents=4000), invoice("B", cents=6000, ccy="USD")]
+        assert self.preparado(lines, items=items).m2_rows["T1"] == lines
+
+    def test_una_diferencia_que_no_es_esa_fraccion_no_cambia(self):
+        lines = [aviso("A", "50.00"), aviso("B", "50.00")]  # falta el 2 %: es un descuento, no una parcial
+        assert self.preparado(lines, cash=9800).m2_rows["T1"] == lines
+
+    def test_dos_lineas_posibles_no_se_elige(self):
+        lines = [aviso("A", "60.00"), aviso("B", "60.00")]
+        assert self.preparado(lines, cash=9000).m2_rows["T1"] == lines
+
+    def test_un_abono_del_aviso_cuenta_restando_y_nunca_es_la_parcial(self):
+        lines = [aviso("A", "40.00"), aviso("B", "80.00"), aviso("ABONO", "20.00")]
+        items = [invoice("A", cents=4000), invoice("B", cents=8000), credit_note("ABONO", cents=2000)]
+        rows = self.preparado(lines, cash=6000, items=items).m2_rows["T1"]  # 100 menos 60 de cobro: faltan 40, B al 50 %
+        assert [(r["item_id"], r["amount"], r["exception"]) for r in rows] == [("A", "40.00", ""), ("B", "40.00", "PARTIAL"), ("ABONO", "20.00", "")]
+
+    def test_una_partida_desconocida_no_cambia(self):
+        lines = [aviso("A", "40.00"), aviso("B", "60.00")]
+        assert self.preparado(lines, items=[invoice("A", cents=4000)]).m2_rows["T1"] == lines
+
+    def test_sin_avisos_cargados_no_falla(self):
+        eng = Engine.__new__(Engine)
+        eng.items, eng.ph = {}, SimpleNamespace(txns=[])
+        mismo_importe.prepare(eng)
+        assert not hasattr(eng, "m2_rows")
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
