@@ -99,7 +99,7 @@ Pasos de un envío, según el código de la web:
 | `.txt` | La web lo rechaza; el scorer lo aceptaría | Avisos, y extractos si el contenido es N43 | Lo ignora |
 | `.pdf` | Rechaza | Avisos: los lee. `pdfs/`: los indexa | Los lista; necesita `pdfs_text.csv` |
 | `.n43`, `.sta`, `.xml` | Rechaza | Detecta el formato por el contenido | Los ignora |
-| Otro fichero en la fase (`README`, `__MACOSX/`) | No aplica | **`FILE_NOT_READ`, que bloquea la publicación** | Lo ignora |
+| Otro fichero en la fase (`README`, `__MACOSX/`) | No aplica | `FILE_NOT_READ` como aviso: no bloquea. Si puede tener datos (`.csv`, `.gz`, extracto, aviso), como error | Lo ignora |
 
 ## 5. Errores posibles
 

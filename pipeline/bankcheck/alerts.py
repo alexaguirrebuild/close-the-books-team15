@@ -105,8 +105,24 @@ def _report_printed_coverage(ctx: IngestContext) -> None:
         ctx.issues.info("REMITTANCE_PRINTED_COVERAGE", "remittance_advices", f"{found} de {total} líneas de aviso citan un número impreso exacto de una partida de la fase")
 
 
+DATA_SUFFIXES = {".csv", ".gz", ".sta", ".n43", ".xml", ".xlsx", ".pdf"}
+TEXT_DATA_FOLDERS = ("bank_statements", "remittance_advices")  # ahí un .txt puede ser un extracto N43 o un aviso
+SYSTEM_FOLDER = "__MACOSX"
+
+
 def _is_indexed_pdf(path: Path, phase_dir: Path) -> bool:
     return path.suffix.lower() == ".pdf" and path.relative_to(phase_dir).parts[0] == INDEXED_ONLY_FOLDER
+
+
+def could_hold_data(path: Path, phase_dir: Path, masters_override: Path | None) -> bool:
+    """¿Un fichero sin leer puede ser un dato perdido? Un README o un maestro de más no lo es, y no debe bloquear FINAL."""
+    if masters_override is not None and path.is_relative_to(masters_override):
+        return False
+    parts = path.relative_to(phase_dir).parts
+    if SYSTEM_FOLDER in parts:
+        return False
+    suffix = path.suffix.lower()
+    return suffix in DATA_SUFFIXES or (suffix == ".txt" and parts[0] in TEXT_DATA_FOLDERS)
 
 
 def check_every_file_was_read(ctx: IngestContext) -> None:
@@ -114,8 +130,10 @@ def check_every_file_was_read(ctx: IngestContext) -> None:
     phase_dir = ctx.layout.phase_dir
     read = {record.path for record in ctx.manifest.files}
     for path in iter_phase_files(phase_dir):
-        if ctx.layout.relative(path) not in read and not _is_indexed_pdf(path, phase_dir):
-            ctx.issues.error("FILE_NOT_READ", "phase_folder", "ningún cargador ha leído este fichero", file=ctx.layout.relative(path))
+        if ctx.layout.relative(path) in read or _is_indexed_pdf(path, phase_dir):
+            continue
+        report = ctx.issues.error if could_hold_data(path, phase_dir, ctx.layout.masters_override_dir) else ctx.issues.warn
+        report("FILE_NOT_READ", "phase_folder", "ningún cargador ha leído este fichero", file=ctx.layout.relative(path))
     for path in phase_dir.iterdir():
         if is_excluded(path):
             ctx.issues.info("GOLDEN_EXCLUDED", "phase_folder", "excluido a propósito: solo sirve para evaluar", file=ctx.layout.relative(path))

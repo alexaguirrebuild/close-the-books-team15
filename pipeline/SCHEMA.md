@@ -148,6 +148,8 @@ Códigos de error (la ingesta sale con código distinto de 0):
 
 `BAD_HEADER`, `BAD_VALUE`, `CSV_ROW_REJECTED`, `FILE_UNREADABLE`, `FILE_NOT_READ`, `MISSING_FILE`, `MASTERS_FINAL_MISSING`, `DUPLICATE_BANK_TXN`, `DUPLICATE_ITEM`, `STATEMENT_UNKNOWN_FORMAT`, `STATEMENT_PARSE_ERROR`, `STATEMENT_PARTIAL`, `STATEMENT_CONTROL`, `RAW_ONLY_LINE`, `MISSING_IN_RAW`, `XVAL_DIFF`, `BANK_LINE_OUTSIDE_PHASE`, `REMITTANCE_PARSE_ERROR`, `REMITTANCE_PARTIAL`, `REMITTANCE_NO_LINES`, y en LIVE y FINAL también `NO_RAW_STATEMENT` e `INDEXED_FILE_MISSING`.
 
+`FILE_NOT_READ` es error solo si el fichero puede contener datos (`.csv`, `.gz`, extracto o aviso). Si no, es un aviso. También son avisos `EXTRA_COLUMNS` (columnas de más, que se ignoran) y `MASTER_SHRANK` (un maestro de `masters_final/` con menos de la mitad de filas que el anterior).
+
 `FILE_UNREADABLE` incluye un `.csv.gz` truncado o dañado y un `index.csv` sin columna `file` o que no se puede decodificar. `BAD_VALUE` incluye una fecha no válida en un `index.csv`, que queda vacía, y una fila de `index.csv` sin nombre de fichero, que se descarta. `REMITTANCE_PARSE_ERROR` incluye un importe `NaN` o fuera de `DECIMAL(18,2)`, y `STATEMENT_PARSE_ERROR` una fecha imposible en un extracto.
 
 Aviso que no bloquea: `FX_RATES_STALE`, cuando los tipos de una divisa en uso acaban más de 5 días antes del final de la fase.
