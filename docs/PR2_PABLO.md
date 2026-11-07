@@ -4,6 +4,25 @@
 - Contenido: es nuestro motor importado al repo de Pablo. Los comentarios por línea son de **CodeRabbit (bot)**, no de Pablo.
 - Extraído el 2026-11-07 con `gh pr view`, `gh api .../pulls/2/comments` y `gh pr diff`.
 
+## Clasificación frente a nuestro main (b768b96)
+
+Ninguno estaba resuelto: el PR es nuestro main. Medido en sample con pypdf y `PYTHONHASHSEED=0` (main 83,77).
+
+| # | Dónde | Qué | Estado |
+|---|---|---|---|
+| 1 | `.githooks/pre-commit` | sin gitleaks solo avisa | pendiente: gitleaks no está instalado aquí, hacerlo obligatorio bloquearía todos los commits |
+| 2 | `engine.py` settle | abonos sumados por `total` y sin convertir divisa | **v-pablo f45b747**, neutro |
+| 3 | `engine.py` cheques | candidata cerrada da fila de importe 0 | probado y descartado: neutro, no aporta |
+| 4a | `engine.py` resolve_names | orden de homónimos depende de la semilla | **v-pablo 35e7996**: 84,16 (main 83,77-83,84 según semilla) |
+| 4b | `engine.py` item_by_number | desempate por fecha sin id | **v-pablo f45b747**, neutro |
+| 5 | `engine.py` DP | cota recalculada en el bucle interno | **v-pablo 638df20** (rendimiento) |
+| 6 | `pdfclauses.py` | proforma con cláusulas: AttributeError en prepare() | **v-pablo 638df20** (evita caída en LIVE/FINAL) |
+| 7 | `remittance.py` | sort con `issue=None`: TypeError | lo lleva la sesión «Parsers documentales» (v-parsers-pdf) |
+| 8 | `remittance.py` settlement | pago sobre factura cerrada | ídem, versión acotada (la literal empeora ar_dispute_settlement) |
+| 9-10 | docs | cifras y bucle del plan del día | sin impacto en nota |
+| 11-14 | `scripts/submit.py` | errores HTTP tras gastar el hueco, token tras confirmar, `out/` | pendiente: importante antes del envío FINAL |
+| 15-16 | `vendor/` | ruta `--data` por defecto | no se toca `vendor/` (AGENTS.md) |
+
 ## Commits
 
 - `bacac6e` Motor bankrec: holdout 82,33 / sample 83,77 · bankrec engine brought in
