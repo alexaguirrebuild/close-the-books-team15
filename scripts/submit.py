@@ -10,9 +10,11 @@ El token sale de la variable de entorno HK_TOKEN o del fichero .env (que no se s
 from __future__ import annotations
 
 import gzip
+import hashlib
 import io
 import json
 import os
+import subprocess
 import sys
 import time
 import urllib.request
@@ -84,12 +86,29 @@ def s3_upload(url, fields, name, payload):
         return r.status
 
 
+def strict_validate(phase: str, path: Path) -> None:
+    """Además del evaluador oficial: cobertura total, partidas que existen, 2 decimales. Ver pipeline/README.md."""
+    command = ["uv", "run", "--project", str(ROOT / "pipeline"), "bankcheck", "validate", "--phase", phase.lower(), str(path.resolve())]
+    if subprocess.run(command, cwd=ROOT).returncode != 0:
+        sys.exit("El validador estricto rechaza el fichero. No se envía.")
+
+
+def describe(path: Path) -> str:
+    """Lo último que ve quien confirma: en FINAL no hay segunda oportunidad y un fichero antiguo también valida."""
+    data = path.read_bytes()
+    stat = path.stat()
+    modified = time.strftime("%H:%M:%S del %d/%m", time.localtime(stat.st_mtime))
+    return f"Fichero: {path.resolve()}\n  {stat.st_size / 1e6:.1f} MB · modificado a las {modified} · SHA-256 {hashlib.sha256(data).hexdigest()}"
+
+
 def main(phase: str, path_s: str) -> None:
     phase = phase.upper()
     path = Path(path_s)
     if phase not in ("LIVE", "FINAL"):
         sys.exit("Fase: LIVE o FINAL")
     local_validate(phase, path)
+    strict_validate(phase, path)
+    print(describe(path))
     ok = input(f"Vas a gastar un envío {phase} con {path.name}. Escribe {'FINAL' if phase == 'FINAL' else 'si'}: ")
     if ok.strip() != ("FINAL" if phase == "FINAL" else "si"):
         sys.exit("Cancelado.")
@@ -98,6 +117,7 @@ def main(phase: str, path_s: str) -> None:
     if st != 201:
         sys.exit(f"upload-url falló: {st} {up}")
     sub_id = up["sub_id"]
+    print(f"Hueco gastado. sub_id={sub_id}", flush=True)
     st = s3_upload(up["upload"]["url"], up["upload"]["fields"], path.name, path.read_bytes())
     if st not in (200, 201, 204):
         sys.exit(f"Subida a S3 falló: {st}")

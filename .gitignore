@@ -32,3 +32,14 @@ data/
 out/
 *.csv.gz
 !.env.example
+
+# Enlace local a la muestra
+/bankrec-docs-and-masters/sample
+# Pipeline bankcheck: almacén
+*.duckdb
+*.duckdb.*
+.pytest_cache/
+.coverage
+.swarm/
+ruvector.db
+agentdb.rvf*
