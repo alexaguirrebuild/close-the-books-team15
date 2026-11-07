@@ -13,6 +13,7 @@ from functools import lru_cache
 from itertools import combinations
 
 from . import duplicados
+from .sumas import exact_subsets
 from .data import SEPA, Phase, Txn, ascii_upper, name_key, norm_text, num_variants
 
 PAYMENT_FACTORY = {"ES00": {"ES01", "ES02", "PT01"}}
@@ -85,6 +86,7 @@ def load_plugins(names: str) -> list:
 
 AMOUNT_TOLERANCE_CENTS = 2
 CITED_MIN_DIGITS = 4
+MAX_COMPLETION_ITEMS = 18
 
 
 @lru_cache(maxsize=None)
@@ -773,8 +775,28 @@ class Engine:
             return False
         if len(open_items) > 1:
             open_items = self.best_subset(open_items, abs(t.amount), t) or open_items
+        extra = self._complete_cited(t, open_items, party or open_items[0].party)
+        if extra:
+            return self.settle(t, [i.id for i in [*open_items, *extra]], "ref_completed", "refs + resto por suma exacta",
+                               party=party or open_items[0].party)
         return self.settle(t, [i.id for i in open_items], "ref", "refs " + ",".join(i.number for i in open_items[:5]),
                            party=party or open_items[0].party)
+
+    def _complete_cited(self, t, cited, party):
+        """El banco corta la lista de facturas (POLICIES §5.5): el resto del cobro se busca entre las demás partidas abiertas
+        del cliente. Solo con solución única y pocas candidatas: con más, varias combinaciones suman lo mismo."""
+        if t.amount <= 0:
+            return None
+        missing = abs(t.amount) - sum(self.sign(i, t) * self.to_bank(i.open, i, t) for i in cited)
+        if missing <= AMOUNT_TOLERANCE_CENTS:
+            return None
+        known = {i.id for i in cited}
+        others = [i for i in self.open_items_of(party, t, {"ARI", "ARC"}) if i.id not in known]
+        if not others or len(others) > MAX_COMPLETION_ITEMS:
+            return None
+        values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in others]
+        solutions = exact_subsets(values, int(round(missing)), AMOUNT_TOLERANCE_CENTS)
+        return [others[position] for position in solutions[0]] if len(solutions) == 1 else None
 
     def _adds_up(self, items, t):
         open_items = [i for i in items if i.open > 0]
