@@ -20,6 +20,18 @@ import types
 from .data import ascii_upper, num_variants
 
 MIN_SHORT_NUMBER = 2  # «556» sí; «7» o «A» no son evidencia
+GATES = ("m_dd_batch", "m_dd_return", "m_card", "m_cheque", "m_payment_run")
+
+
+def _cents_or_none(value):
+    """Céntimos de un importe de fichero, o None si viene roto (vacío, «N/A», «1.234,56», «nan»…)."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    if f != f or abs(f) == float("inf"):
+        return None
+    return abs(int(round(f * 100)))
 
 
 def _exact(self, i, amt, ccy, d) -> bool:
@@ -30,12 +42,14 @@ def _exact(self, i, amt, ccy, d) -> bool:
 
 def run_doc_item(self, r, t):
     """Partida de un documento de remesa. Igual que Engine.run_doc_item, con desempate reproducible por id."""
+    amt = _cents_or_none(r.get("document_amount"))
+    if amt is None:  # importe roto: sin él no hay evidencia; se salta este documento, no la remesa
+        return None
     party = self.ph.party_by_iban.get((r.get("beneficiary_iban") or "").replace(" ", ""))
     if not party:
-        party = self.resolve_name(r["beneficiary"])
-    kinds = {"API", "APC", "ARC"} if r["document_type"] != "INVOICE" else {"API", "ARC"}
-    amt = abs(int(round(float(r["document_amount"]) * 100)))
-    variants = num_variants(r["document_number"])
+        party = self.resolve_name(r.get("beneficiary") or "")
+    kinds = {"API", "APC", "ARC"} if r.get("document_type") != "INVOICE" else {"API", "ARC"}
+    variants = num_variants(r.get("document_number") or "")
     if not variants:
         return _short_number_item(self, r, t, party, kinds, amt)
     cands = set()
@@ -172,9 +186,46 @@ def _wrap_payment_run(engine) -> None:
     engine.m_payment_run = m_payment_run
 
 
+def _rollback(engine, n0) -> None:
+    """Deshace las filas emitidas desde n0: saldo de la partida, settled_by y la lista de filas."""
+    for row in reversed(engine.rows[n0:]):
+        it = engine.items.get(row.item) if row.item else None
+        if it is not None and row.amount is not None:
+            it.open += -row.amount if row.exception == "RETURNED" else row.amount
+            done = engine.settled_by.get(row.item)
+            if done and done[-1] == (row.txn, row.amount):
+                done.pop()
+    del engine.rows[n0:]
+
+
+def _safety_net(engine) -> None:
+    """Una fila rota en un fichero de lotes no puede tumbar FINAL (un único envío). Si una puerta de lotes lanza
+    una excepción con un movimiento, se deshace lo que hubiera emitido, se apunta en engine.lote2_errors y devuelve
+    False: el movimiento sigue por las demás puertas y la fase continúa."""
+    engine.lote2_errors = []
+
+    def guard(name, gate):
+        def guarded(t):
+            n0 = len(engine.rows)
+            try:
+                return gate(t)
+            except Exception as exc:  # noqa: BLE001 - cualquier dato roto, nunca caer
+                _rollback(engine, n0)
+                engine.lote2_errors.append((getattr(t, "id", None), name, f"{type(exc).__name__}: {exc}"[:200]))
+                if len(engine.lote2_errors) <= 5:
+                    print(f"  AVISO lotes: {name} en {getattr(t, 'id', '?')}: {type(exc).__name__}: {exc}"[:200])
+                return False
+        return guarded
+
+    for name in GATES:
+        if hasattr(engine, name):
+            setattr(engine, name, guard(name, getattr(engine, name)))
+
+
 def prepare(engine) -> None:
     engine.run_doc_item = types.MethodType(run_doc_item, engine)
     _wrap_payment_run(engine)
+    _safety_net(engine)
 
 
 def match(engine, t) -> bool:
