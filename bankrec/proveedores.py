@@ -23,6 +23,7 @@ from .data import ascii_upper, num_variants
 
 MIN_SHORT_NUMBER = 2  # «556» sí; «7» o «A» no son evidencia
 GATES = ("m_dd_batch", "m_dd_return", "m_card", "m_cheque", "m_payment_run")
+DD_BATCH_ID = re.compile(r"\b\d{9,12}\b")  # la misma forma de id de remesa que lee Engine.m_dd_batch
 
 
 def _cents_or_none(value):
@@ -175,6 +176,56 @@ def _by_original_amount(engine, index, t) -> bool:
     return True
 
 
+def _wrap_dd_batch(engine) -> None:
+    """POLICIES §5.10: un recibo devuelto se vuelve a presentar (re_presentation=Y) y liquida la misma factura.
+    Si el motor no vio la devolución, la factura figura cerrada y m_dd_batch la cambiaba por otra abierta del
+    cliente con el mismo importe. Aquí, en un recibo re-presentado, la factura citada se mantiene aunque figure
+    cerrada; el resto de m_dd_batch queda igual."""
+    orig_item_by_number = engine.item_by_number
+    orig_dd_batch = engine.m_dd_batch
+    current = {"rows": None}
+
+    def item_by_number(number, entity=None, party=None, kinds=None, amount=None):
+        it = orig_item_by_number(number, entity, party=party, kinds=kinds, amount=amount)
+        rows = current["rows"]
+        if it is not None and it.open <= 0 and rows is not None and any(
+                r.get("re_presentation") == "Y" and r.get("remittance_info") == number for r in rows):
+            # m_dd_batch descarta una factura con open <= 0: se presenta abierta solo para esta consulta
+            return _ReopenedView(it)
+        return it
+
+    def m_dd_batch(t):
+        rows = [r for bid in DD_BATCH_ID.findall(t.up or "") for r in engine.dd_batches.get(bid, ())]
+        current["rows"] = rows if any(r.get("re_presentation") == "Y" for r in rows) else None
+        engine.item_by_number = item_by_number if current["rows"] else orig_item_by_number
+        try:
+            return orig_dd_batch(t)
+        finally:
+            engine.item_by_number = orig_item_by_number
+            current["rows"] = None
+
+    engine.m_dd_batch = m_dd_batch
+
+
+class _ReopenedView:
+    """La partida real, pero con open = total para la comprobación «open <= 0» de m_dd_batch. emit() escribe en la
+    partida real a través de esta vista (el saldo de verdad baja desde su valor real)."""
+
+    def __init__(self, it):
+        object.__setattr__(self, "_it", it)
+
+    def __getattr__(self, name):
+        if name == "open":
+            return max(self._it.open, self._it.total)
+        return getattr(self._it, name)
+
+    def __setattr__(self, name, value):
+        if name == "open":
+            # emit hace it.open -= amount sobre el valor mostrado: aplicar la misma resta al saldo real
+            value = self._it.open - (max(self._it.open, self._it.total) - value)
+        setattr(self._it, name, value)
+
+
 def _wrap_payment_run(engine) -> None:
     """Envuelve m_payment_run (POLICIES §5.3):
     - confirming: el banco carga a cada proveedor en su vencimiento más tardío, pero lo que vence en fin de semana se
@@ -295,6 +346,7 @@ def prepare(engine) -> None:
     _drop_broken_rows(engine)
     engine.run_doc_item = types.MethodType(run_doc_item, engine)
     _wrap_payment_run(engine)
+    _wrap_dd_batch(engine)
     _safety_net(engine)
 
 
