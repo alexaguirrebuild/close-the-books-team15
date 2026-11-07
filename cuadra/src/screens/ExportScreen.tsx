@@ -7,6 +7,7 @@ import {
   buildExportRows,
   canDownloadSubmission,
   minConfidenceFromPercent,
+  percentFromMinConfidence,
   previewExport,
   SUBMISSION_HEADER,
   validateExport,
@@ -153,7 +154,7 @@ export function ExportScreen() {
                 min={0}
                 max={100}
                 disabled={!options.includeProposals}
-                value={percentDraft ?? Math.round(options.minConfidence * 100)}
+                value={percentDraft ?? percentFromMinConfidence(options.minConfidence)}
                 onChange={(e) => {
                   setPercentDraft(e.target.value)
                   const minConfidence = minConfidenceFromPercent(e.target.value)

@@ -41,6 +41,11 @@ describe('ruleLabel', () => {
     expect(ruleName('regla_nueva')).toBeNull()
   })
 
+  test.each(['__proto__', 'constructor', 'toString'])('does not take the inherited %s for a rule', (rule) => {
+    expect(ruleName(rule)).toBeNull()
+    expect(ruleLabel(rule)).toBe(rule.replace(/_/g, ' '))
+  })
+
   test.each(ENGINE_RULES)('has a name for %s', (rule) => {
     expect(ruleLabel(rule)).not.toBe(rule.replace(/_/g, ' '))
   })

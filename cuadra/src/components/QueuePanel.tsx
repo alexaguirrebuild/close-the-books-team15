@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { minConfidenceFromPercent } from '../data/exportSubmission'
+import { minConfidenceFromPercent, percentFromMinConfidence } from '../data/exportSubmission'
 import { availableViews, CASE_TYPE_LABEL, queuePage, VIEW_LABEL, viewHint, type QueueFilters, type QueueRow, type QueueView } from '../data/queue'
 import { formatCount, formatMoney, formatPercent } from '../domain/money'
 import { EXCEPTION_LABELS, isException } from '../domain/types'
@@ -173,7 +173,7 @@ function BulkRow() {
   const setFilters = useStore((s) => s.setFilters)
   const setBulkOpen = useStore((s) => s.setBulkOpen)
   const counts = useStore((s) => s.counts)
-  const [percent, setPercent] = useState(String(Math.round(filters.readyThreshold * 100)))
+  const [percent, setPercent] = useState(percentFromMinConfidence(filters.readyThreshold))
   const eligible = counts?.ready ?? 0
 
   useEffect(() => {
@@ -195,7 +195,7 @@ function BulkRow() {
           value={percent}
           aria-label="Confianza mínima"
           onChange={(e) => setPercent(e.target.value)}
-          onBlur={() => setPercent(String(Math.round((minConfidenceFromPercent(percent) ?? filters.readyThreshold) * 100)))}
+          onBlur={() => setPercent(percentFromMinConfidence(minConfidenceFromPercent(percent) ?? filters.readyThreshold))}
         />
         %
       </label>

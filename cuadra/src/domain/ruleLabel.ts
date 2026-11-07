@@ -42,7 +42,8 @@ const FAMILIES: [string, string][] = [
 
 /** Says in words why the engine or the pipeline proposed a row, when the rule is a known one. */
 export function ruleName(rule: string): string | null {
-  return EXACT[rule] ?? FAMILIES.find(([prefix]) => rule.startsWith(prefix))?.[1] ?? null
+  const exact = Object.hasOwn(EXACT, rule) ? EXACT[rule] : undefined
+  return exact ?? FAMILIES.find(([prefix]) => rule.startsWith(prefix))?.[1] ?? null
 }
 
 /** The readable name of an engine rule. An unknown rule keeps its own name, with spaces instead of underscores. */

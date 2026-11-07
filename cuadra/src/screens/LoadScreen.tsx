@@ -25,6 +25,7 @@ export function LoadScreen() {
   const [reading, setReading] = useState(false)
   const [lastFolder, setLastFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const latestRead = useRef(0)
   const progress = useStore((s) => s.progress)
   const loadError = useStore((s) => s.loadError)
   const loadDataset = useStore((s) => s.loadDataset)
@@ -33,21 +34,30 @@ export function LoadScreen() {
     readFolderHandle().then(setLastFolder, () => setLastFolder(null))
   }, [])
 
-  const openPhase = useCallback(async (folder: FolderScan, next: PhaseLayout | null, phaseHint: string | null = null) => {
+  /** Only the last read may change the screen: an earlier one would overwrite the phase chosen after it. */
+  const startRead = useCallback(() => {
+    const read = ++latestRead.current
     setReading(true)
     setError(null)
+    return () => read === latestRead.current
+  }, [])
+
+  const openPhase = useCallback(async (folder: FolderScan, next: PhaseLayout | null, phaseHint: string | null = null) => {
+    const isLatest = startRead()
     try {
       setLayout(next)
       const found = await folder.load(next)
       const phase = next?.phase ?? phaseHint
+      const built = await buildPlan(phase ? `${folder.name}/${phase}` : folder.name, found, { phase })
+      if (!isLatest()) return
       setSources(found)
-      setPlan(await buildPlan(phase ? `${folder.name}/${phase}` : folder.name, found, { phase }))
+      setPlan(built)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      if (isLatest()) setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
-      setReading(false)
+      if (isLatest()) setReading(false)
     }
-  }, [])
+  }, [startRead])
 
   const accept = useCallback(
     async (folder: FolderScan, phaseHint: string | null = null) => {
@@ -76,12 +86,14 @@ export function LoadScreen() {
 
   const changeProposal = async (path: string) => {
     if (!plan) return
-    setError(null)
-    setReading(true)
+    const isLatest = startRead()
     try {
-      setPlan(await buildPlan(plan.name, sources, { phase: plan.phase, proposalPath: path }))
+      const built = await buildPlan(plan.name, sources, { phase: plan.phase, proposalPath: path })
+      if (isLatest()) setPlan(built)
+    } catch (cause) {
+      if (isLatest()) setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
-      setReading(false)
+      if (isLatest()) setReading(false)
     }
   }
 
@@ -95,20 +107,20 @@ export function LoadScreen() {
     }
     const path = `out/${file.name}`
     const next = [...sources.filter((source) => source.path !== path), fileSource(path, file)]
-    setReading(true) // Until the new plan is ready, loading would use the proposals of the previous one.
+    const isLatest = startRead() // Until the new plan is ready, loading would use the proposals of the previous one.
     try {
       const built = await buildPlan(plan.name, next, { phase: plan.phase, proposalPath: path })
+      if (!isLatest()) return
       if (built.files.proposals?.path !== path) {
         setError(`${file.name} no es un fichero de propuestas. Elige el explain_<fase>.csv.gz que escribe el motor.`)
         return
       }
       setSources(next)
       setPlan(built)
-      setError(null)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      if (isLatest()) setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
-      setReading(false)
+      if (isLatest()) setReading(false)
     }
   }
 

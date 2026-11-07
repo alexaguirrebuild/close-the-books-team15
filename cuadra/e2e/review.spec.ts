@@ -365,6 +365,11 @@ test.describe('the list', () => {
     await field.fill('')
     await field.blur()
     await expect(field).toHaveValue('100')
+
+    await field.fill('95.5')
+    await field.blur()
+    await expect(field).toHaveValue('95.5')
+    await expect.poll(threshold).toBe(0.955)
   })
 
   test('confirms a batch after showing what it holds, and can undo it', async ({ page }) => {
@@ -599,6 +604,42 @@ test.describe('engine output', () => {
     await page.getByLabel('Fichero del motor').setInputFiles(right)
     await expect(page.getByRole('alert')).toHaveCount(0)
     await expect(page.getByLabel('Propuestas')).toHaveValue('out/explain_train.csv')
+  })
+
+  test('a phase chosen while the engine file is being read wins over that file', async ({ page }) => {
+    const repo = join(folder, 'repo')
+    cpSync(SAMPLE, join(repo, 'data', 'train'), { recursive: true, filter: (from) => !/propuestas\.csv|masters|pdfs/.test(from) })
+    cpSync(SAMPLE, join(repo, 'data', 'sample'), { recursive: true, filter: (from) => !/propuestas\.csv|masters|pdfs/.test(from) })
+    cpSync(join(SAMPLE, 'masters'), join(repo, 'data', 'masters'), { recursive: true })
+    const explain = join(folder, 'explain_train.csv')
+    writeFileSync(explain, explainFile())
+    await page.addInitScript(() => {
+      // Reading the file takes longer than choosing another phase, so the race always happens.
+      const slice = Blob.prototype.slice
+      Blob.prototype.slice = function delayedSlice(this: Blob, ...args: Parameters<Blob['slice']>) {
+        const part = slice.apply(this, args)
+        if (this instanceof File && this.name === 'explain_train.csv') {
+          const read = part.arrayBuffer.bind(part)
+          part.arrayBuffer = async () => {
+            await new Promise((resolve) => setTimeout(resolve, 700))
+            return read()
+          }
+        }
+        return part
+      }
+    })
+
+    await page.goto('/')
+    await page.locator('input[type=file]').first().setInputFiles(repo)
+    await page.getByRole('button', { name: 'TRAIN', exact: true }).click()
+    await expect(page.locator('.load-pick-label')).toContainText('repo/train')
+    await page.getByLabel('Fichero del motor').setInputFiles(explain)
+    await page.getByRole('button', { name: 'Sample', exact: true }).click()
+    await expect(page.locator('.load-pick-label')).toContainText('repo/sample')
+
+    await page.waitForTimeout(3000) // The file is read twice: by now the old result would have overwritten the plan.
+    await expect(page.locator('.load-pick-label')).toContainText('repo/sample')
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled()
   })
 
   test('does not offer to filter by a confidence the engine does not give', async ({ page }) => {

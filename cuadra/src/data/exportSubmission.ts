@@ -19,6 +19,11 @@ export function minConfidenceFromPercent(raw: string): number | null {
   return Number.isFinite(percent) ? Math.min(Math.max(percent, 0), 100) / 100 : null
 }
 
+/** The percentage a field shows for a minimum confidence: with the decimals typed, without the noise of floating point. */
+export function percentFromMinConfidence(confidence: number): string {
+  return String(Number((confidence * 100).toFixed(6)))
+}
+
 export type ExportSummary = {
   rows: number
   txns: number
