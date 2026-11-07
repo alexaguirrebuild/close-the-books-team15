@@ -56,9 +56,10 @@ class TestCompleta:
     def test_las_mas_antiguas_hasta_cuadrar(self):
         eng = engine([item("A", 300, issue=dt.date(2025, 3, 1)), item("B", 700, issue=dt.date(2025, 4, 1)),
                       item("C", 400, issue=dt.date(2025, 5, 2)), item("D", 50, issue=dt.date(2025, 5, 3))])
-        ids, rule = run(eng, 2000)
+        assert [i.id for i in cp.fifo(eng, movement(2000), [eng.items[CITED]], others(eng, "A", "B", "C", "D"))] == ["A", "B"]
+        ids, rule = run(eng, 2000)  # fifo ya no se aplica; con 4 candidatas lo resuelve el subconjunto pequeño
         assert (ids, rule) == (sorted([CITED, "A", "B"]), "ref_completed")
-        assert eng.citas_parciales_rule == "fifo"
+        assert eng.citas_parciales_rule == "subconjunto_pequeno"
 
     def test_numero_con_una_cifra_cambiada_en_el_texto(self):
         eng = engine([item("FV25-0001234", 300, issue=dt.date(2025, 5, 2)), item("FV25-0005678", 700, issue=dt.date(2025, 5, 3)),
@@ -117,7 +118,7 @@ class TestCompleta:
         eng.settle = lambda t, ids, rule, ev="", party=None: [eng.rows.append(Row("T1", i, 1, "", "", rule, ev)) for i in ids] or True
         assert eng.m_refs(movement(2000))
         assert {r.rule for r in eng.rows} == {"ref_completed_cp"}
-        assert all("citas_parciales:fifo" in r.evidence for r in eng.rows)
+        assert all("citas_parciales:subconjunto_pequeno" in r.evidence for r in eng.rows)
 
 
 class TestNoFuerza:

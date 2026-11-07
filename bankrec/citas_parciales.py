@@ -220,19 +220,16 @@ def fifo_con_salto(engine, t, cited, others):
     return picked if picked and abs(remaining) <= AMOUNT_TOLERANCE_CENTS else None
 
 
-# Orden de aplicación: precisión estática 1,000 primero (por filas netas), luego 0,996 y 0,984. Ver la tabla de la PR.
+# Orden de aplicación. Holdout real (ab5127d, 89,95): numeracion 54/54, emitidas_cerca_30d 3/3, vencimiento_entre_citadas_3d 2/2,
+# mismo_mes_emision 1/1 y subconjunto_pequeno sin disparos. Fuera, por precisión real < 0,95: fifo (17/22), fifo_con_salto
+# (13/18), emitidas_cerca_7d (7/8), numeracion_pequeno (4/5), misma_semana_vencimiento (2/3), vencidas_recientes (1/2); se
+# conservan como funciones medidas, no se aplican. Con la poda, 89,93 resimulado frente a 89,91 de base.
 PREDICADOS = [
     numeracion,
-    fifo,
     emitidas_cerca(30),
     subconjunto_pequeno,
-    emitidas_cerca(7),
     mismo_mes_emision,
-    misma_semana_vencimiento,
     vencimiento_entre_citadas(3),
-    vencidas_recientes,
-    numeracion_pequeno,
-    fifo_con_salto,
 ]
 
 
