@@ -46,7 +46,7 @@ function origin({ proposal }: EvidenceInput): EvidenceStep {
     const line = withSource.lineNo ? `, línea ${withSource.lineNo}` : ''
     return { ...base, state: 'none', text: `${ruleLabel(withSource.source)} ${withSource.adviceId}${line}` }
   }
-  return { ...base, state: 'none', text: withSource.source ? ruleLabel(withSource.source) : 'Propuesta del pipeline, sin detalle' }
+  return { ...base, state: 'none', text: withSource.source ? ruleLabel(withSource.source) : 'Propuesta sin detalle' }
 }
 
 const AMOUNT_OK: BalanceStatus[] = ['balanced', 'explained', 'no_item']

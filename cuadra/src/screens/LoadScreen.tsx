@@ -77,7 +77,12 @@ export function LoadScreen() {
   const changeProposal = async (path: string) => {
     if (!plan) return
     setError(null)
-    setPlan(await buildPlan(plan.name, sources, { phase: plan.phase, proposalPath: path }))
+    setReading(true)
+    try {
+      setPlan(await buildPlan(plan.name, sources, { phase: plan.phase, proposalPath: path }))
+    } finally {
+      setReading(false)
+    }
   }
 
   /** The engine may have written elsewhere: its folder cannot be walked when the data is behind symlinks. */
@@ -90,6 +95,7 @@ export function LoadScreen() {
     }
     const path = `out/${file.name}`
     const next = [...sources.filter((source) => source.path !== path), fileSource(path, file)]
+    setReading(true) // Until the new plan is ready, loading would use the proposals of the previous one.
     try {
       const built = await buildPlan(plan.name, next, { phase: plan.phase, proposalPath: path })
       if (built.files.proposals?.path !== path) {
@@ -101,6 +107,8 @@ export function LoadScreen() {
       setError(null)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setReading(false)
     }
   }
 
@@ -139,7 +147,7 @@ export function LoadScreen() {
         <div className="load-brand"><Robot mood={plan ? (problems.length ? 'worried' : 'happy') : 'neutral'} size={40} /><span>Cuadra</span></div>
         <h1 className="load-title">Cuadra cada movimiento del banco con sus partidas.</h1>
         <p className="load-lede">
-          Revisa las propuestas del pipeline por teclado, corrige lo dudoso y comprueba el formato oficial. Todo se queda en este navegador.
+          Revisa las propuestas por teclado, corrige lo dudoso y comprueba el formato oficial. Todo se queda en este navegador.
         </p>
 
         <div className="load-pick">

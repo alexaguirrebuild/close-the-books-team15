@@ -342,6 +342,31 @@ test.describe('the list', () => {
     await expect(page.locator('.queue')).toBeVisible()
   })
 
+  test('keeps the threshold of the batch while its field is empty, so the batch does not grow to every proposal', async ({ page }) => {
+    const threshold = () =>
+      page.evaluate(() => (window as unknown as { __cuadra: { getState(): { filters: { readyThreshold: number } } } }).__cuadra.getState().filters.readyThreshold)
+
+    await openSample(page, 'train')
+    await openReview(page)
+    await viewTab(page, /^Listas/).click()
+    const before = await threshold()
+    const field = page.getByLabel('Confianza mínima')
+
+    await field.fill('')
+    await expect(field).toHaveValue('')
+    await page.waitForTimeout(400) // Longer than the delay of the field: a wrong value would have reached the store by now.
+    expect(await threshold()).toBe(before)
+
+    await field.fill('150')
+    await expect.poll(threshold).toBe(1)
+    await field.blur()
+    await expect(field).toHaveValue('100')
+
+    await field.fill('')
+    await field.blur()
+    await expect(field).toHaveValue('100')
+  })
+
   test('confirms a batch after showing what it holds, and can undo it', async ({ page }) => {
     await openSample(page, 'train')
     await openReview(page)

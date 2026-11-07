@@ -79,7 +79,7 @@ export function Dashboard() {
           </h1>
           <p className="summary-lede">
             {left
-              ? `Empieza por los que más pueden subir la puntuación. Lo que no revises se queda con la propuesta del pipeline${unanswered ? `, y ${formatCount(unanswered)} sin propuesta quedan como no identificados` : ''}.`
+              ? `Empieza por los que más pueden subir la puntuación. Lo que no revises se queda con su propuesta${unanswered ? `, y ${formatCount(unanswered)} sin propuesta quedan como no identificados` : ''}.`
               : 'Confirma las propuestas listas o valida el formato.'}
           </p>
         </div>

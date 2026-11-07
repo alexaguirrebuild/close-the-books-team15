@@ -73,6 +73,10 @@ describe('buildEvidence', () => {
     expect(step('origin', {})).toMatchObject({ state: 'warn', text: 'No hay propuesta' })
   })
 
+  test('says when a proposal comes with no detail, without naming who made it', () => {
+    expect(step('origin', { proposal: [row] })).toMatchObject({ state: 'none', text: 'Propuesta sin detalle' })
+  })
+
   test('leaves out documents when there are none', () => {
     expect(step('documents', {})).toBeUndefined()
     expect(step('documents', { documents: 2 })?.text).toBe('2 documentos lo mencionan')

@@ -183,7 +183,7 @@ export const ROLE_LABEL: Record<FileRole, string> = {
   ap: 'ap_invoices.csv',
   cn: 'credit_notes.csv',
   open: 'open_items_at_start.csv',
-  proposals: 'Propuestas del pipeline',
+  proposals: 'Propuestas',
   golden: 'golden_allocations.csv',
   categories: 'masters/categories.csv',
   customers: 'masters/customers.csv',
