@@ -187,6 +187,30 @@ class Engine:
                 return "SHORT_BANK_CHARGES"
         return None
 
+    def _discount_subset(self, invoices, credits, t, cash, max_eligible=10):
+        """Ids de las facturas con descuento a tiempo (POLICIES §3) que explican el cobro exacto; None si no hay
+        una solución única. El resto de facturas y los abonos van por su importe completo."""
+        if len(invoices) < 2 or any(it.ccy != t.ccy for it in invoices + credits):
+            return None
+        disc = {}
+        for it in invoices:
+            term = self.ph.terms.get(it.terms or "")
+            if not term or not term.get("early_payment_discount_pct") or not it.issue:
+                continue
+            days = int(term.get("discount_days") or 0)
+            if t.date <= it.issue + dt.timedelta(days=days + 3):
+                disc[it.id] = it.total - int(round(it.total * float(term["early_payment_discount_pct"]) / 100))
+        if not disc or len(disc) > max_eligible:
+            return None
+        base = sum(it.open for it in invoices) - sum(c.total for c in credits)
+        sols = []
+        ids = list(disc)
+        for n in range(1, len(ids) + 1):
+            for sub in combinations(ids, n):
+                if abs(base - sum(self.items[i].total - disc[i] for i in sub) - cash) <= 2:
+                    sols.append(set(sub))
+        return sols[0] if len(sols) == 1 else None
+
     def settle(self, t, cands, rule, ev="", party=None):
         """Reparte el importe del movimiento entre partidas candidatas y pone las excepciones."""
         cash = abs(t.amount)
@@ -262,6 +286,12 @@ class Engine:
         if all_disc and abs(disc_sum - sum(c.total for c in credits) - cash) <= 2 * len(invoices):
             for it in cands:
                 full(it, "SHORT_DISCOUNT" if self.sign(it, t) > 0 else "")
+            return True
+        # POLICIES §3 SHORT_DISCOUNT: el descuento solo en las facturas que llegan a plazo; vale solo con solución única
+        subset = self._discount_subset(invoices, credits, t, cash)
+        if subset is not None:
+            for it in cands:
+                full(it, "SHORT_DISCOUNT" if it.id in subset else "")
             return True
         # pago de menos repartido: el más antiguo primero, la última queda parcial
         remaining = cash + sum(self.to_bank(c.open, c, t) for c in credits)
