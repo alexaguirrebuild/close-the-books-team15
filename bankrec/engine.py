@@ -9,6 +9,7 @@ import importlib
 import datetime as dt
 import re
 from collections import defaultdict
+from functools import lru_cache
 from itertools import combinations
 
 from . import duplicados
@@ -80,6 +81,15 @@ def load_plugins(names: str) -> list:
             if name not in OPTIONAL_PLUGINS or error.name != module_name:
                 raise
     return loaded
+
+
+AMOUNT_TOLERANCE_CENTS = 2
+CITED_MIN_DIGITS = 4
+
+
+@lru_cache(maxsize=None)
+def plain_number(number):
+    return re.sub(r"[^A-Z0-9]", "", ascii_upper(number))
 
 
 MAX_PARTIES_TRIED = 4
@@ -745,6 +755,8 @@ class Engine:
                         if it.party in fam and it.kind in kinds:
                             items.append(it)
         items = list({i.id: i for i in items}.values())
+        if not self._adds_up(items, t) and self._settle_cited(t, parties, kinds):
+            return True
         if not items:
             return False
         open_items = [i for i in items if i.open > 0]
@@ -763,6 +775,42 @@ class Engine:
             open_items = self.best_subset(open_items, abs(t.amount), t) or open_items
         return self.settle(t, [i.id for i in open_items], "ref", "refs " + ",".join(i.number for i in open_items[:5]),
                            party=party or open_items[0].party)
+
+    def _adds_up(self, items, t):
+        open_items = [i for i in items if i.open > 0]
+        return bool(open_items) and abs(sum(self.sign(i, t) * self.to_bank(i.open, i, t) for i in open_items) - abs(t.amount)) <= AMOUNT_TOLERANCE_CENTS
+
+    def _settle_cited(self, t, parties, kinds):
+        """Trozos de número en el texto (POLICIES §5.5: sin prefijo, cortados, sin ceros) de facturas abiertas de un cliente
+        identificado. Solo valen si suman exactamente el cobro y un único cliente cuadra: una cita sola no basta."""
+        tokens = {tok for tok in re.findall(r"[A-Z0-9]+", t.up) if sum(ch.isdigit() for ch in tok) >= CITED_MIN_DIGITS}
+        if not tokens:
+            return False
+        hits = {}
+        for party in dict.fromkeys([*parties, *self.scan_names(t)]):
+            cited = [i for i in self.open_items_of(party, t, kinds) if any(tok in plain_number(i.number) for tok in tokens)]
+            picks = self._exact_with_credits(cited, party, t) if cited else None
+            if picks:
+                hits[party] = picks
+        if len(hits) != 1:
+            return False
+        party, picks = next(iter(hits.items()))
+        return self.settle(t, [i.id for i in picks], "ref_cited", "citas " + ",".join(i.number for i in picks[:5]), party=party)
+
+    def _exact_with_credits(self, cited, party, t):
+        """Las citadas que suman el cobro, o las que lo superan justo en abonos no citados (settle los añade)."""
+        cash = abs(t.amount)
+        exact = self.best_subset(cited, cash, t)
+        if exact:
+            return exact
+        invoices = [i for i in cited if self.sign(i, t) > 0]
+        gap = sum(self.to_bank(i.open, i, t) for i in invoices) - cash
+        if gap <= AMOUNT_TOLERANCE_CENTS or not invoices:
+            return None
+        credits = [self.to_bank(c.open, c, t) for c in self.open_items_of(party, t, {"ARC"} if t.amount > 0 else {"APC"})]
+        if any(abs(c - gap) <= AMOUNT_TOLERANCE_CENTS for c in credits) or any(abs(a + b - gap) <= AMOUNT_TOLERANCE_CENTS for a, b in combinations(credits, 2)):
+            return invoices
+        return None
 
     def best_subset(self, items, cash, t, max_n=40):
         """Qué partidas suman exactamente el importe. Orden de preferencia: todas, las más antiguas (FIFO), DP."""
