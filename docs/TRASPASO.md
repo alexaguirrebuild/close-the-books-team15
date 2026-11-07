@@ -2,7 +2,7 @@
 
 Quien recibe este repo (Claude, Codex, Antigravity o una persona) lee esto antes que nada y lo sobrescribe al terminar su parte. Si algo falla dos veces, se escribe aquí y se para.
 
-- **Último que escribió:** Claude (PC de Pablo), sábado 7-nov, 13:40.
+- **Último que escribió:** Claude (PC de Pablo), sábado 7-nov, 14:10.
 - **Rama de integración:** `origin/Dev`. Toda rama nueva sale de ahí. `team15-dev` no comparte historia con `Dev` y no sirve de base.
 - **Referencia para superar:** holdout **89,91**, en `Dev`.
 - **Última nota oficial:** LIVE **88,63** con `648cc9c`. **No se sube nada a LIVE hasta llegar a 95 en holdout** (decisión de Pablo, 13:45). Los envíos los decide una persona.
@@ -10,19 +10,18 @@ Quien recibe este repo (Claude, Codex, Antigravity o una persona) lee esto antes
 
 ## Quién lleva qué
 
-Di en el canal del equipo qué lote coges. Un lote por persona, y **solo se tocan los ficheros de tu lote**.
+Reparto medido a las 14:00. Di en el canal del equipo qué lote coges. Un lote por persona, y **solo se tocan los ficheros de tu lote**. Los techos suponen esa parte perfecta: no se suman ni son previsiones.
 
-| Lote | Ficheros | Segmentos | Fallos en LIVE |
-|---|---|---|---|
-| 1. Cobros cortos | `bankrec/cobros_cortos.py`, `tests/test_cobros_cortos.py` | `ar_short_discount`, `ar_partial`, `ar_overpayment`, `ar_retention`, `ar_discount_late`, `ar_short_withholding`, `ar_short_dispute`, `ar_fx` | ~4.120 |
-| 2. Mismo importe y n:m | `bankrec/mismo_importe.py`, `tests/test_mismo_importe.py` | `ar_n_to_m`, `ar_same_amount_fifo`, `ar_same_amount_month`, `ar_third_party_agency`, `nonitem_intercompany`, `ar_advance_deduction` | ~2.940 |
-| 3. Cheques y adeudos | `bankrec/lotes_cobro.py`, `tests/test_lotes_cobro.py`, `bankrec/devoluciones.py`, `tests/test_devoluciones.py` | `ar_cheque_deposit`, `ar_cheque_returned`, `ar_dd_returned`, `ar_dd_batch`, `ar_dd_represented_transfer` | ~1.650 |
-| 4. Proveedores | `bankrec/proveedores.py`, `tests/test_proveedores.py` | `ap_confirming`, `ap_credit_note_netted`, `ap_direct_debit`, `ap_partial`, `ap_fx`, `ap_duplicate_payment`, `ap_duplicate_refund` | ~1.190 |
+| Lote | Ficheros | Qué ataca | Dónde está | Techo |
+|---|---|---|---|---|
+| 1. Citas incompletas | `bankrec/citas_parciales.py`, `tests/test_citas_parciales.py` | La regla `ref` asigna lo que cita el texto y deja el resto: faltan 31.945 filas en 3.309 movimientos | `ar_short_dispute` 11.706, `ar_1toN_credit_note` 9.096, `ar_1toN_text` 6.201, `ar_ref_noise` 4.106 | el mayor; +4,10 junto con el lote 2 |
+| 2. Pagos y otras fuentes | `bankrec/proveedores.py`, `tests/test_proveedores.py`, `bankrec/lotes_cobro.py`, `tests/test_lotes_cobro.py`, `bankrec/devoluciones.py`, `tests/test_devoluciones.py` | Pagos con partidas que acaban en `fallback_debit` (7.238 filas en 844 movimientos), remesas, cheques y adeudos | `ap_confirming` 5.562, `ap_fx` 1.674, `ar_cheque_deposit` 572, `ar_dd_batch` 477, `ar_dd_returned` 460 | +0,26 `ap_confirming`, +0,25 `ar_dd_returned`, +0,14 `ap_fx` |
+| 3. Cobros sin asignar | `bankrec/mismo_importe.py`, `tests/test_mismo_importe.py` | Cobros en UNIDENTIFIED con cliente, pero sin suma exacta única. Parte de `integracion-sesiones` hasta que entre la PR #12 | Ambiguos o con demasiadas candidatas: 24.021 filas. No cuadran: 18.573. Sobre todo `ar_ref_noise`, `ar_1toN_credit_note`, `ar_n_to_m`, `ar_partial`, `ar_retention` | +1,86 y +2,52 |
+| 4. Etiquetas y soluciones seguras | `bankrec/cobros_cortos.py`, `tests/test_cobros_cortos.py` | 1.146 movimientos con las partidas bien y la etiqueta mal, OVERPAYMENT y las soluciones que ya dan precisión alta | `ar_short_discount` 240, `ar_n_to_m` 197, `ar_instalment` 128, `ar_discount_late` 118, `ar_overpayment` | +1,01 etiquetas, +0,90 `ar_overpayment` |
 
 | Fuera de los lotes | Quién |
 |---|---|
-| `m_refs` en `bankrec/engine.py`, con `ar_ref_noise`, `ar_1toN_text` y `ar_1toN_credit_note` | Sesión de Pablo, rama `mejoras-citas` |
-| Flujo de FINAL: `scripts/final_run.py` y `docs/RUNBOOK_FINAL.md` | Sesión de Pablo, rama `feat/flujo-final` |
+| Nombres cortados: `bankrec/nombres_cortados.py` | Sesión de Pablo. Pendiente de holdout |
 | `cuadra/` | Sesión de Pablo. Solo revisión y demo: no genera envíos |
 
 **No tocar:** el resto de `bankrec/`, incluido `engine.py`, y `scripts/`, `vendor/`, `pipeline/`, `cuadra/`, `pyproject.toml` y `uv.lock`.
@@ -61,7 +60,18 @@ Cascada en holdout, con el golden solo para evaluar: cada fila supone perfecta e
 
 La clasificación por cita es aproximada: 7.663 filas no tienen número localizado y cuentan como sin cita.
 
-**Para llegar a 95 hace falta recuperar cerca de la mitad de los cobros sin cita, con evidencia exacta.** Primero hay que medir cuántos tienen cliente identificado y una suma exacta única, también tras los ajustes que marca POLICIES (descuento, retención, abono, parcial).
+### Qué dio la medida de los cobros en UNIDENTIFIED
+
+De 12.920 cobros, 8.149 tienen partidas. **El cliente no es el problema:** está identificado en 7.322 de esos 8.149, pero también en 2.660 de los 4.771 que son UNIDENTIFIED de verdad, así que tener cliente no basta para asignar.
+
+| Solución única | Bien | Mal | Nota si se asignan todas, acumulada |
+|---|---|---|---|
+| Suma exacta | 16 | 84 | **No usar:** +0,00 |
+| Con descuento | 197 | 17 | +0,04 |
+| Con retención | 97 | 0 | +0,06 |
+| Con parcial al 40, 50 o 60 % | 410 | 32 | +0,10; total 90,11 |
+
+**Por tanto, las sumas exactas no llevan a 95: dan +0,20.** Simulación sin propagar saldos: decide el holdout. Lo que queda exige otra evidencia: un patrón nuevo, como el del parcial, o completar las citas. Probado y descartado: los pagos grandes no siguen un orden de facturas, y los extractos crudos no traen más referencias.
 
 ## Dónde se pierden los puntos (LIVE 88,63)
 
