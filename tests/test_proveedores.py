@@ -511,3 +511,48 @@ class TestRedDeSeguridad:
         t = SimpleNamespace(id="T1", amount=-100, cp_iban="")
         assert eng.m_dd_batch(t) is False
         assert eng.rows == [] and it.open == 10000 and not eng.settled_by[it.id]
+
+
+class TestFilasRotasNoTumbanElLote:
+    """Una fila rota dentro de un lote (cheque, recibo, documento) se retira al preparar: el resto del lote se casa
+    con normalidad en lugar de perder el lote entero por la red de seguridad."""
+
+    def test_e2e_vacio_no_rompe_el_indice_de_importe_original(self):
+        from collections import defaultdict
+        eng = Engine.__new__(Engine)
+        eng.e2e_rows = defaultdict(list)
+        eng.e2e_rows["PR010025030701-0001"].append(transferencia("PR010025030701-0001", "1000.00"))
+        eng.e2e_rows[None].append(dict(transferencia("PR010025030701-0002", "500.00"), end_to_end_id=None))
+        idx = proveedores._index_by_original(eng)
+        assert ("ES01-BANK-EUR", 100000, "USD") in idx
+
+    def test_cheque_roto_se_retira_y_el_resto_del_deposito_sigue(self):
+        eng = Engine.__new__(Engine)
+        bueno = {"deposit_id": "RCH1", "amount": "100.00", "deposit_total": "300.00", "account_id": "A"}
+        roto = {"deposit_id": "RCH1", "amount": "N/A", "deposit_total": "300.00", "account_id": "A"}
+        eng.cheque_deps = {"RCH1": [bueno, roto]}
+        eng.dd_batches, eng.dd_by_mandate, eng.card_sets, eng.run_rows, eng.e2e_rows = {}, {}, {}, {}, {}
+        proveedores._drop_broken_rows(eng)
+        assert eng.cheque_deps["RCH1"] == [bueno]
+        assert eng.lote2_dropped == [("cheque_deps", "RCH1", "amount")]
+
+    def test_recibo_y_documento_rotos_se_retiran(self):
+        eng = Engine.__new__(Engine)
+        ok_dd = {"batch_id": "1", "amount": "10.00", "collection_date": "2025-01-02"}
+        bad_dd = {"batch_id": "1", "amount": "", "collection_date": "2025-01-02"}
+        ok_doc = transferencia("PR1-0001", "10.00")
+        bad_doc = dict(transferencia("PR1-0002", "10.00"), execution_date="2025-13-45")
+        eng.cheque_deps, eng.card_sets = {}, {}
+        eng.dd_batches, eng.dd_by_mandate = {"1": [ok_dd, bad_dd]}, {"M": [bad_dd]}
+        eng.run_rows, eng.e2e_rows = {"PR1": [ok_doc, bad_doc]}, {"PR1-0001": [ok_doc], "PR1-0002": [bad_doc]}
+        proveedores._drop_broken_rows(eng)
+        assert eng.dd_batches["1"] == [ok_dd] and eng.dd_by_mandate["M"] == []
+        assert eng.run_rows["PR1"] == [ok_doc] and eng.e2e_rows["PR1-0002"] == []
+
+    def test_datos_buenos_no_se_tocan(self):
+        eng = Engine.__new__(Engine)
+        filas = [{"deposit_id": "RCH1", "amount": "100.00", "deposit_total": "100.00"}]
+        eng.cheque_deps = {"RCH1": list(filas)}
+        eng.dd_batches, eng.dd_by_mandate, eng.card_sets, eng.run_rows, eng.e2e_rows = {}, {}, {}, {}, {}
+        proveedores._drop_broken_rows(eng)
+        assert eng.cheque_deps["RCH1"] == filas and eng.lote2_dropped == []

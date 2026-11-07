@@ -149,7 +149,7 @@ def _index_by_original(engine) -> dict:
     """(cuenta, importe, divisa) de cada transferencia -> [(e2e, filas)]. Una entrada por transferencia, como
     Engine._index_transfers, pero con la divisa: el importe original del cargo viene en la divisa del proveedor."""
     index: dict = {}
-    for e2e in sorted(engine.e2e_rows):
+    for e2e in sorted(e for e in engine.e2e_rows if e):  # un e2e vacío no identifica transferencia (y no ordena)
         for group in engine._transfers_of(engine.e2e_rows[e2e]):
             r0 = group[0]
             index.setdefault((r0["debtor_account_id"], _cents(r0["transfer_amount"]), r0["currency"]), []).append((e2e, group))
@@ -215,6 +215,46 @@ def _wrap_payment_run(engine) -> None:
 _wrap_confirming = _wrap_payment_run  # nombre anterior (tests de la issue #21)
 
 
+def _date_ok(value) -> bool:
+    try:
+        dt.date.fromisoformat((value or "")[:10])
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+# índice de lotes del motor -> (campos de importe, campos de fecha) que sus puertas leen fila a fila
+ROW_FIELDS = {
+    "cheque_deps": (("amount",), ()),
+    "dd_batches": (("amount",), ()),
+    "dd_by_mandate": (("amount",), ("collection_date",)),
+    "card_sets": (("gross",), ("settlement_date",)),
+    "run_rows": (("document_amount",), ("execution_date",)),
+    "e2e_rows": (("document_amount",), ("execution_date",)),
+}
+
+
+def _drop_broken_rows(engine) -> None:
+    """Retira de los índices de lotes las filas con importe o fecha ilegibles y las apunta en engine.lote2_dropped.
+    Así un cheque, recibo o documento roto se pierde solo él, y no todo su lote por la red de seguridad."""
+    engine.lote2_dropped = []
+    for name, (num_fields, date_fields) in ROW_FIELDS.items():
+        index = getattr(engine, name, None)
+        if not index:
+            continue
+        for key, rows in index.items():
+            keep = []
+            for r in rows:
+                bad = next((f for f in num_fields if _cents_or_none(r.get(f)) is None), None) or \
+                    next((f for f in date_fields if not _date_ok(r.get(f))), None)
+                if bad:
+                    engine.lote2_dropped.append((name, key, bad))
+                else:
+                    keep.append(r)
+            if len(keep) != len(rows):
+                rows[:] = keep
+
+
 def _rollback(engine, n0) -> None:
     """Deshace las filas emitidas desde n0: saldo de la partida, settled_by y la lista de filas."""
     for row in reversed(engine.rows[n0:]):
@@ -252,6 +292,7 @@ def _safety_net(engine) -> None:
 
 
 def prepare(engine) -> None:
+    _drop_broken_rows(engine)
     engine.run_doc_item = types.MethodType(run_doc_item, engine)
     _wrap_payment_run(engine)
     _safety_net(engine)
