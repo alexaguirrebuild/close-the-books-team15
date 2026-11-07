@@ -25,11 +25,21 @@ def _returned_transfer_rows(engine, t) -> list[dict]:
     e2es = [cited.group(0)] if cited else ([t.e2e] if t.e2e else [])
     if not any(e in engine.e2e_rows for e in e2es):
         e2es = engine.transfers_by_amount.get((t.account, t.amount), [])
+    used_ret = getattr(engine, "returned_e2es", set())
+    matches = []
     for e2e in e2es:
+        if e2e in used_ret:
+            continue
         same_transfer = [r for r in engine.e2e_rows.get(e2e, ()) if abs(_cents(r["transfer_amount"]) - t.amount) <= 2]
         if same_transfer:
-            return same_transfer
-    return []
+            matches.append((same_transfer[0].get("execution_date") or "", e2e, same_transfer))
+    if not matches:
+        return []
+    t_iso = t.date.isoformat() if getattr(t, "date", None) else "9999-12-31"
+    past = [m for m in matches if not m[0] or m[0][:10] <= t_iso]
+    chosen = max(past, key=lambda m: m[0]) if past else matches[0]
+    engine.__dict__.setdefault("returned_e2es", set()).add(chosen[1])
+    return chosen[2]
 
 
 def _match_transfer(engine, t) -> bool:
@@ -50,10 +60,29 @@ def _match_transfer(engine, t) -> bool:
 
 def _match_cheque(engine, t) -> bool:
     found = CHEQUE_RETURN.search(t.up)
-    item = engine.cheque_items.get(found.group(1)) if found else None
+    if not found:
+        return False
+    chk = found.group(1)
+    item = engine.cheque_items.get(chk)
+    amt = -t.amount
+    if item is None and hasattr(engine, "ph"):
+        for r in getattr(engine.ph, "cheques", ()):
+            if r.get("cheque_number") == chk:
+                party = engine.resolve_name(r.get("drawer") or "")
+                if party:
+                    closed = [
+                         engine.items[i]
+                        for i in engine.ph.by_party.get(party, ())
+                        if engine.items[i].kind == "ARI"
+                        and engine.items[i].open <= 0
+                        and abs(engine.items[i].total - amt) <= 2
+                    ]
+                    if len(closed) == 1:
+                        item = closed[0]
+                        break
     if item is None:
         return False
-    engine.emit(t, item, -t.amount, "RETURNED", "cheque_returned", f"cheque {found.group(1)}")
+    engine.emit(t, item, amt, "RETURNED", "cheque_returned", f"cheque {chk}")
     return True
 
 

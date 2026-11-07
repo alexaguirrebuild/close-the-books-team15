@@ -19,7 +19,8 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "out"
 
 
 def _stage_path(phase: str) -> Path:
-    return Path(os.environ.get("BANKREC_M2_DIR", DEFAULT_ROOT)) / phase / STAGE_FILE
+    base = os.environ.get("BANKREC_M2_DIR") or os.environ.get("BANKREC_OUT") or DEFAULT_ROOT
+    return Path(base) / phase / STAGE_FILE
 
 
 def prepare(engine) -> None:

@@ -662,8 +662,10 @@ def _emit_line(engine, t, adv, ln, it, ev, override=None):
             elif short > 2:
                 # descuento fuera de plazo o sin motivo: la diferencia queda abierta (POLICIES §3 PARTIAL)
                 exc, amount = "PARTIAL", paid
-        elif WITHHOLD_RX.search(reason):
+        elif WITHHOLD_RX.search(reason) and not re.search(r"GARANT|WARRANTY", reason):
             exc, amount = "SHORT_WITHHOLDING", max(it.open, paid)
+        elif re.search(r"GARANT|WARRANTY", reason) and short > 2:
+            exc, amount = "PARTIAL", paid
         elif CHARGE_RX.search(reason) and not DISPUTE_RX.search(reason):
             exc, amount = "SHORT_BANK_CHARGES", max(it.open, paid)
         elif short > 2 and _withholding_rate(engine, it, short):
