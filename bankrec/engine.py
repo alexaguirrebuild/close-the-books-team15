@@ -292,10 +292,7 @@ class Engine:
         for r in ph.runs:
             self.run_rows[r["run_id"]].append(r)
             self.e2e_rows[r["end_to_end_id"]].append(r)
-        self.transfers_by_amount = defaultdict(list)
-        for e2e, rs in self.e2e_rows.items():
-            r0 = rs[0]
-            self.transfers_by_amount[(r0["debtor_account_id"], int(round(float(r0["transfer_amount"]) * 100)))].append(e2e)
+        self.transfers_by_amount = self._index_transfers()
         self.used_batches = set()
 
     def item_by_number(self, number, entity=None, party=None, kinds=None, amount=None):
@@ -486,6 +483,38 @@ class Engine:
         return cache[rid]
 
     @staticmethod
+    def _transfers_of(rows):
+        """Filas de un mismo end_to_end_id, una lista por transferencia: el id se repite entre beneficiarios y divisas."""
+        groups = defaultdict(list)
+        for r in rows:
+            groups[(r["debtor_account_id"], r["beneficiary"], r["currency"], r["transfer_amount"])].append(r)
+        return list(groups.values())
+
+    def _index_transfers(self):
+        index = defaultdict(list)
+        for e2e, rows in self.e2e_rows.items():
+            for group in self._transfers_of(rows):
+                index[(group[0]["debtor_account_id"], int(round(float(group[0]["transfer_amount"]) * 100)))].append(e2e)
+        return index
+
+    def _transfer_for(self, rows, t):
+        """La transferencia de este cargo: la de su importe, o su importe original, o el beneficiario que cita el texto."""
+        groups = self._transfers_of(rows)
+        if len(groups) == 1:
+            return rows
+        own = [g for g in groups if g[0]["debtor_account_id"] == t.account] or groups
+        amt = abs(t.amount)
+
+        def cents(group):
+            return int(round(float(group[0]["transfer_amount"]) * 100))
+
+        exact = [g for g in own if abs(cents(g) - amt) <= 2]
+        original = [g for g in own if t.orig_amount and g[0]["currency"] == t.orig_ccy and abs(cents(g) - t.orig_amount) <= 2]
+        named = [g for g in own if all(w in t.up for w in name_key(g[0]["beneficiary"]).split()[:2])]
+        same_currency = [g for g in own if g[0]["currency"] == t.ccy]
+        return (exact or original or named or same_currency or own)[0]
+
+    @staticmethod
     def _cited_runs(t):
         """Ids de remesa del texto. El banco puede partirlos entre dos campos: «PR0101250 | 71007»."""
         return list(dict.fromkeys(RUN_ID.findall(t.up) + RUN_ID.findall(t.up.replace(" | ", ""))))
@@ -495,7 +524,7 @@ class Engine:
             return False
         amt = -t.amount
         if t.e2e and t.e2e in self.e2e_rows:
-            self.emit_run_rows(t, self.e2e_rows[t.e2e], "payment_run_e2e", f"e2e {t.e2e}")
+            self.emit_run_rows(t, self._transfer_for(self.e2e_rows[t.e2e], t), "payment_run_e2e", f"e2e {t.e2e}")
             return True
         for rid in self._cited_runs(t):
             rs = self.run_rows.get(rid)
@@ -513,7 +542,7 @@ class Engine:
                 # un cargo por beneficiario: solo la transferencia de este importe
                 sub = defaultdict(list)
                 for r in rs:
-                    sub[r["end_to_end_id"]].append(r)
+                    sub[(r["end_to_end_id"], r["beneficiary"], r["currency"], r["transfer_amount"])].append(r)
                 hits = [e for e, x in sub.items() if abs(int(round(float(x[0]["transfer_amount"]) * 100)) - amt) <= 2
                         and e not in self.used_batches]
                 if not hits:
@@ -561,7 +590,7 @@ class Engine:
                     self.used_batches.add(key)
                     self.emit_run_rows(t, g, "payment_run", f"remesa {rid}")
                     return True
-        e2es = [e for e in self.transfers_by_amount.get((t.account, amt), []) if e not in self.used_batches]
+        e2es = [e for e in self.transfers_by_amount.get((t.account, amt), []) if (e, amt) not in self.used_batches]
         if e2es:
             def score(e):
                 r0 = self.e2e_rows[e][0]
@@ -572,8 +601,8 @@ class Engine:
             e = min(e2es, key=score)
             r0 = self.e2e_rows[e][0]
             if abs((dt.date.fromisoformat(r0["execution_date"]) - t.date).days) <= 5:
-                self.used_batches.add(e)
-                self.emit_run_rows(t, self.e2e_rows[e], "payment_run_amount", f"transfer {e}")
+                self.used_batches.add((e, amt))
+                self.emit_run_rows(t, self._transfer_for(self.e2e_rows[e], t), "payment_run_amount", f"transfer {e}")
                 return True
         return False
 
