@@ -114,7 +114,7 @@ class Engine:
         self.reversal = self._find_reversals()
         self.plugins = []
         import os
-        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", "devoluciones,m2_avisos,remittance,pdfclauses,learned")):
+        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", "devoluciones,m2_avisos,remittance,pdfclauses,learned,mismo_importe")):
             if hasattr(mod, "prepare"):
                 mod.prepare(self)
             if hasattr(mod, "match"):
