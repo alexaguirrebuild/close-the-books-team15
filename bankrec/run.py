@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import preflight
 from .data import DATA, Phase
-from .engine import Engine
+from .engine import DEFAULT_PLUGINS, Engine
 
 ROOT = Path(__file__).resolve().parents[1]
 import os
@@ -128,6 +128,7 @@ def main(argv=None):
         ph = Phase("train", holdout=dt.date.fromisoformat(a.since))
     else:
         ph = Phase(a.phase)
+    print("  plugins:", os.environ.get("BANKREC_PLUGINS", DEFAULT_PLUGINS), flush=True)  # Un export olvidado los apagaría sin avisar.
     print(f"[{a.phase}] {len(ph.txns)} movimientos, {len(ph.items)} partidas · carga {time.time() - t0:.0f}s", flush=True)
     print(f"  maestros: {ph.mdir} · remesas de pago {len(ph.runs)} · recibos {len(ph.dd)}", flush=True)
     eng = Engine(ph)

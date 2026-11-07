@@ -11,6 +11,19 @@ export const canDownloadSubmission = (phase: string | null): boolean => phase ==
 
 export type ExportOptions = { includeProposals: boolean; minConfidence: number }
 
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = { includeProposals: true, minConfidence: 0 }
+
+/** The minimum confidence for a percentage typed by hand, limited to 0-100; null if the field holds no usable number. */
+export function minConfidenceFromPercent(raw: string): number | null {
+  const percent = raw.trim() ? Number(raw) : Number.NaN
+  return Number.isFinite(percent) ? Math.min(Math.max(percent, 0), 100) / 100 : null
+}
+
+/** The percentage a field shows for a minimum confidence: with the decimals typed, without the noise of floating point. */
+export function percentFromMinConfidence(confidence: number): string {
+  return String(Number((confidence * 100).toFixed(6)))
+}
+
 export type ExportSummary = {
   rows: number
   txns: number

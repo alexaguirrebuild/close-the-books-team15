@@ -4,8 +4,10 @@ Reglas del plugin bankrec/proveedores.py, que envuelve métodos del motor sin ed
 """
 import datetime as dt
 import os
+import re
 import subprocess
 import sys
+from collections import defaultdict
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -235,7 +237,7 @@ def motor_confirming(vencimientos, plugin=True):
     eng.emitidas = []
     eng.emit_run_rows = lambda t, filas, rule, ev: eng.emitidas.append((sorted(f["beneficiary"] for f in filas), rule))
     if plugin:
-        proveedores._wrap_confirming(eng)
+        proveedores._wrap_payment_run(eng)
     return eng
 
 
@@ -298,6 +300,80 @@ class TestConfirmingFinDeSemana:
         assert eng.emitidas == [(["Prov 0", "Prov 1"], "payment_run_confirming")]
 
 
+def transferencia(e2e, importe, moneda="USD", cuenta="ES01-BANK-EUR", ejecucion="2025-03-07", beneficiario="Pumps Global"):
+    return {"run_id": e2e.split("-")[0], "run_type": "transfers", "end_to_end_id": e2e, "execution_date": ejecucion,
+            "debtor_account_id": cuenta, "beneficiary": beneficiario, "currency": moneda, "transfer_amount": importe,
+            "document_number": f"INV-{e2e}", "document_amount": importe}
+
+
+def motor_transferencias(*filas):
+    from collections import defaultdict
+    eng = Engine.__new__(Engine)
+    eng.run_rows, eng.e2e_rows = defaultdict(list), defaultdict(list)
+    for f in filas:
+        eng.run_rows[f["run_id"]].append(f)
+        eng.e2e_rows[f["end_to_end_id"]].append(f)
+    eng.transfers_by_amount = eng._index_transfers()
+    eng.used_batches = set()
+    eng.emitidas = []
+    eng.emit_run_rows = lambda t, filas, rule, ev: eng.emitidas.append(([f["end_to_end_id"] for f in filas], rule))
+    proveedores._wrap_payment_run(eng)
+    return eng
+
+
+def cargo_fx(eur=-110000, original=100000, moneda="USD", dia=dt.date(2025, 3, 10), texto="TRF.INTERNACIONAL PUMPS GLOBAL"):
+    return SimpleNamespace(amount=eur, account="ES01-BANK-EUR", ccy="EUR", orig_amount=original, orig_ccy=moneda,
+                           date=dia, e2e="", up=texto)
+
+
+class TestImporteOriginal:
+    """ap_fx: el cargo va en la divisa de la cuenta y la transferencia en la del proveedor. Sin e2e ni remesa citada,
+    el motor solo buscaba por el importe en la divisa del banco. En el holdout, 617 de 1.217 cargos de ap_fx solo
+    se identifican por el importe original; los 617 tienen una única transferencia (cuenta, importe, divisa) en ±5
+    días, y en 591 los documentos coinciden con el golden. POLICIES §5.3: la transferencia liquida sus documentos."""
+
+    def test_casa_por_importe_y_divisa_originales(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"))
+        assert eng.m_payment_run(cargo_fx()) is True
+        assert eng.emitidas == [(["PR010025030701-0001"], "payment_run_amount_orig")]
+
+    def test_no_fuerza_con_dos_candidatas(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"),
+                                   transferencia("PR010025030801-0002", "1000.00", ejecucion="2025-03-08", beneficiario="Otro"))
+        assert eng.m_payment_run(cargo_fx()) is False
+        assert eng.emitidas == []
+
+    def test_no_fuerza_otra_divisa(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00", moneda="GBP"))
+        assert eng.m_payment_run(cargo_fx(moneda="USD")) is False
+
+    def test_no_fuerza_otra_cuenta(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00", cuenta="ES02-BANK-EUR"))
+        assert eng.m_payment_run(cargo_fx()) is False
+
+    def test_no_fuerza_fuera_de_la_ventana(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00", ejecucion="2025-02-20"))
+        assert eng.m_payment_run(cargo_fx()) is False
+
+    def test_no_repite_la_misma_transferencia(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"))
+        assert eng.m_payment_run(cargo_fx()) is True
+        assert eng.m_payment_run(cargo_fx()) is False
+        assert len(eng.emitidas) == 1
+
+    def test_sin_importe_original_o_cobro_no_hace_nada(self):
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1000.00"))
+        assert eng.m_payment_run(cargo_fx(original=None, moneda=None)) is False
+        assert eng.m_payment_run(cargo_fx(eur=110000)) is False
+        assert eng.emitidas == []
+
+    def test_el_importe_del_banco_sigue_mandando(self):
+        # si la transferencia cuadra por el importe en la divisa del banco, la ruta del motor la coge primero
+        eng = motor_transferencias(transferencia("PR010025030701-0001", "1100.00", moneda="EUR"))
+        assert eng.m_payment_run(cargo_fx()) is True
+        assert eng.emitidas == [(["PR010025030701-0001"], "payment_run_amount")]
+
+
 class TestDerivaDeFinal:
     """POLICIES §6: Moncayo pasa de Norma 43 a camt.053 (2025-10-01) y en 2026 llega ZA01 con numeración «KWI…».
     Textos reales de LIVE: el cargo de confirming debe seguir encontrando su remesa en los dos formatos."""
@@ -334,3 +410,399 @@ class TestDerivaDeFinal:
         eng = motor([it], by_num=by_num, names={"Proveedor ZA": "S1"})
         r = doc(numero="KWI26-000417", beneficiario="Proveedor ZA", cuenta="ZA01-BANK-ZAR", moneda="ZAR")
         assert eng.run_doc_item(r, cargo(cuenta="ZA01-BANK-ZAR", ccy="ZAR")).id == it.id
+
+
+def test_el_cargo_del_viernes_no_se_lleva_otra_remesa():
+    """Issue #21: la fecha del confirming se prueba antes que las búsquedas por importe, que miran cualquier remesa."""
+    run = "CF010025011055"
+    vencimientos = {"INV0": dt.date(2025, 3, 8), "INV1": dt.date(2025, 3, 18), "INV2": dt.date(2025, 3, 18), "OTRA": dt.date(2025, 3, 6)}
+
+    def fila(remesa, tipo, e2e, proveedor, importe, documento, ejecucion="2025-03-05"):
+        return {
+            "run_id": remesa, "run_type": tipo, "end_to_end_id": e2e, "execution_date": ejecucion, "debtor_account_id": "ES01-BANK-EUR",
+            "beneficiary": proveedor, "currency": "EUR", "transfer_amount": importe, "document_number": documento, "document_amount": importe,
+        }
+
+    filas = [
+        fila(run, "confirming", f"{run}-0000", "Prov Cero", "100.00", "INV0"),
+        fila(run, "confirming", f"{run}-0001", "Prov Uno", "200.00", "INV1"),
+        fila(run, "confirming", f"{run}-0002", "Prov Dos", "300.00", "INV2"),
+        fila("PR010125030601", "transfers", "PR010125030601-0007", "Otro Proveedor", "100.00", "OTRA", ejecucion="2025-03-06"),
+    ]
+    motor = Engine.__new__(Engine)
+    motor.run_rows, motor.e2e_rows = defaultdict(list), defaultdict(list)
+    for r in filas:
+        motor.run_rows[r["run_id"]].append(r)
+        motor.e2e_rows[r["end_to_end_id"]].append(r)
+    motor.transfers_by_amount = motor._index_transfers()
+    motor.used_batches = set()
+    motor.run_doc_item = lambda r, t: SimpleNamespace(due=vencimientos[r["document_number"]])
+    salida = []
+    motor.emit_run_rows = lambda t, rs, rule, ev: salida.append((rule, sorted(r["document_number"] for r in rs)))
+    proveedores._wrap_confirming(motor)
+    viernes = SimpleNamespace(
+        amount=-10000, account="ES01-BANK-EUR", e2e="", date=dt.date(2025, 3, 7), ccy="EUR", orig_amount=None, orig_ccy=None,
+        up=f"PAGO CONFIRMING | REMESA {run} 1 PROVEEDORES",
+    )
+
+    assert motor.m_payment_run(viernes) is True
+    assert salida == [("payment_run_confirming", ["INV0"])]
+
+
+class TestDatosRotos:
+    """FINAL tiene un único envío: una fila rota en un fichero de lotes no puede tumbar la ejecución entera.
+    Se salta lo roto, se apunta, y el resto del movimiento y de la fase sigue."""
+
+    def test_documento_con_importe_roto_se_salta_sin_caer(self):
+        it = factura("API-2025-0000001")
+        eng = motor([it], by_num={"INV0001234": {it.id}}, names={"Proveedor Uno SL": "S1"})
+        for roto in ("N/A", "", None, "abc", "1.234,56"):
+            assert eng.run_doc_item(doc(importe=roto), cargo()) is None
+
+    def test_remesa_con_un_documento_roto_casa_los_demas(self):
+        from collections import defaultdict
+        buena = factura("API-2025-0000001", numero="INV0001111", cents=10000)
+        otra = factura("API-2025-0000002", numero="INV0002222", cents=20000)
+        eng = motor([buena, otra], by_num={"INV0001111": {buena.id}, "INV0002222": {otra.id}},
+                    names={"Proveedor Uno SL": "S1"})
+        rid = "PR010025030701"
+        filas = [dict(doc(numero="INV0001111", importe="100.00"), run_id=rid, run_type="aggregated",
+                      end_to_end_id=f"{rid}-0001", execution_date="2025-03-07", transfer_amount="100.00"),
+                 dict(doc(numero="INV0002222", importe="N/A"), run_id=rid, run_type="aggregated",
+                      end_to_end_id=f"{rid}-0002", execution_date="2025-03-07", transfer_amount="200.00")]
+        eng.run_rows, eng.e2e_rows, eng.transfers_by_amount, eng.used_batches = {rid: filas}, defaultdict(list), {}, set()
+        eng.rows, eng.settled_by, eng.iban_learned = [], defaultdict(list), {}
+        t = SimpleNamespace(id="T1", amount=-30000, account="ES01-BANK-EUR", ccy="EUR", date=DAY, up=f"PAGO REMESA {rid}",
+                            e2e="", orig_amount=None, orig_ccy=None, cp_iban="")
+        assert eng.m_payment_run(t) is True
+        assert [(r.item, r.amount) for r in eng.rows] == [(buena.id, 10000)]
+
+
+class TestRedDeSeguridad:
+    """Si una puerta de lotes revienta con un movimiento, se deshace lo que hubiera emitido, se apunta el error y
+    devuelve False para que el movimiento siga por las demás puertas. Nunca cae la fase."""
+
+    def _motor(self, falla_tras_emitir):
+        from collections import defaultdict
+        it = factura("API-2025-0000001", cents=10000)
+        eng = Engine.__new__(Engine)
+        eng.items = {it.id: it}
+        eng.rows, eng.settled_by, eng.iban_learned = [], defaultdict(list), {}
+        eng.used_batches = set()
+
+        def puerta_rota(t):
+            if falla_tras_emitir:
+                eng.emit(t, it, 4000, "", "dd_batch")
+            raise ValueError("could not convert string to float: 'N/A'")
+
+        for g in proveedores.GATES:
+            setattr(eng, g, puerta_rota)
+        proveedores._safety_net(eng)
+        return eng, it
+
+    def test_no_cae_y_devuelve_false(self):
+        eng, _ = self._motor(False)
+        t = SimpleNamespace(id="T1", amount=-100, cp_iban="")
+        for g in proveedores.GATES:
+            assert getattr(eng, g)(t) is False
+        assert len(eng.lote2_errors) == len(proveedores.GATES)
+
+    def test_deshace_lo_emitido_antes_del_fallo(self):
+        eng, it = self._motor(True)
+        t = SimpleNamespace(id="T1", amount=-100, cp_iban="")
+        assert eng.m_dd_batch(t) is False
+        assert eng.rows == [] and it.open == 10000 and not eng.settled_by[it.id]
+
+
+class TestFilasRotasNoTumbanElLote:
+    """Una fila rota dentro de un lote (cheque, recibo, documento) se retira al preparar: el resto del lote se casa
+    con normalidad en lugar de perder el lote entero por la red de seguridad."""
+
+    def test_e2e_vacio_no_rompe_el_indice_de_importe_original(self):
+        from collections import defaultdict
+        eng = Engine.__new__(Engine)
+        eng.e2e_rows = defaultdict(list)
+        eng.e2e_rows["PR010025030701-0001"].append(transferencia("PR010025030701-0001", "1000.00"))
+        eng.e2e_rows[None].append(dict(transferencia("PR010025030701-0002", "500.00"), end_to_end_id=None))
+        idx = proveedores._index_by_original(eng)
+        assert ("ES01-BANK-EUR", 100000, "USD") in idx
+
+    def test_cheque_roto_se_retira_y_el_resto_del_deposito_sigue(self):
+        eng = Engine.__new__(Engine)
+        bueno = {"deposit_id": "RCH1", "amount": "100.00", "deposit_total": "300.00", "account_id": "A"}
+        roto = {"deposit_id": "RCH1", "amount": "N/A", "deposit_total": "300.00", "account_id": "A"}
+        eng.cheque_deps = {"RCH1": [bueno, roto]}
+        eng.dd_batches, eng.dd_by_mandate, eng.card_sets, eng.run_rows, eng.e2e_rows = {}, {}, {}, {}, {}
+        proveedores._drop_broken_rows(eng)
+        assert eng.cheque_deps["RCH1"] == [bueno]
+        assert eng.lote2_dropped == [("cheque_deps", "RCH1", "amount")]
+
+    def test_recibo_y_documento_rotos_se_retiran(self):
+        eng = Engine.__new__(Engine)
+        ok_dd = {"batch_id": "1", "amount": "10.00", "collection_date": "2025-01-02"}
+        bad_dd = {"batch_id": "1", "amount": "", "collection_date": "2025-01-02"}
+        ok_doc = transferencia("PR1-0001", "10.00")
+        bad_doc = dict(transferencia("PR1-0002", "10.00"), execution_date="2025-13-45")
+        eng.cheque_deps, eng.card_sets = {}, {}
+        eng.dd_batches, eng.dd_by_mandate = {"1": [ok_dd, bad_dd]}, {"M": [bad_dd]}
+        eng.run_rows, eng.e2e_rows = {"PR1": [ok_doc, bad_doc]}, {"PR1-0001": [ok_doc], "PR1-0002": [bad_doc]}
+        proveedores._drop_broken_rows(eng)
+        assert eng.dd_batches["1"] == [ok_dd] and eng.dd_by_mandate["M"] == []
+        assert eng.run_rows["PR1"] == [ok_doc] and eng.e2e_rows["PR1-0002"] == []
+
+    def test_datos_buenos_no_se_tocan(self):
+        eng = Engine.__new__(Engine)
+        filas = [{"deposit_id": "RCH1", "amount": "100.00", "deposit_total": "100.00"}]
+        eng.cheque_deps = {"RCH1": list(filas)}
+        eng.dd_batches, eng.dd_by_mandate, eng.card_sets, eng.run_rows, eng.e2e_rows = {}, {}, {}, {}, {}
+        proveedores._drop_broken_rows(eng)
+        assert eng.cheque_deps["RCH1"] == filas and eng.lote2_dropped == []
+
+
+def motor_adeudos(items, recibos, mandato_cliente="C1"):
+    from collections import defaultdict
+    eng = Engine.__new__(Engine)
+    eng.items = {i.id: i for i in items}
+    by_num, by_party = defaultdict(set), defaultdict(list)
+    from bankrec.data import num_variants
+    for i in items:
+        for v in num_variants(i.number):
+            by_num[v].add(i.id)
+        by_party[i.party].append(i.id)
+    eng.ph = SimpleNamespace(by_num=by_num, by_party=by_party, by_suffix={}, children={}, party_by_iban={})
+    eng.dd_batches = {"0325051665": recibos}
+    eng.mandate_party = {"VTM-ES-0006972": mandato_cliente}
+    eng.rows, eng.settled_by, eng.iban_learned, eng.used_batches = [], defaultdict(list), {}, set()
+    proveedores._wrap_dd_batch(eng)
+    return eng
+
+
+def recibo(numero, importe="211.75", re_presentado="N"):
+    return {"batch_id": "0325051665", "batch_total": importe, "amount": importe, "remittance_info": numero,
+            "mandate_id": "VTM-ES-0006972", "debtor_iban": "", "re_presentation": re_presentado}
+
+
+def abono_remesa(importe=21175):
+    return SimpleNamespace(id="T9", amount=importe, entity="ES01", date=DAY, cp_iban="",
+                           up="ABONO REMESA SEPA CORE 0325051665 | PRESENTADA 250516 1 RECIBOS")
+
+
+def cobro(item_id, numero, abierto, issue=dt.date(2025, 4, 1)):
+    return Item(id=item_id, kind="ARI", side="AR", entity="ES01", number=numero, party="C1", ccy="EUR",
+                total=21175, open=abierto, issue=issue)
+
+
+class TestReciboRepresentado:
+    """POLICIES §5.10: un recibo devuelto se vuelve a presentar en otra remesa (re_presentation=Y) y liquida la
+    MISMA factura. Si el motor no vio la devolución, la factura figura cerrada y m_dd_batch la cambiaba por otra
+    abierta del cliente con el mismo importe: fila equivocada. Holdout: los 5 re-presentados de 3 remesas
+    revisadas siguen la secuencia cobro -> RETURNED -> re-presentación de la misma factura."""
+
+    def test_representado_liquida_su_factura_aunque_figure_cerrada(self):
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=0)
+        otra = cobro("ARI-2025-0000002", "FV25-0000002", abierto=21175, issue=dt.date(2025, 3, 1))
+        eng = motor_adeudos([citada, otra], [recibo("FV25-0631481", re_presentado="Y")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [(r.item, r.amount) for r in eng.rows] == [(citada.id, 21175)]
+
+    def test_representado_con_factura_reabierta_igual_que_antes(self):
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=21175)
+        eng = motor_adeudos([citada], [recibo("FV25-0631481", re_presentado="Y")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [(r.item, r.amount, r.exception) for r in eng.rows] == [(citada.id, 21175, "")]
+
+    def test_no_representado_con_factura_cerrada_sigue_buscando_por_mandato(self):
+        # comportamiento previo del motor: sin la marca, una factura cerrada se cambia por la abierta del mandato
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=0)
+        otra = cobro("ARI-2025-0000002", "FV25-0000002", abierto=21175, issue=dt.date(2025, 3, 1))
+        eng = motor_adeudos([citada, otra], [recibo("FV25-0631481", re_presentado="N")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [r.item for r in eng.rows] == [otra.id]
+
+    def test_representado_sin_factura_citada_no_inventa(self):
+        otra = cobro("ARI-2025-0000002", "FV25-0000002", abierto=21175)
+        eng = motor_adeudos([otra], [recibo("FV25-9999999", re_presentado="Y")])
+        eng.m_dd_batch(abono_remesa())
+        assert [r.item for r in eng.rows] in ([], [otra.id])  # sin cita válida, el motor sigue su camino de siempre
+
+
+def motor_adeudos_sufijo(items, recibos):
+    eng = motor_adeudos(items, recibos)
+    from collections import defaultdict
+    by_suffix = defaultdict(set)
+    for i in items:
+        dg = re.sub(r"\D", "", i.number)
+        by_suffix[dg[-6:].rjust(6, "0")].add(i.id)
+    eng.ph.by_suffix = by_suffix
+    return eng
+
+
+class TestReciboConReferenciaCortada:
+    """El banco cita el recibo como «RECIBO 503648», sin el prefijo de la factura «1102503648». num_variants no lo
+    casa (0 de 3.000 en el holdout; 9.497 recibos así en 2025) y el motor caía al mandato, que elige la cuota MÁS
+    ANTIGUA abierta del mismo importe: mal si hay una vieja abierta (p. ej. devuelta). POLICIES §5.3: el recibo
+    liquida la factura que cita. Evidencia: sufijo citado + cliente del mandato + candidata única."""
+
+    def test_usa_el_sufijo_citado_y_no_la_cuota_mas_antigua(self):
+        vieja = cobro("ARI-2024-4687359", "1102418829", abierto=21175, issue=dt.date(2024, 10, 1))
+        citada = cobro("ARI-2025-1572292", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        eng = motor_adeudos_sufijo([vieja, citada], [recibo("RECIBO 503648")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [r.item for r in eng.rows] == [citada.id]
+
+    def test_no_fuerza_el_sufijo_de_otro_cliente(self):
+        vieja = cobro("ARI-2024-4687359", "1102418829", abierto=21175, issue=dt.date(2024, 10, 1))
+        ajena = cobro("ARI-2025-1572292", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        ajena.party = "C2"
+        eng = motor_adeudos_sufijo([vieja, ajena], [recibo("RECIBO 503648")])
+        eng.m_dd_batch(abono_remesa())
+        assert ajena.id not in [r.item for r in eng.rows]
+
+    def test_dos_del_cliente_con_el_mismo_sufijo_no_elige_por_sufijo(self):
+        a = cobro("ARI-2024-0000001", "1102403648", abierto=21175, issue=dt.date(2024, 3, 1))
+        b = cobro("ARI-2025-0000002", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        eng = motor_adeudos_sufijo([a, b], [recibo("RECIBO 503648")])
+        eng.m_dd_batch(abono_remesa())
+        assert len(eng.rows) <= 1  # sin candidata única por sufijo, el motor sigue su camino de siempre
+
+    def test_referencia_completa_no_cambia(self):
+        citada = cobro("ARI-2025-1572292", "1102503648", abierto=21175, issue=dt.date(2025, 3, 3))
+        eng = motor_adeudos_sufijo([citada], [recibo("1102503648")])
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert [r.item for r in eng.rows] == [citada.id]
+
+
+def motor_cheques(items, depositos, nombres=None):
+    from collections import defaultdict
+    eng = Engine.__new__(Engine)
+    eng.items = {i.id: i for i in items}
+    by_suffix, by_num, by_party = defaultdict(set), defaultdict(set), defaultdict(list)
+    for i in items:
+        by_suffix[re.sub(r"\D", "", i.number)[-6:].rjust(6, "0")].add(i.id)
+        by_party[i.party].append(i.id)
+    eng.ph = SimpleNamespace(by_suffix=by_suffix, by_num=by_num, by_party=by_party, children={}, party_by_iban={})
+    eng.cheque_deps = depositos
+    eng.rows, eng.settled_by, eng.iban_learned, eng.used_batches, eng.cheque_items = [], defaultdict(list), {}, set(), {}
+    nombres = nombres or {}
+    eng.resolve_names = lambda raw: list(nombres.get(raw, []))
+    eng.resolve_name = lambda raw: (nombres.get(raw) or [None])[0]
+    proveedores._wrap_cheque(eng)
+    return eng
+
+
+def cheque(numero, importe, ref, librador="Jardins Delta EURL", dep="RCH25033102694", total="300.00"):
+    return {"deposit_id": dep, "account_id": "FR01-LORV-EUR", "deposit_total": total, "cheque_number": numero,
+            "drawer": librador, "amount": importe, "stub_reference": ref}
+
+
+def remesa_cheques(importe=30000, dep="RCH25033102694"):
+    return SimpleNamespace(id="T7", amount=importe, account="FR01-LORV-EUR", entity="ES01", date=DAY, cp_iban="",
+                           up=f"REMISE DE CHEQUES {dep} 2 CHQ")
+
+
+def fra(item_id, numero, cents, party="C1", abierto=None):
+    return Item(id=item_id, kind="ARI", side="AR", entity="ES01", number=numero, party=party, ccy="EUR", total=cents,
+                open=cents if abierto is None else abierto, issue=dt.date(2025, 2, 1))
+
+
+class TestChequesSinAmbiguedad:
+    """m_cheque recorría un set y se quedaba con la primera factura que encajaba por sufijo: con dos candidatas, el
+    resultado dependía de PYTHONHASHSEED y podía ser la de otro cliente. POLICIES §5.3 + regla del equipo: candidata
+    única, o la del librador si hay varias; si no, ese cheque no se asigna (y los demás del depósito sí)."""
+
+    def test_una_candidata_igual_que_antes(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000)
+        b = fra("ARI-2025-0000002", "FA240233180", 20000)
+        eng = motor_cheques([a, b], {"RCH25033102694": [cheque("1", "100.00", "FA240233179"),
+                                                         cheque("2", "200.00", "FA240233180")]})
+        assert eng.m_cheque(remesa_cheques()) is True
+        assert sorted((r.item, r.amount) for r in eng.rows) == [(a.id, 10000), (b.id, 20000)]
+
+    def test_dos_candidatas_gana_la_del_librador(self):
+        mia = fra("ARI-2025-0000001", "FA240233179", 10000, party="C1")
+        ajena = fra("ARI-2025-0000009", "FB990233179", 10000, party="C2")
+        eng = motor_cheques([mia, ajena], {"RCH25033102694": [cheque("1", "100.00", "FA240233179", total="100.00")]},
+                            nombres={"Jardins Delta EURL": ["C1"]})
+        assert eng.m_cheque(remesa_cheques(10000)) is True
+        assert [r.item for r in eng.rows] == [mia.id]
+
+    def test_homonimos_con_factura_identica_no_se_asigna_ese_cheque(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000, party="C1")
+        b = fra("ARI-2025-0000009", "FA240233179", 10000, party="C2")
+        otra = fra("ARI-2025-0000003", "FA240233555", 20000, party="C1")
+        eng = motor_cheques([a, b, otra], {"RCH25033102694": [cheque("1", "100.00", "FA240233179"),
+                                                               cheque("2", "200.00", "FA240233555")]},
+                            nombres={"Jardins Delta EURL": ["C1", "C2"]})
+        assert eng.m_cheque(remesa_cheques()) is True
+        assert [r.item for r in eng.rows] == [otra.id]
+
+    def test_reproducible_con_cualquier_semilla(self):
+        sonda = r'''
+import sys, re, datetime as dt
+sys.path.insert(0, sys.argv[1]); sys.path.insert(0, sys.argv[1] + "/tests")
+import test_proveedores as T
+items = [T.fra(f"ARI-2025-{k:07d}", f"FX{k}0233179", 10000, party="C1") for k in range(20)]
+eng = T.motor_cheques(items, {"RCH25033102694": [T.cheque("1", "100.00", "0233179", total="100.00")]},
+                      nombres={"Jardins Delta EURL": ["C1"]})
+eng.m_cheque(T.remesa_cheques(10000))
+print([r.item for r in eng.rows])
+'''
+        outs = set()
+        for seed in range(1, 7):
+            r = subprocess.run([sys.executable, "-c", sonda, str(ROOT)], env=dict(os.environ, PYTHONHASHSEED=str(seed)),
+                               capture_output=True, text=True, check=True)
+            outs.add(r.stdout.strip())
+        assert outs == {"[]"}  # 20 candidatas del mismo cliente e importe: ambigua, no se asigna, siempre igual
+
+    def test_total_de_deposito_roto_no_cae(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000)
+        eng = motor_cheques([a], {"RCH1": [cheque("1", "100.00", "FA240233179", dep="RCH1", total="N/A")],
+                                  "RCH2": [cheque("2", "100.00", "FA240233179", dep="RCH2", total="100.00")]})
+        t = SimpleNamespace(id="T7", amount=10000, account="FR01-LORV-EUR", entity="ES01", date=DAY, cp_iban="",
+                            up="REMISE DE CHEQUES SANS NUMERO")
+        assert eng.m_cheque(t) is True
+        assert [r.item for r in eng.rows] == [a.id]
+
+    def test_sin_referencia_usa_librador_e_importe(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000)
+        eng = motor_cheques([a], {"RCH25033102694": [cheque("1", "100.00", "", total="100.00")]},
+                            nombres={"Jardins Delta EURL": ["C1"]})
+        eng.find_by_party_amount = lambda raw, amt, t, kinds: a if raw == "Jardins Delta EURL" and amt == 10000 else None
+        assert eng.m_cheque(remesa_cheques(10000)) is True
+        assert [r.item for r in eng.rows] == [a.id]
+
+
+class TestIntegridadDelPlugin:
+    """Guardas del propio fichero: un carácter de control en una expresión regular (p. ej. «\b» convertido en
+    retroceso al copiar) la deja casi inservible sin que ningún otro test lo note."""
+
+    def test_sin_caracteres_de_control_en_el_codigo(self):
+        src = (ROOT / "bankrec" / "proveedores.py").read_bytes()
+        assert not [c for c in src if c < 32 and c not in (9, 10, 13)]
+
+    def test_ids_de_remesa_se_leen_como_en_el_motor(self):
+        assert proveedores.DD_BATCH_ID.findall("ABONO REMESA SEPA CORE 03250516656 | PRESENTADA 250516 29") == ["03250516656"]
+        assert proveedores.DD_BATCH_ID.findall("X 1234567890123 Y") == []
+        assert proveedores.CHEQUE_DEPOSIT_ID.findall("REMISE DE CHEQUES RCH25033102694 4 CHQ") == ["RCH25033102694"]
+        assert proveedores.CHEQUE_DEPOSIT_ID.findall("DEPOSIT LBX20250331 | ABCLBX20250331") == ["LBX20250331"]
+
+
+class TestConvivenciaConOtrosPlugins:
+    """Los plugins posteriores (mismo_importe, nombres_cortados, cobros_cortos…) pueden envolver los mismos métodos.
+    m_dd_batch sustituye item_by_number mientras procesa una remesa: al acabar debe dejar el que había EN ESE
+    MOMENTO, no el que guardó al preparar (borraría la envoltura del plugin posterior)."""
+
+    def test_la_envoltura_de_un_plugin_posterior_sobrevive_a_una_remesa(self):
+        citada = cobro("ARI-2025-6314812", "FV25-0631481", abierto=21175)
+        eng = motor_adeudos([citada], [recibo("FV25-0631481")])
+        llamadas = []
+        previo = eng.item_by_number
+
+        def de_otro_plugin(*a, **k):
+            llamadas.append(a[0])
+            return previo(*a, **k)
+
+        eng.item_by_number = de_otro_plugin  # un plugin cargado después de proveedores
+        assert eng.m_dd_batch(abono_remesa()) is True
+        assert eng.item_by_number is de_otro_plugin
+        assert llamadas == ["FV25-0631481"]  # y durante la remesa también se usó

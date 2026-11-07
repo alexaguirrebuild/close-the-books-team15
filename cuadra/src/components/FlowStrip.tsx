@@ -19,11 +19,13 @@ export function FlowStrip({ counts, withProposal }: { counts: ViewCounts; withPr
   const setFilters = useStore((s) => s.setFilters)
   const go = useStore((s) => s.go)
   const threshold = useStore((s) => s.filters.readyThreshold)
+  const hasConfidence = useStore((s) => Boolean(s.meta?.hasConfidence))
 
+  const readyNode: Node = { id: 'ready', label: 'Listas', value: formatCount(counts.ready), note: `Confianza desde ${Math.round(threshold * 100)} %`, icon: Wand2, view: 'ready' }
   const nodes: Node[] = [
     { id: 'all', label: 'Movimientos', value: formatCount(counts.totalAll), note: `${formatCount(withProposal)} con propuesta`, icon: Scale, view: 'all' },
     { id: 'review', label: 'Por revisar', value: formatCount(counts.priority), note: `${formatCount(counts.no_proposal)} sin propuesta`, icon: ListChecks, view: 'priority' },
-    { id: 'ready', label: 'Listas', value: formatCount(counts.ready), note: `Confianza desde ${Math.round(threshold * 100)} %`, icon: Wand2, view: 'ready' },
+    ...(hasConfidence ? [readyNode] : []),
     { id: 'done', label: 'Hechas', value: formatCount(counts.done), note: 'Salen como las decidiste', icon: Check, view: 'done' },
     { id: 'send', label: 'Formato', value: 'Validar', note: 'Comprobar el formato oficial', icon: ShieldCheck, view: null },
   ]

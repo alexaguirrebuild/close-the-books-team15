@@ -15,22 +15,27 @@ Para probarla sin datos, la pantalla inicial ofrece dos conjuntos inventados en 
 
 ## Qué carpeta elegir
 
-La carpeta raíz, con las mismas reglas que el pipeline (`pipeline/bankrec/roots.py`). Cuadra detecta las fases y solo lee la que elijas:
+La carpeta raíz, con las mismas reglas que el motor (`bankrec/run.py`) y el pipeline (`pipeline/bankrec/roots.py`). Cuadra detecta las fases y solo lee la que elijas:
 
 ```
 <raíz>/
-  live/  train/  final/  o  bankrec-docs-and-masters/sample/
-  masters/  o  bankrec-docs-and-masters/masters/
-  out/<fase>/                       lo que escribe el pipeline
+  live/  train/  final/  o  data/<fase>/  o  bankrec-docs-and-masters/sample/
+  masters/  o  data/masters/  o  bankrec-docs-and-masters/masters/
+  out/explain_<fase>.csv.gz  y  out/sub_<fase>.csv.gz    lo que escribe el motor
+  out/<fase>/                                            lo que escribe el pipeline
 ```
 
 `final/masters_final/` sustituye a los maestros generales en FINAL. También se puede elegir directamente una carpeta que sea un único conjunto de datos.
 
+**El navegador no sigue enlaces simbólicos.** Si `data/` son enlaces, elige la carpeta donde están los datos de verdad y usa «Elegir su fichero explain» en la pantalla de carga para traer el fichero del motor desde donde esté.
+
 ### Propuestas
 
-Dentro de `out/<fase>/`, por este orden: `propuestas*`, el fichero fusionado (`submission*`), `baseline*` y, por último, una etapa suelta. Se puede cambiar en la pantalla de carga.
+Por este orden: `explain_<fase>*` y `propuestas*`, el fichero fusionado (`sub_*`, `submission*`), `baseline*` y, por último, una etapa suelta. Se puede cambiar en la pantalla de carga.
 
-El fichero fusionado solo lleva las cinco columnas oficiales: la confianza y el origen se toman de `out/<fase>/matches/*.csv.gz`, que el pipeline escribe con `bank_txn_id,item_id,amount,category,exception,source,confidence,advice_id,line_no`. También se lee una columna `reason` si existe.
+**Motor.** `explain_<fase>` lleva las mismas filas que el envío más `rule` y `evidence`, que aparecen en «De dónde sale». El motor no da confianza por fila, así que sin ella se ocultan «Listas», el lote y los órdenes por confianza, y «Prioridad» ordena por número de partidas y rareza de la excepción.
+
+**Pipeline.** El fichero fusionado solo lleva las cinco columnas oficiales: la confianza y el origen se toman de `out/<fase>/matches/*.csv.gz`, que el pipeline escribe con `bank_txn_id,item_id,amount,category,exception,source,confidence,advice_id,line_no`. Un fichero que ya dice el origen de cada fila, como el del motor, no se mezcla con esas etapas. También se lee una columna `reason` si existe.
 
 ### Documentos
 

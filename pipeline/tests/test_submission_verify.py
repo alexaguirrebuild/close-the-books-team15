@@ -6,10 +6,11 @@ import pytest
 from submission_roots import build_phase, write_golden, write_submission_text
 
 from bankcheck.cli import main as cli_main
-from bankcheck.roots import resolve_layout
+from bankcheck.roots import DataRootNotFound, resolve_layout
 from bankcheck.submission import verify as verify_module
 from bankcheck.submission.score import score_submission_file
 from bankcheck.submission.validate import validate_submission
+from bankcheck.submission.verify import _reports_folder as verify_reports_folder
 from bankcheck.submission.verify import EXIT_OK, EXIT_PROBLEMS, main
 
 T1, T2, T3 = "BT-2025-0000001", "BT-2025-0000002", "BT-2025-0000003"
@@ -214,7 +215,11 @@ class TestSelfCheck:
 class TestAgainstTheRealSample:
     @pytest.fixture
     def sample(self):
-        layout = resolve_layout("sample", data_root=REPO_ROOT)
+        """The real sample phase; skipped when its data or its warehouse is missing."""
+        try:
+            layout = resolve_layout("sample", data_root=REPO_ROOT)
+        except DataRootNotFound:
+            pytest.skip("hace falta sample/ en la raíz del repo o en bankrec-docs-and-masters/")
         if not layout.warehouse_path.is_file():
             pytest.skip("hace falta `bankcheck ingest --phase sample`")
         return layout
@@ -229,3 +234,22 @@ class TestAgainstTheRealSample:
         assert result["score"] == 100.0
         assert report["ok"] is True
         assert not report["warnings"]
+
+
+def test_a_relative_root_from_inside_data_also_sends_the_reports_outside_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`--data-root .` has no name to recognise: the report ended up inside data/, where nothing looks for it."""
+    project = tmp_path / "repo"
+    data = project / "data"
+    build_phase(data, "live", TXNS, ITEMS)
+    monkeypatch.chdir(data)
+
+    main(["--data-root", ".", "--phase", "live"])
+
+    assert (project / "out" / "verification" / "report.json").is_file()
+    assert not (data / "out" / "verification").exists()
+
+
+def test_with_a_data_folder_the_reports_go_to_the_project_out_folder(tmp_path: Path) -> None:
+    """roots.py keeps out/ and cache/ outside data/; the verification report must land next to them."""
+    assert verify_reports_folder(tmp_path / "data") == tmp_path / "out" / "verification"
+    assert verify_reports_folder(tmp_path / "repo") == tmp_path / "repo" / "out" / "verification"

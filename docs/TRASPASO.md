@@ -36,10 +36,11 @@ git worktree add ../Paella-<lote> -b <lote> origin/Dev
 cd ../Paella-<lote>
 git config core.hooksPath .githooks   # exige gitleaks instalado
 export BANKREC_DATA=<ruta>/data BANKREC_M2_DIR=<ruta>/out
-export BANKREC_PLUGINS=devoluciones,m2_avisos,remittance,pdfclauses,learned,<plugin>
+export BANKREC_PLUGINS="$(uv run python -c 'from bankrec.engine import DEFAULT_PLUGINS; print(DEFAULT_PLUGINS)'),<plugin>"
 uv run python -m bankrec.run --phase holdout
 ```
 
+- **Antes de generar LIVE o FINAL:** `unset BANKREC_PLUGINS`. Si queda de una medición, salen sin los plugins por defecto. `bankrec.run` imprime al arrancar cuáles carga: compruébalo.
 - **Avisos enlazados:** copia `m2_remittance.csv.gz` de `train` y de `sample` a `<ruta>/out/<fase>/matches/`. No van en git. Pídeselos a Pablo: sin ellos la nota sale más baja y no se puede comparar con la referencia.
 - **Plugin:** un módulo en `bankrec/` con `prepare(engine)` y `match(engine, t)`. `bankrec/devoluciones.py` sirve de modelo. `match` se ejecuta después de las remesas y las categorías claras, y antes de `m_refs` y `m_party_amount`.
 - **Para cambiar algo anterior o interno:** envuelve en `prepare` el método que toque (`engine.m_cheque`, `engine.m_payment_run`, `engine.explain_short`…), sin editar `engine.py`. Lo hace `_wrap_resolve` en `bankrec/pdfclauses.py`.

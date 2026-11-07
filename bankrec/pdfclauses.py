@@ -42,6 +42,8 @@ for _m, _names in enumerate([
     for _n in _names.split():
         MONTHS[_n] = _m
 MONTH_RE = "|".join(sorted(MONTHS, key=len, reverse=True))
+YEAR_DIGITS = (2, 4)
+CENTURY = 2000
 
 AMT = r"(\d{1,3}(?:[\.  ]\d{3})*(?:,\d{1,2})?|\d+(?:\.\d{1,2})?|\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)"
 
@@ -407,18 +409,27 @@ def _fit(engine, it, c, cash, t):
     return None
 
 
-def _text_month(t):
+def month_words(t) -> list[str]:
+    """El texto del banco en palabras y números, para buscar en él un mes."""
+    return re.findall(r"[A-Z]+|\d+", t.up)
+
+
+def year_after(words: list[str], position: int) -> int | None:
+    """El año de 2 o 4 cifras que sigue al mes de esa posición, con «de» por medio o sin él; None si no lo hay."""
+    following = words[position + 1] if position + 1 < len(words) else ""
+    if following == "DE" and position + 2 < len(words):
+        following = words[position + 2]
+    if not following.isdigit() or len(following) not in YEAR_DIGITS:
+        return None
+    return int(following) if len(following) == 4 else CENTURY + int(following)
+
+
+def text_month(t):
     """Mes de servicio que nombra el texto del banco: palabra exacta (no 'SEPA'), con año de 2 o 4 cifras si lo hay."""
-    words = re.findall(r"[A-Z]+|\d+", t.up)
+    words = month_words(t)
     for i, w in enumerate(words):
         if w in MONTHS and w not in ("MAR", "DEC", "JUN", "JUL", "AGO", "MAI") or w in ("MAR", "DEC", "JUN", "JUL", "AGO", "MAI")                 and i + 1 < len(words) and words[i + 1].isdigit() and len(words[i + 1]) in (2, 4):
-            year = None
-            nxt = words[i + 1] if i + 1 < len(words) else ""
-            if nxt == "DE" and i + 2 < len(words):
-                nxt = words[i + 2]
-            if nxt.isdigit() and len(nxt) in (2, 4):
-                year = int(nxt) if len(nxt) == 4 else 2000 + int(nxt)
-            return year, MONTHS[w]
+            return year_after(words, i), MONTHS[w]
     return None
 
 
@@ -441,6 +452,7 @@ HINT = re.compile(r"PLAZO|ECHEANCE|INSTALMENT|INSTALLMENT|RATE \d|RETENTION|RETE
 
 
 def match(engine, t):
+    """Cobros de facturas con plazos, retención en garantía o anticipo a deducir, y mes de servicio (POLICIES §3 PARTIAL y §5.6-§5.11)."""
     cl = getattr(engine, "clauses", None)
     if not cl:
         return False
@@ -519,7 +531,7 @@ def match(engine, t):
     # (b) §5.6 mes de servicio: mismo importe en varias facturas, el texto nombra un mes
     same = [it for _, it in cands if it.ccy == t.ccy and _near(it.open, cash)]
     if len(same) > 1:
-        tm = _text_month(t)
+        tm = text_month(t)
         if tm:
             yr, mon = tm
             pick = []

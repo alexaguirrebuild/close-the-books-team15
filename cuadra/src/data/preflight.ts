@@ -76,15 +76,21 @@ async function planFile(role: FileRole, source: SourceFile): Promise<PlannedFile
 }
 
 const isStage = (path: string) => /(^|\/)matches\//.test(path)
+const ENGINE_RULE_COLUMN = /^(rule|regla)$/i
+const PARTIAL_RUN = /^(sub|explain)_(holdout|train_since)/
 
-/** The most finished file wins: named proposals, then the merged submission, then the baseline. */
+/**
+ * The most finished file wins: named proposals and the engine's explained rows, then the merged submission, then the baseline.
+ * A run over a part of TRAIN comes after all of them: picked on its own it would leave most of the phase without proposals.
+ */
 function proposalRank(path: string): number {
   const name = (path.split('/').at(-1) ?? '').toLowerCase()
-  if (isStage(path)) return 3
-  if (/^(propuestas|proposals)/.test(name)) return 0
+  if (isStage(path)) return 4
+  if (PARTIAL_RUN.test(name)) return 3
+  if (/^(propuestas|proposals|explain_)/.test(name)) return 0
   if (/^(submission|sub_|merged)/.test(name)) return 1
   if (/^baseline/.test(name)) return 2
-  return 4
+  return 5
 }
 
 async function pickProposal(candidates: SourceFile[], wanted: string | null | undefined): Promise<SourceFile | null> {
@@ -99,6 +105,7 @@ async function pickProposal(candidates: SourceFile[], wanted: string | null | un
   return dated.reduce((latest, next) => (next.at > latest.at ? next : latest)).source
 }
 
+/** Sorts the files of a folder by role, chooses the proposals and their stages, and records what it ignored. */
 export async function buildPlan(name: string, sources: SourceFile[], options: PlanOptions = {}): Promise<Plan> {
   const files: Plan['files'] = {}
   const pdfs: SourceFile[] = []
@@ -124,7 +131,10 @@ export async function buildPlan(name: string, sources: SourceFile[], options: Pl
 
   const primary = await pickProposal(proposals, options.proposalPath)
   if (primary) files.proposals = await planFile('proposals', primary)
-  const stages = proposals.filter((source) => isStage(source.path) && source.path !== primary?.path)
+  // The engine says where each row came from and gives no confidence: the stages and theirs belong to another pipeline.
+  const mapping = files.proposals?.mapping
+  const fromEngine = ENGINE_RULE_COLUMN.test(mapping?.source ?? '') && !mapping?.confidence
+  const stages = fromEngine ? [] : proposals.filter((source) => isStage(source.path) && source.path !== primary?.path)
   const enrichments = await Promise.all(stages.map((source) => planFile('proposals', source)))
 
   return {
@@ -153,9 +163,12 @@ export function withMapping(plan: Plan, role: FileRole, field: string, column: s
 
 export type PlanProblem = { role?: FileRole; message: string }
 
+/** What stops this plan from loading: missing files and required columns without a mapping. */
 export function planProblems(plan: Plan): PlanProblem[] {
   const problems: PlanProblem[] = []
-  if (!plan.files.bank) problems.push({ message: 'Falta bank_transactions.csv en la carpeta.' })
+  if (!plan.files.bank) {
+    problems.push({ message: 'Falta bank_transactions.csv en la carpeta. Si los datos son enlaces simbólicos, elige la carpeta original: el navegador no los sigue.' })
+  }
   if (!plan.files.ar && !plan.files.ap && !plan.files.cn && !plan.files.open) {
     problems.push({ message: 'Falta al menos un fichero de partidas: ar_invoices, ap_invoices, credit_notes u open_items_at_start.' })
   }

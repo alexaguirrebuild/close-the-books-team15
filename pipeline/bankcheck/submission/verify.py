@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..roots import PHASES, DataRootNotFound, Layout, resolve_layout
+from ..roots import DATA_DIRNAME, PHASES, DataRootNotFound, Layout, resolve_layout
 from .baseline import write_baseline
 from .official import SCORER_SHA256
 from .score import PHASES_WITH_GOLDEN, golden_as_submission, print_score, score_submission_file
@@ -158,7 +159,10 @@ def _render_markdown(report: dict) -> str:
 
 
 def _reports_folder(root: Path) -> Path:
-    return root / "out" / "verification"
+    """The reports go to out/verification of the project, outside data/."""
+    absolute = Path(os.path.abspath(root))  # `--data-root .` no tiene nombre. abspath no sigue enlaces, y data/ puede serlo.
+    project = absolute.parent if absolute.name == DATA_DIRNAME else absolute  # out/ vive fuera de data/, como en resolve_layout.
+    return project / "out" / "verification"
 
 
 def _clear_reports(root: Path) -> None:

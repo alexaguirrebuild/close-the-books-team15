@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { detectLayouts, filesOfLayout, shouldEnter, type PhaseLayout } from './dataRoot'
+import { detectLayouts, engineFileProblem, filesOfLayout, phaseOfEngineFile, shouldEnter, type PhaseLayout } from './dataRoot'
 
 const live: PhaseLayout = { phase: 'live', phaseDir: 'live', mastersDir: 'bankrec-docs-and-masters/masters', outDir: 'out/live' }
+
+const source = (path: string) => ({ path, open: async () => new File([], path) })
 
 describe('detectLayouts', () => {
   test('finds the phases next to the documentation folder, like the pipeline does', () => {
@@ -32,10 +34,19 @@ describe('detectLayouts', () => {
   test('finds nothing in a folder that is itself a dataset', () => {
     expect(detectLayouts(['bank_transactions.csv.gz', 'masters/fx_rates.csv'])).toEqual([])
   })
+
+  test('finds the phases and the masters inside data/, where the engine keeps them', () => {
+    const layouts = detectLayouts([
+      'data/live/bank_transactions.csv.gz',
+      'data/sample/bank_transactions.csv.gz',
+      'data/masters/fx_rates.csv',
+    ])
+    expect(layouts.map((l) => l.phase)).toEqual(['sample', 'live'])
+    expect(layouts[1]).toEqual({ phase: 'live', phaseDir: 'data/live', mastersDir: 'data/masters', outDir: 'out/live' })
+  })
 })
 
 describe('filesOfLayout', () => {
-  const source = (path: string) => ({ path, open: async () => new File([], path) })
 
   test('keeps the phase, the masters and its output, and nothing from other phases', () => {
     const paths = filesOfLayout(live, [
@@ -52,6 +63,18 @@ describe('filesOfLayout', () => {
     ])
   })
 
+  test('keeps what the engine writes for this phase directly under out/, and nothing else from there', () => {
+    const paths = filesOfLayout(live, [
+      source('out/explain_live.csv.gz'),
+      source('out/sub_live.csv.gz'),
+      source('out/sub_train.csv.gz'),
+      source('out/explain_holdout.csv.gz'),
+      source('out/_txns.csv.gz'),
+      source('out/_golden_holdout.csv.gz'),
+    ]).map((s) => s.path)
+    expect(paths).toEqual(['out/explain_live.csv.gz', 'out/sub_live.csv.gz'])
+  })
+
   test('puts the masters of FINAL before the general ones, because they replace them', () => {
     const final: PhaseLayout = { ...live, phase: 'final', phaseDir: 'final', outDir: 'out/final' }
     const paths = filesOfLayout(final, [
@@ -59,6 +82,59 @@ describe('filesOfLayout', () => {
       source('final/masters_final/fx_rates.csv'),
     ]).map((s) => s.path)
     expect(paths).toEqual(['final/masters_final/fx_rates.csv', 'bankrec-docs-and-masters/masters/fx_rates.csv'])
+  })
+})
+
+describe('engine runs of TRAIN', () => {
+  const train: PhaseLayout = { ...live, phase: 'train', phaseDir: 'train', outDir: 'out/train' }
+  const kept = (layout: PhaseLayout, names: string[]) => filesOfLayout(layout, names.map((name) => source(`out/${name}`))).map((s) => s.path)
+
+  test('finds the full run, the holdout and the --since runs, which are all parts of TRAIN', () => {
+    const names = ['explain_train.csv.gz', 'sub_train.csv.gz', 'explain_holdout.csv.gz', 'sub_holdout.csv.gz', 'explain_train_since2025-01-01.csv.gz', 'sub_train_since2025-01-01.csv.gz']
+    expect(kept(train, names)).toEqual(names.map((name) => `out/${name}`))
+  })
+
+  test('leaves out copies with another suffix and the temporary files of a run', () => {
+    expect(kept(train, ['sub_train_v2.csv.gz', 'explain_holdout_old.csv.gz', 'explain_train_since2025.csv.gz', '_txns.csv.gz', '_golden_holdout.csv.gz', 'sub_live.csv.gz'])).toEqual([])
+  })
+
+  test('does not bring them into any other phase', () => {
+    expect(kept(live, ['explain_holdout.csv.gz', 'explain_train_since2025-01-01.csv.gz'])).toEqual([])
+  })
+})
+
+describe('phaseOfEngineFile', () => {
+  test('reads the phase from the name the engine gives its files', () => {
+    expect(phaseOfEngineFile('explain_live.csv.gz')).toBe('live')
+    expect(phaseOfEngineFile('sub_final.csv')).toBe('final')
+  })
+
+  test('accepts a copy with a suffix, such as a saved submission', () => {
+    expect(phaseOfEngineFile('sub_live_648cc9c.csv.gz')).toBe('live')
+    expect(phaseOfEngineFile('sub_train_since2025-01-01.csv.gz')).toBe('train')
+  })
+
+  test('treats the holdout as TRAIN, because its rows come from there', () => {
+    expect(phaseOfEngineFile('explain_holdout.csv.gz')).toBe('train')
+  })
+
+  test('says nothing about any other name', () => {
+    expect(phaseOfEngineFile('mi_revision.csv')).toBeNull()
+    expect(phaseOfEngineFile('sub_lively.csv')).toBeNull()
+  })
+})
+
+describe('engineFileProblem', () => {
+  test('with a phase chosen, refuses only a file that names another one', () => {
+    expect(engineFileProblem('explain_live.csv', 'train')).toBe('explain_live.csv es de otra fase (LIVE). Elige el de esta fase o cambia de fase.')
+    expect(engineFileProblem('explain_train.csv', 'train')).toBeNull()
+    expect(engineFileProblem('explain_holdout.csv', 'train')).toBeNull()
+    expect(engineFileProblem('mi_revision.csv', 'train')).toBeNull()
+  })
+
+  test('with no phase chosen, the name has to say which one it is', () => {
+    expect(engineFileProblem('mi_revision.csv', null)).toBe('mi_revision.csv no dice de qué fase es. Elige el explain_<fase>.csv.gz que escribe el motor.')
+    expect(engineFileProblem('explain_live.csv.gz', null)).toBeNull()
   })
 })
 

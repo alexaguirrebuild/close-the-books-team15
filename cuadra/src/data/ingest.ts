@@ -16,6 +16,7 @@ export type DatasetMeta = {
   proposalTxnCount: number
   hasGolden: boolean
   hasProposals: boolean
+  hasConfidence: boolean
   hasOpenItems: boolean
   phase: string | null
   categories: string[]
@@ -437,6 +438,7 @@ const RATE_INSERT_BATCH = 2000
 
 const list = async (db: Db, sql: string) => (await db.query(sql)).map((r) => str(r.v)).filter(Boolean)
 
+/** Loads the files of the plan into the database and returns what the dataset holds. Throws without a bank file. */
 export async function ingest(
   db: Db,
   plan: Plan,
@@ -491,6 +493,7 @@ export async function ingest(
     proposalTxnCount: await scalar(db, 'SELECT count(*) FROM prop_sum'),
     hasGolden: Boolean(plan.files.golden),
     hasProposals: Boolean(plan.files.proposals),
+    hasConfidence: (await scalar(db, 'SELECT count(conf) FROM prop')) > 0,
     hasOpenItems: Boolean(plan.files.open),
     phase: plan.phase,
     categories,

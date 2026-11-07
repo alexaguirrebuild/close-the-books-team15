@@ -1,5 +1,6 @@
 import type { BalanceStatus } from './balance'
 import type { PrintedToken } from './printed'
+import { ruleLabel, ruleName } from './ruleLabel'
 import type { ProposalRow } from './types'
 
 export type EvidenceState = 'ok' | 'warn' | 'bad' | 'none'
@@ -17,13 +18,6 @@ export type EvidenceInput = {
   golden: { ok: boolean; text: string } | null
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  m2_remittance: 'Aviso de remesa',
-  baseline: 'Regla básica',
-}
-
-const humanSource = (source: string) => SOURCE_LABEL[source] ?? source.replace(/_/g, ' ')
-
 function reference({ tokens, matchedFragments }: EvidenceInput): EvidenceStep {
   const base = { id: 'reference', label: 'Referencia' }
   const hit = tokens.find((token) => matchedFragments.includes(token.norm))
@@ -39,16 +33,20 @@ function party({ partyName, counterparty }: EvidenceInput): EvidenceStep {
   return { ...base, state: 'ok', text: different ? `${partyName}. Ordenante: ${counterparty}` : partyName }
 }
 
+/** Where the proposal comes from: its reason if it has one, then the advice behind it, then its rule. */
 function origin({ proposal }: EvidenceInput): EvidenceStep {
   const base = { id: 'origin', label: 'De dónde sale' }
-  if (!proposal.length) return { ...base, state: 'warn', text: 'El pipeline no propone nada' }
+  if (!proposal.length) return { ...base, state: 'warn', text: 'No hay propuesta' }
   const withSource = proposal.find((row) => row.adviceId || row.source || row.reason) ?? proposal[0]
-  if (withSource.reason) return { ...base, state: 'none', text: withSource.reason }
+  if (withSource.reason) {
+    const name = ruleName(withSource.source)
+    return { ...base, state: 'none', text: name ? `${name}: ${withSource.reason}` : withSource.reason }
+  }
   if (withSource.adviceId) {
     const line = withSource.lineNo ? `, línea ${withSource.lineNo}` : ''
-    return { ...base, state: 'none', text: `${humanSource(withSource.source)} ${withSource.adviceId}${line}` }
+    return { ...base, state: 'none', text: `${ruleLabel(withSource.source)} ${withSource.adviceId}${line}` }
   }
-  return { ...base, state: 'none', text: withSource.source ? humanSource(withSource.source) : 'Propuesta del pipeline, sin detalle' }
+  return { ...base, state: 'none', text: withSource.source ? ruleLabel(withSource.source) : 'Propuesta sin detalle' }
 }
 
 const AMOUNT_OK: BalanceStatus[] = ['balanced', 'explained', 'no_item']

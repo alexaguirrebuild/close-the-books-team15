@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 import { BulkDialog } from '../components/BulkDialog'
 import { CasePane } from '../components/CasePane'
 import { QueuePanel, SEARCH_INPUT_ID } from '../components/QueuePanel'
-import { VIEW_ORDER_IN_TABS } from '../data/queue'
+import { availableViews } from '../data/queue'
 import { useStore } from '../store'
 
 const PAGE_JUMP = 100
@@ -38,7 +38,7 @@ export function Review() {
         }
       } else if (key === 'v') {
         event.preventDefault()
-        const views = VIEW_ORDER_IN_TABS.filter((view) => view !== 'errors' || state.meta?.hasGolden)
+        const views = availableViews(state.meta)
         const next = views[(views.indexOf(state.filters.view) + 1) % views.length]
         void state.setFilters({ view: next })
       } else if (key === 'c' && event.shiftKey) {

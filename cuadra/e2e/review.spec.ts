@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
@@ -342,6 +342,36 @@ test.describe('the list', () => {
     await expect(page.locator('.queue')).toBeVisible()
   })
 
+  test('keeps the threshold of the batch while its field is empty, so the batch does not grow to every proposal', async ({ page }) => {
+    const threshold = () =>
+      page.evaluate(() => (window as unknown as { __cuadra: { getState(): { filters: { readyThreshold: number } } } }).__cuadra.getState().filters.readyThreshold)
+
+    await openSample(page, 'train')
+    await openReview(page)
+    await viewTab(page, /^Listas/).click()
+    const before = await threshold()
+    const field = page.getByLabel('Confianza mínima')
+
+    await field.fill('')
+    await expect(field).toHaveValue('')
+    await page.waitForTimeout(400) // Longer than the delay of the field: a wrong value would have reached the store by now.
+    expect(await threshold()).toBe(before)
+
+    await field.fill('150')
+    await expect.poll(threshold).toBe(1)
+    await field.blur()
+    await expect(field).toHaveValue('100')
+
+    await field.fill('')
+    await field.blur()
+    await expect(field).toHaveValue('100')
+
+    await field.fill('95.5')
+    await field.blur()
+    await expect(field).toHaveValue('95.5')
+    await expect.poll(threshold).toBe(0.955)
+  })
+
   test('confirms a batch after showing what it holds, and can undo it', async ({ page }) => {
     await openSample(page, 'train')
     await openReview(page)
@@ -487,6 +517,204 @@ test.describe('summary and diagnosis', () => {
   })
 })
 
+test.describe('engine output', () => {
+  const SAMPLE = join('public', 'sample', 'train')
+  const HEADER = 'bank_txn_id,item_id,amount,category,exception'
+  let folder: string
+
+  /** The official columns plus the rule and the evidence, as bankrec.run writes them. */
+  const explainFile = () => {
+    const [, ...rows] = readFileSync(join(SAMPLE, 'propuestas.csv'), 'utf8').trim().split('\n')
+    const body = rows.map((row) => {
+      const official = row.split(',').slice(0, 5)
+      return [...official, 'dd_batch', `remesa ${official[0]}`].join(',')
+    })
+    return [`${HEADER},rule,evidence`, ...body].join('\n')
+  }
+
+  async function expectEngineReview(page: Page) {
+    await page.getByRole('button', { name: /Cargar datos/ }).click()
+    await expect(page.locator('.rail')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.flow')).not.toContainText('Listas')
+    await openReview(page)
+    await expect(viewTab(page, /^Listas/)).toHaveCount(0)
+    await expect(page.locator('.view-hint')).toContainText('no da confianza')
+    await expect(page.getByText(/Remesa de recibos: remesa/)).toBeVisible()
+  }
+
+  test.beforeEach(() => {
+    folder = mkdtempSync(join(tmpdir(), 'cuadra-engine-'))
+  })
+
+  test.afterEach(() => {
+    rmSync(folder, { recursive: true, force: true })
+  })
+
+  test('reads the repository as the engine leaves it, without being told where anything is', async ({ page }) => {
+    const repo = join(folder, 'repo')
+    mkdirSync(join(repo, 'out', 'train'), { recursive: true })
+    cpSync(SAMPLE, join(repo, 'data', 'train'), { recursive: true, filter: (from) => !/propuestas\.csv|masters|pdfs/.test(from) })
+    cpSync(join(SAMPLE, 'masters'), join(repo, 'data', 'masters'), { recursive: true })
+    writeFileSync(join(repo, 'out', 'explain_train.csv'), explainFile())
+    writeFileSync(join(repo, 'out', 'train', 'baseline.csv'), `${HEADER}\n`)
+
+    await page.goto('/')
+    await page.locator('input[type=file]').setInputFiles(repo)
+    await expect(page.getByLabel('Propuestas')).toHaveValue('out/explain_train.csv')
+    await expectEngineReview(page)
+  })
+
+  test('accepts a file of the engine from another folder, for when the data is behind symlinks', async ({ page }) => {
+    const explain = join(folder, 'explain_train.csv')
+    writeFileSync(explain, explainFile())
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled({ timeout: 30_000 })
+    await page.getByLabel('Fichero del motor').setInputFiles(explain)
+    await expect(page.getByLabel('Propuestas')).toHaveValue('out/explain_train.csv')
+    await expectEngineReview(page)
+  })
+
+  test('says so when the chosen file holds no proposals, and keeps what was loaded', async ({ page }) => {
+    const notes = join(folder, 'notas.txt')
+    writeFileSync(notes, 'nada que ver')
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled({ timeout: 30_000 })
+    await page.getByLabel('Fichero del motor').setInputFiles(notes)
+    await expect(page.getByRole('alert')).toContainText('notas.txt no es un fichero de propuestas')
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled()
+  })
+
+  test('refuses a file of the engine written for another phase, and forgets the complaint on the next choice', async ({ page }) => {
+    const otherPhase = join(folder, 'explain_live.csv')
+    const right = join(folder, 'explain_train.csv')
+    writeFileSync(otherPhase, explainFile())
+    writeFileSync(right, explainFile())
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled({ timeout: 30_000 })
+    await page.getByLabel('Fichero del motor').setInputFiles(otherPhase)
+    await expect(page.getByRole('alert')).toContainText('explain_live.csv es de otra fase (LIVE)')
+    await expect(page.getByLabel('Propuestas')).toHaveCount(0)
+
+    await page.getByLabel('Fichero del motor').setInputFiles(right)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(page.getByLabel('Propuestas')).toHaveValue('out/explain_train.csv')
+  })
+
+  test('a phase chosen while the engine file is being read wins over that file', async ({ page }) => {
+    const repo = join(folder, 'repo')
+    cpSync(SAMPLE, join(repo, 'data', 'train'), { recursive: true, filter: (from) => !/propuestas\.csv|masters|pdfs/.test(from) })
+    cpSync(SAMPLE, join(repo, 'data', 'sample'), { recursive: true, filter: (from) => !/propuestas\.csv|masters|pdfs/.test(from) })
+    cpSync(join(SAMPLE, 'masters'), join(repo, 'data', 'masters'), { recursive: true })
+    const explain = join(folder, 'explain_train.csv')
+    writeFileSync(explain, explainFile())
+    await page.addInitScript(() => {
+      // Reading the file takes longer than choosing another phase, so the race always happens.
+      const slice = Blob.prototype.slice
+      Blob.prototype.slice = function delayedSlice(this: Blob, ...args: Parameters<Blob['slice']>) {
+        const part = slice.apply(this, args)
+        if (this instanceof File && this.name === 'explain_train.csv') {
+          const read = part.arrayBuffer.bind(part)
+          part.arrayBuffer = async () => {
+            await new Promise((resolve) => setTimeout(resolve, 700))
+            return read()
+          }
+        }
+        return part
+      }
+    })
+
+    await page.goto('/')
+    await page.locator('input[type=file]').first().setInputFiles(repo)
+    await page.getByRole('button', { name: 'TRAIN', exact: true }).click()
+    await expect(page.locator('.load-pick-label')).toContainText('repo/train')
+    await page.getByLabel('Fichero del motor').setInputFiles(explain)
+    await page.getByRole('button', { name: 'Sample', exact: true }).click()
+    await expect(page.locator('.load-pick-label')).toContainText('repo/sample')
+
+    await page.waitForTimeout(3000) // The file is read twice: by now the old result would have overwritten the plan.
+    await expect(page.locator('.load-pick-label')).toContainText('repo/sample')
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled()
+  })
+
+  test('does not offer to filter by a confidence the engine does not give', async ({ page }) => {
+    const explain = join(folder, 'explain_train.csv')
+    writeFileSync(explain, explainFile())
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled({ timeout: 30_000 })
+    await page.getByLabel('Fichero del motor').setInputFiles(explain)
+    await page.getByRole('button', { name: /Cargar datos/ }).click()
+    await expect(page.locator('.rail')).toBeVisible({ timeout: 30_000 })
+    await page.keyboard.press('Alt+Digit3')
+    await expect(page.locator('.send-summary')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(/confianza/i)).toHaveCount(0)
+  })
+
+  const exportMinConfidence = (page: Page) =>
+    page.evaluate(() => (window as unknown as { __cuadra: { getState(): { exportOptions: { minConfidence: number } } } }).__cuadra.getState().exportOptions.minConfidence)
+
+  test('lets the confidence field stay empty while typing, and keeps the last valid filter', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await page.getByRole('button', { name: /Cargar datos/ }).click()
+    await expect(page.locator('.rail')).toBeVisible({ timeout: 30_000 })
+    await page.keyboard.press('Alt+Digit3')
+    const field = page.getByLabel(/Solo con confianza desde/)
+    await field.fill('80')
+    await expect.poll(() => exportMinConfidence(page)).toBe(0.8)
+
+    await field.fill('')
+    await expect(field).toHaveValue('')
+    expect(await exportMinConfidence(page)).toBe(0.8)
+    await field.blur()
+    await expect(field).toHaveValue('80')
+
+    await field.fill('150')
+    await expect.poll(() => exportMinConfidence(page)).toBe(1)
+    await field.blur()
+    await expect(field).toHaveValue('100')
+  })
+
+  test('forgets the confidence filter when another dataset loads', async ({ page }) => {
+    const minConfidence = () => exportMinConfidence(page)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await page.getByRole('button', { name: /Cargar datos/ }).click()
+    await expect(page.locator('.rail')).toBeVisible({ timeout: 30_000 })
+    await page.keyboard.press('Alt+Digit3')
+    await page.getByLabel(/Solo con confianza desde/).fill('80')
+    await expect.poll(minConfidence).toBe(0.8)
+
+    await page.getByRole('button', { name: 'Datos' }).click()
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await page.getByRole('button', { name: /Cargar datos/ }).click()
+    await expect(page.locator('.rail')).toBeVisible({ timeout: 30_000 })
+    await expect.poll(minConfidence).toBe(0)
+  })
+
+  test('fills the width of the summary with the steps it shows', async ({ page }) => {
+    const explain = join(folder, 'explain_train.csv')
+    writeFileSync(explain, explainFile())
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await expect(page.getByRole('button', { name: /Cargar datos/ })).toBeEnabled({ timeout: 30_000 })
+    await page.getByLabel('Fichero del motor').setInputFiles(explain)
+    await page.getByRole('button', { name: /Cargar datos/ }).click()
+    await expect(page.locator('.flow-step')).toHaveCount(4, { timeout: 30_000 })
+    const [flow, last] = await Promise.all([page.locator('.flow').boundingBox(), page.locator('.flow-step').last().boundingBox()])
+    expect(Math.round((last?.x ?? 0) + (last?.width ?? 0))).toBe(Math.round((flow?.x ?? 0) + (flow?.width ?? 0)))
+  })
+})
+
 /** The real data is not in the repository: BANKREC_DATA_ROOT=/path PW_CHANNEL=chrome npx playwright test -g "real data" */
 const ROOT = process.env.BANKREC_DATA_ROOT
 const PHASE = process.env.BANKREC_PHASE ?? 'sample'
@@ -500,10 +728,15 @@ test.describe('real data', () => {
     const folder = mkdtempSync(join(tmpdir(), 'cuadra-root-'))
     const docs = join(ROOT as string, 'bankrec-docs-and-masters')
     const phaseDir = PHASE === 'sample' ? join(docs, 'sample') : join(ROOT as string, PHASE)
+    const out = join(ROOT as string, 'out')
     mkdirSync(join(folder, 'root', 'out'), { recursive: true })
     execFileSync('cp', ['-cR', phaseDir, join(folder, 'root', PHASE)])
     execFileSync('cp', ['-cR', join(docs, 'masters'), join(folder, 'root', 'masters')])
-    execFileSync('cp', ['-cR', join(ROOT as string, 'out', PHASE), join(folder, 'root', 'out', PHASE)])
+    if (existsSync(join(out, PHASE))) execFileSync('cp', ['-cR', join(out, PHASE), join(folder, 'root', 'out', PHASE)])
+    const runPrefixes = [`sub_${PHASE}.`, `explain_${PHASE}.`]
+    for (const name of readdirSync(out).filter((file) => runPrefixes.some((prefix) => file.startsWith(prefix)))) {
+      execFileSync('cp', ['-c', join(out, name), join(folder, 'root', 'out', name)])
+    }
     const started = Date.now()
     const lap = (label: string) => process.stdout.write(`${PHASE}: ${label} a los ${Math.round((Date.now() - started) / 1000)} s\n`)
     await page.addInitScript(() => {
@@ -517,6 +750,11 @@ test.describe('real data', () => {
       await page.getByRole('button', { name: /Cargar datos/ }).click()
       await expect(page.locator('.rail')).toBeVisible({ timeout: 240_000 })
       lap('datos cargados')
+      if (PHASE === 'sample' || PHASE === 'train') {
+        await expect(page.locator('.score-total')).toBeVisible({ timeout: 120_000 })
+        process.stdout.write(`${PHASE}: nota en Resumen ${await page.locator('.score-total').innerText()}\n`)
+      }
+      await page.screenshot({ path: join(tmpdir(), `cuadra-${PHASE}-resumen.png`) })
       await page.keyboard.press('Alt+Digit2')
       await expect(currentTxn(page)).toHaveText(/^BT-\d{4}-\d{7}$/, { timeout: 30_000 })
       lap('primer caso abierto')

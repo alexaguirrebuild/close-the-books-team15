@@ -26,14 +26,28 @@ export const VIEW_LABEL: Record<QueueView, string> = {
 export const VIEW_HINT: Record<QueueView, string> = {
   priority: 'Primero lo que más puede subir la puntuación.',
   ready: 'Propuestas con confianza alta, para confirmar en lote.',
-  exceptions: 'El pipeline propone una excepción: compruébala.',
-  no_proposal: 'El pipeline no propone nada: hay que decidir a mano.',
+  exceptions: 'La propuesta trae una excepción: compruébala.',
+  no_proposal: 'No hay propuesta: hay que decidir a mano.',
   done: 'Lo ya decidido, por si hay que corregirlo.',
   errors: 'La propuesta no coincide con el golden.',
   all: 'Todos los movimientos de la fase.',
 }
 
 export const VIEW_ORDER_IN_TABS: QueueView[] = ['priority', 'ready', 'exceptions', 'no_proposal', 'errors', 'done', 'all']
+
+type ViewSupport = { hasGolden: boolean; hasConfidence: boolean }
+
+/** Errors need a golden, and a list ready to confirm needs something that says how sure a proposal is. */
+export function availableViews(support: ViewSupport | null): QueueView[] {
+  return VIEW_ORDER_IN_TABS.filter((view) => (view !== 'errors' || support?.hasGolden) && (view !== 'ready' || support?.hasConfidence))
+}
+
+const PRIORITY_HINT_WITHOUT_CONFIDENCE = 'El motor no da confianza: primero las líneas con más partidas y excepciones raras.'
+
+/** The line that explains a view. Without confidence, the priority view cannot promise to find the doubtful cases. */
+export function viewHint(view: QueueView, hasConfidence: boolean): string {
+  return view === 'priority' && !hasConfidence ? PRIORITY_HINT_WITHOUT_CONFIDENCE : VIEW_HINT[view]
+}
 
 export const DEFAULT_READY_THRESHOLD = 0.95
 

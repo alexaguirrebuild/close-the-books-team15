@@ -108,6 +108,88 @@ afterAll(() => {
   }
 })
 
+describe('engine output', () => {
+  const OFFICIAL = 'bank_txn_id,item_id,amount,category,exception\nT1,,,BANK_FEES,\n'
+  const EXPLAINED = 'bank_txn_id,item_id,amount,category,exception,rule,evidence\nT1,,,BANK_FEES,,kw:FEE,\n'
+  const output = (path: string, text: string, lastModified = 0) =>
+    fileSource(path, new File([gzipSync(text)], path.split('/').at(-1) ?? path, { lastModified }))
+
+  test('prefers what the engine explains, even over a newer file', async () => {
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/sub_live.csv.gz', OFFICIAL, 5),
+      output('out/live/submission_m2.csv.gz', OFFICIAL, 9),
+      output('out/explain_live.csv.gz', EXPLAINED, 1),
+    ])
+    expect(plan.files.proposals?.path).toBe('out/explain_live.csv.gz')
+    expect(plan.files.proposals?.mapping).toMatchObject({ source: 'rule', reason: 'evidence' })
+  })
+
+  test('a full run of TRAIN beats one over a part of it, even when that one is newer', async () => {
+    for (const partial of ['out/explain_holdout.csv.gz', 'out/explain_train_since2025-01-01.csv.gz']) {
+      const plan = await buildPlan('demo', [
+        ...sources({ 'propuestas.csv': null }),
+        output('out/sub_train.csv.gz', OFFICIAL, 1),
+        output(partial, EXPLAINED, 9),
+      ])
+      expect(plan.files.proposals?.path).toBe('out/sub_train.csv.gz')
+      expect(plan.proposalOptions).toContain(partial)
+    }
+  })
+
+  test('the holdout is used when it is the only run, and a manual choice is respected', async () => {
+    const holdout = output('out/explain_holdout.csv.gz', EXPLAINED, 1)
+    const full = output('out/explain_train.csv.gz', EXPLAINED, 9)
+    const base = sources({ 'propuestas.csv': null })
+    expect((await buildPlan('demo', [...base, holdout])).files.proposals?.path).toBe('out/explain_holdout.csv.gz')
+    const chosen = await buildPlan('demo', [...base, full, holdout], { proposalPath: 'out/explain_holdout.csv.gz' })
+    expect(chosen.files.proposals?.path).toBe('out/explain_holdout.csv.gz')
+  })
+
+  test('does not mix old stages into a file that already says where each row came from', async () => {
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/explain_live.csv.gz', EXPLAINED),
+      output('out/live/matches/m2_remittance.csv.gz', OFFICIAL),
+    ])
+    expect(plan.enrichments).toEqual([])
+    expect(plan.proposalOptions).toHaveLength(2)
+  })
+
+  test('keeps the stages for a pipeline file that names its source but brings no confidence', async () => {
+    const named = 'bank_txn_id,item_id,amount,category,exception,source\nT1,,,BANK_FEES,,m1_reference\n'
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/live/propuestas.csv.gz', named),
+      output('out/live/matches/m2_remittance.csv.gz', OFFICIAL),
+    ])
+    expect(plan.enrichments.map((f) => f.path)).toEqual(['out/live/matches/m2_remittance.csv.gz'])
+  })
+
+  test('keeps the stages for a file that names its rule and brings a confidence: the engine gives none', async () => {
+    const withConfidence = 'bank_txn_id,item_id,amount,category,exception,rule,confidence\nT1,,,BANK_FEES,,kw:FEE,0.9\n'
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/live/propuestas.csv.gz', withConfidence),
+      output('out/live/matches/m2_remittance.csv.gz', OFFICIAL),
+    ])
+    expect(plan.enrichments.map((f) => f.path)).toEqual(['out/live/matches/m2_remittance.csv.gz'])
+  })
+
+  test('keeps the rule and the evidence of each row, and knows there is no confidence', async () => {
+    const explain = `bank_txn_id,item_id,amount,category,exception,rule,evidence\nT1,${A1},100.00,,,ref,refs F-1`
+    const { db, meta } = await setup({ 'propuestas.csv': null, 'out/explain_live.csv': explain })
+    const data = await loadCase(db, meta, 1)
+    expect(meta.hasConfidence).toBe(false)
+    expect(data.proposal[0]).toMatchObject({ source: 'ref', reason: 'refs F-1', confidence: null })
+  })
+
+  test('knows when the proposals carry confidence', async () => {
+    const { meta } = await setup()
+    expect(meta.hasConfidence).toBe(true)
+  })
+})
+
 describe('preflight', () => {
   const gz = (text: string) => new File([gzipSync(text)], 'x.csv.gz')
 
