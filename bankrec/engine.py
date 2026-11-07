@@ -217,7 +217,7 @@ class Engine:
         to_pay = {it.id: amount for it in invoices if (amount := self._discounted_total(it, t)) is not None}
         if not to_pay or len(to_pay) > max_eligible:
             return None
-        base = sum(it.open for it in invoices) - sum(c.total for c in credits)
+        base = sum(max(it.open, 0) for it in invoices) - sum(max(c.open, 0) for c in credits)  # como `exp` en settle
         sols = []
         ids = list(to_pay)
         for n in range(1, len(ids) + 1):
@@ -289,11 +289,15 @@ class Engine:
                 self.emit(t, it, cash_item, "PARTIAL", rule, ev)
             return True
         # varias facturas: ¿descuento en todas?
-        terms = [self._discount_terms(it) for it in invoices]
-        all_disc = all(terms)
-        if all_disc and abs(sum(to_pay for to_pay, _ in terms) - sum(c.total for c in credits) - cash) <= 2 * len(invoices):
+        terms = {it.id: self._discount_terms(it) for it in invoices}
+        all_disc = all(terms.values())
+        if all_disc and abs(sum(to_pay for to_pay, _ in terms.values()) - sum(max(c.open, 0) for c in credits) - cash) <= 2 * len(invoices):
             for it in cands:
-                full(it, "SHORT_DISCOUNT" if self.sign(it, t) > 0 else "")
+                if it.id in terms and self._discounted_total(it, t) is None:
+                    # POLICIES §3 PARTIAL: fuera de plazo no se acepta el descuento y la diferencia queda abierta
+                    self.emit(t, it, min(terms[it.id][0], it.open), "PARTIAL", rule, ev)
+                else:
+                    full(it, "SHORT_DISCOUNT" if it.id in terms else "")
             return True
         # POLICIES §3 SHORT_DISCOUNT: el descuento solo en las facturas que llegan a plazo; vale solo con solución única
         subset = self._discount_subset(invoices, credits, t, cash)
