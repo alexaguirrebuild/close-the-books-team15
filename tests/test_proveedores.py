@@ -124,3 +124,41 @@ class TestNoCambiaLoQueYaFunciona:
     def test_sin_candidatas_devuelve_none(self):
         eng = motor([], names={"Proveedor Uno SL": "S1"})
         assert eng.run_doc_item(doc(), cargo()) is None
+
+
+class TestDerivaDeFinal:
+    """POLICIES §6: Moncayo pasa de Norma 43 a camt.053 (2025-10-01) y en 2026 llega ZA01 con numeración «KWI…».
+    Textos reales de LIVE: el cargo de confirming debe seguir encontrando su remesa en los dos formatos."""
+
+    def test_la_remesa_citada_se_lee_en_n43_y_en_camt053(self):
+        n43 = "PAGO CONFIRMING | REMESA CF000025062552 3 PROVEEDORES"
+        camt = "PAGO CONFIRMING REMESA CF000025092566 3 PROVEEDORES"
+        assert Engine._cited_runs(SimpleNamespace(up=n43)) == ["CF000025062552"]
+        assert Engine._cited_runs(SimpleNamespace(up=camt)) == ["CF000025092566"]
+
+    def test_el_id_partido_por_el_banco_se_recompone(self):
+        assert "PR010125071007" in Engine._cited_runs(SimpleNamespace(up="PAGO REMESA PR0101250 | 71007"))
+
+    def test_confirming_en_camt053_paga_los_tres_proveedores_del_dia(self):
+        due = dt.date(2025, 10, 1)
+        rs = [{"run_id": "CF000025092566", "run_type": "confirming", "end_to_end_id": f"CF000025092566-000{k}",
+               "execution_date": "2025-09-25", "debtor_account_id": "ES01-BANK-EUR", "beneficiary": f"Prov {k}",
+               "currency": "EUR", "transfer_amount": f"{k}00.00", "document_number": f"INV{k}", "document_amount": f"{k}00.00"}
+              for k in (1, 2, 3)]
+        eng = Engine.__new__(Engine)
+        eng.run_rows, eng.e2e_rows, eng.transfers_by_amount, eng.used_batches = {"CF000025092566": rs}, {}, {}, set()
+        eng.run_doc_item = lambda r, t: SimpleNamespace(due=due)
+        eng.emitidas = []
+        eng.emit_run_rows = lambda t, filas, rule, ev: eng.emitidas.append((len(filas), rule))
+        t = SimpleNamespace(amount=-60000, account="ES01-BANK-EUR", up="PAGO CONFIRMING REMESA CF000025092566 3 PROVEEDORES",
+                            e2e="", date=due, ccy="EUR", orig_amount=None, orig_ccy=None)
+        assert eng.m_payment_run(t) is True
+        assert eng.emitidas == [(3, "payment_run_confirming")]
+
+    def test_numeracion_kwi_de_la_sociedad_nueva(self):
+        it = factura("API-2026-0000001", numero="KWI26-000417", entity="ZA01", ccy="ZAR")
+        from bankrec.data import num_variants
+        by_num = {v: {it.id} for v in num_variants(it.number)}
+        eng = motor([it], by_num=by_num, names={"Proveedor ZA": "S1"})
+        r = doc(numero="KWI26-000417", beneficiario="Proveedor ZA", cuenta="ZA01-BANK-ZAR", moneda="ZAR")
+        assert eng.run_doc_item(r, cargo(cuenta="ZA01-BANK-ZAR", ccy="ZAR")).id == it.id
