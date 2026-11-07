@@ -69,11 +69,15 @@ def parse_amt(s: str):
 
 # ------------------------------------------------------------------ extracción de texto
 def _extract(path):
+    """Texto del PDF; None si no se pudo leer (sin pypdf o PDF roto): no se guarda en caché."""
     try:
         from pypdf import PdfReader
+    except ImportError:
+        return None
+    try:
         return "\n".join((p.extract_text() or "") for p in PdfReader(path).pages)
     except Exception:
-        return ""
+        return None
 
 
 def _extract_many(paths):
@@ -95,17 +99,22 @@ def _load_texts(pdir: Path, phase: str, wanted: list[str]):
             cache = json.loads(cache_path.read_text(encoding="utf-8"))
         except Exception:
             cache = {}
-    missing = [f for f in wanted if f not in cache]
+    # un texto vacío en caché es casi siempre una extracción fallida (p. ej. un entorno sin pypdf): se reintenta
+    missing = [f for f in wanted if not (cache.get(f) or "").strip()]
     if missing:
         texts = _extract_many([str(pdir / f) for f in missing])
+        got = 0
         for f, tx in zip(missing, texts):
-            cache[f] = tx
-        try:
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
-        except OSError:
-            pass
-    return {f: cache.get(f, "") for f in wanted}
+            if tx is not None:
+                cache[f] = tx
+                got += 1
+        if got:
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+            except OSError:
+                pass
+    return {f: cache.get(f) or "" for f in wanted}
 
 
 # ------------------------------------------------------------------ detección de cláusulas

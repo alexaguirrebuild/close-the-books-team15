@@ -9,12 +9,16 @@ fecha, importes, texto del motivo), de modo que un cambio de columnas o de idiom
 """
 from __future__ import annotations
 
+import base64
 import bisect
 import csv
 import datetime as dt
 import io
 import re
+import zipfile
+import zlib
 from collections import defaultdict
+from xml.etree import ElementTree as ET
 
 from .data import ascii_upper, cents, rows
 from .engine import PAYMENT_FACTORY
@@ -255,26 +259,94 @@ def read_csv(path):
 
 
 def read_xlsx(path):
-    import openpyxl
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    table = []
-    for ws in wb.worksheets:
-        for row in ws.iter_rows(values_only=True):
-            table.append(list(row))
-    adv = _from_table(table)
-    return adv
+    try:
+        import openpyxl
+    except ImportError:
+        pass
+    else:
+        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        try:
+            return _from_table([list(row) for ws in wb.worksheets for row in ws.iter_rows(values_only=True)])
+        finally:
+            wb.close()
+    # POLICIES §5.4: XLSX también debe funcionar en el motor sin dependencias.
+    ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    with zipfile.ZipFile(path) as book:
+        shared = []
+        if "xl/sharedStrings.xml" in book.namelist():
+            root = ET.fromstring(book.read("xl/sharedStrings.xml"))
+            shared = ["".join(si.itertext()) for si in root]
+        table = []
+        wb = ET.fromstring(book.read("xl/workbook.xml"))
+        rels = ET.fromstring(book.read("xl/_rels/workbook.xml.rels"))
+        targets = {r.get("Id"): r.get("Target") for r in rels}
+        for sheet in wb.find("s:sheets", ns):
+            rid = sheet.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+            target = targets[rid]
+            name = target.lstrip("/") if target.startswith("/") else "xl/" + target
+            for row in ET.fromstring(book.read(name)).findall(".//s:sheetData/s:row", ns):
+                cells = []
+                for cell in row:
+                    col = 0
+                    for ch in re.match(r"[A-Z]+", cell.get("r")).group():
+                        col = col * 26 + ord(ch) - ord("A") + 1
+                    cells.extend([None] * (col - len(cells)))
+                    val = cell.find("s:v", ns)
+                    text = val.text if val is not None else None
+                    kind = cell.get("t")
+                    if kind == "s":
+                        text = shared[int(text)] if text is not None else None
+                    elif kind == "inlineStr":
+                        text = "".join(t.text or "" for t in cell.findall(".//s:t", ns))
+                    elif kind in (None, "n") and text is not None:
+                        number = float(text)
+                        text = int(number) if number.is_integer() else number
+                    cells[col - 1] = text
+                table.append(cells)
+    return _from_table(table)
+
+
+def _pdf_tokens(path):
+    try:
+        import pypdf
+    except ImportError:
+        # POLICIES §5.4: lector mínimo de PDF con fuentes simples, sin dependencias.
+        # Las fuentes compuestas necesitan pypdf; no se adivina su codificación.
+        raw = path.read_bytes()
+        if re.search(rb"/Subtype\s*/Type0\b", raw):
+            raise ValueError("PDF con fuente compuesta: requiere pypdf")
+        tokens = []
+        escapes = {b"n": b"\n", b"r": b"\r", b"t": b"\t", b"b": b"\b", b"f": b"\f"}
+        def unescape(m):
+            s = m.group(1)
+            if s[:1] in b"01234567":
+                return bytes([int(s, 8)])
+            return escapes.get(s, b"" if s in (b"\n", b"\r", b"\r\n") else s)
+        for stream in re.finditer(rb"<<(.*?)>>\s*stream\r?\n(.*?)endstream", raw, re.S):
+            meta, content = stream.groups()
+            filters = re.findall(rb"/(ASCII85Decode|FlateDecode|[A-Za-z]+Decode)\b", meta)
+            for filt in filters:
+                if filt == b"ASCII85Decode":
+                    content = base64.a85decode(content.strip(), adobe=True)
+                elif filt == b"FlateDecode":
+                    content = zlib.decompress(content)
+                else:
+                    raise ValueError("Filtro PDF no soportado: " + filt.decode())
+            for m in re.finditer(rb"\(((?:\\.|[^\\)])*)\)\s*Tj\b", content, re.S):
+                value = re.sub(rb"\\([0-7]{1,3}|\r\n|.)", unescape, m.group(1), flags=re.S)
+                tokens.extend(value.decode("cp1252").splitlines())
+        if not tokens:
+            raise ValueError("PDF sin texto simple: requiere pypdf")
+        return tokens
+    import logging
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    rd = pypdf.PdfReader(str(path))
+    return [line for pg in rd.pages for line in (pg.extract_text() or "").splitlines()]
 
 
 def read_pdf(path):
-    import logging
-    import pypdf
-    logging.getLogger("pypdf").setLevel(logging.ERROR)
-    rd = pypdf.PdfReader(str(path))
-    toks = []
-    for pg in rd.pages:
-        toks.extend((pg.extract_text() or "").splitlines())
+    toks = _pdf_tokens(path)
     adv = _blank()
-    full = "\n".join(toks)
     # cabecera: valores en la línea siguiente a la etiqueta
     def after(label_rx):
         for i, t in enumerate(toks):
@@ -298,17 +370,28 @@ def read_pdf(path):
     for i, t in enumerate(toks):
         if re.match(r"^(paid|pagado|pay[eé]|bezahlt)$", t.strip(), re.I):
             start = i + 1
+            break  # las cabeceras repetidas no deben descartar las páginas anteriores (§5.4)
     recs, cur = [], None
-    for t in toks[start:]:
+    in_table = True
+    for i, t in enumerate(toks[start:], start):
         s = t.strip()
-        if not s or s.startswith("Documento sint") or "Synthetic" in s:
+        if not s:
+            continue
+        if s.startswith("Documento sint") or "Synthetic" in s or re.fullmatch(
+                r"document|documento|beleg|factura|remittance advice|aviso de pago", s, re.I):
+            if cur:
+                recs.append(cur)
+                cur = None
+            in_table = False
+            continue
+        if not in_table:
+            if re.fullmatch(r"paid|pagado|pay[eé]|bezahlt", s, re.I):
+                in_table = True
             continue
         first = s.split()[0]
-        is_doc = (DOC_RE.match(first) and not DATE_RE.match(first) and not AMT_RE.match(first)) or \
-                 (re.fullmatch(r"\d{5,}", first) and cur is None) or \
-                 (re.fullmatch(r"\d{5,}", first) and cur is not None and len(cur) >= 3 and parse_amount(first) is not None
-                  and DATE_RE.match(cur[1] if len(cur) > 1 else "") and False)
-        if is_doc and (cur is None or len(cur) >= 3):
+        following = s.split()[1:] or (toks[i + 1:i + 2])
+        is_doc = DOC_RE.match(first) and not DATE_RE.match(first) and following and parse_date(following[0].strip())
+        if is_doc:
             if cur:
                 recs.append(cur)
             cur = [s]
