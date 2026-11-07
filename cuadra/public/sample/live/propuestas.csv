@@ -1,0 +1,1950 @@
+bank_txn_id,item_id,amount,exception,confidence,motivo
+TXN-00000001,API-00000001,945.23,,0.655,La combinación suma el importe
+TXN-00000001,API-00000002,746.27,,0.655,La combinación suma el importe
+TXN-00000001,API-00000003,2502.74,,0.655,La combinación suma el importe
+TXN-00000002,API-00000004,3851.21,SHORT_BANK_CHARGES,0.831,Diferencia compatible con la excepción
+TXN-00000003,ARI-00000005,518.79,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000004,ARI-00000006,7878.64,SHORT_BANK_CHARGES,0.659,Diferencia compatible con la excepción
+TXN-00000006,ARI-00000007,2161.78,,0.772,La combinación suma el importe
+TXN-00000006,ARI-00000008,1687.57,,0.772,La combinación suma el importe
+TXN-00000006,ARI-00000009,1278.74,,0.772,La combinación suma el importe
+TXN-00000006,ARI-00000010,2214.39,,0.772,La combinación suma el importe
+TXN-00000007,ARI-00000011,899.72,,0.644,La combinación suma el importe
+TXN-00000007,ARI-00000012,463.62,,0.644,La combinación suma el importe
+TXN-00000007,ARI-00000013,2889.95,,0.644,La combinación suma el importe
+TXN-00000008,API-00000014,1595.22,,0.870,Mismo tercero e importe exacto
+TXN-00000009,ARI-00000015,3913.34,,0.952,Número impreso en el concepto e importe exacto
+TXN-00000010,ARI-00000016,3788.49,FX_DIFFERENCE,0.749,"Número impreso, conversión de divisa"
+TXN-00000011,ARI-00000017,1294.69,,0.993,Número impreso en el concepto e importe exacto
+TXN-00000012,ARI-00000018,3503.73,,0.968,Número impreso en el concepto e importe exacto
+TXN-00000013,ARI-00000019,2932.54,SHORT_WITHHOLDING,0.752,Diferencia compatible con la excepción
+TXN-00000014,ARI-00000020,4250.60,,0.956,Número impreso en el concepto e importe exacto
+TXN-00000016,ARI-00000022,2955.79,,0.443,Importe inferior sin causa clara
+TXN-00000017,ARI-00000023,1643.27,,0.930,Mismo tercero e importe exacto
+TXN-00000019,API-00000024,2963.75,,0.993,Número impreso en el concepto e importe exacto
+TXN-00000020,ARI-00000025,3324.16,,0.821,Mismo tercero e importe exacto
+TXN-00000021,ARI-00000026,226.31,FX_DIFFERENCE,0.563,"Número impreso, conversión de divisa"
+TXN-00000022,ARI-00000027,1182.69,,0.838,La combinación suma el importe
+TXN-00000022,ARI-00000028,309.08,,0.838,La combinación suma el importe
+TXN-00000023,API-00000029,4012.25,SHORT_WITHHOLDING,0.819,Diferencia compatible con la excepción
+TXN-00000024,API-00000030,1041.07,,0.959,Número impreso en el concepto e importe exacto
+TXN-00000025,ARI-00000031,2366.22,,0.942,Número impreso en el concepto e importe exacto
+TXN-00000026,ARI-00000032,1441.12,,0.924,Mismo tercero e importe exacto
+TXN-00000027,ARI-00000033,1005.52,,0.912,Mismo tercero e importe exacto
+TXN-00000028,API-00000034,892.94,SHORT_DISPUTE,0.843,Diferencia compatible con la excepción
+TXN-00000029,ARI-00000035,2875.91,,0.839,Mismo tercero e importe exacto
+TXN-00000030,ARI-00000036,866.01,SHORT_DISCOUNT,0.823,Diferencia compatible con la excepción
+TXN-00000031,ARI-00000037,1658.14,,0.934,Número impreso en el concepto e importe exacto
+TXN-00000032,ARI-00000038,3546.62,,0.487,Importe inferior sin causa clara
+TXN-00000035,API-00000039,2150.91,,0.646,La combinación suma el importe
+TXN-00000035,API-00000040,2958.39,,0.646,La combinación suma el importe
+TXN-00000036,ARI-00000041,2471.98,SHORT_BANK_CHARGES,0.796,Diferencia compatible con la excepción
+TXN-00000037,ARI-00000042,2952.67,,0.903,Mismo tercero e importe exacto
+TXN-00000038,API-00000043,2701.43,,0.637,Varias partidas iguales del mismo tercero
+TXN-00000039,ARI-00000045,592.10,,0.784,Varias partidas iguales del mismo tercero
+TXN-00000040,ARI-00000047,2118.11,,0.877,Mismo tercero e importe exacto
+TXN-00000044,API-00000048,2606.82,,0.933,Número impreso en el concepto e importe exacto
+TXN-00000045,API-00000049,4681.16,,0.927,Número impreso en el concepto e importe exacto
+TXN-00000046,ARI-00000050,851.20,,0.428,"Coincide el tercero, combinación incompleta"
+TXN-00000047,ARI-00000052,67655.69,,0.844,Mismo tercero e importe exacto
+TXN-00000048,ARI-00000053,2577.61,,0.957,Número impreso en el concepto e importe exacto
+TXN-00000049,ARI-00000054,1169.69,PARTIAL,0.516,"Número impreso, importe inferior"
+TXN-00000050,API-00000055,4880.85,,0.566,"Número impreso, conversión de divisa"
+TXN-00000051,ARI-00000056,81068.07,,0.945,Número impreso en el concepto e importe exacto
+TXN-00000052,ARI-00000057,2794.98,,0.786,Varias partidas iguales del mismo tercero
+TXN-00000053,API-00000059,2943.81,,0.787,Mismo tercero e importe exacto
+TXN-00000054,ARI-00000060,66994.08,,0.956,Número impreso en el concepto e importe exacto
+TXN-00000055,ARI-00000061,37235.56,,0.962,Número impreso en el concepto e importe exacto
+TXN-00000056,ARI-00000062,7013.74,SHORT_BANK_CHARGES,0.638,Diferencia compatible con la excepción
+TXN-00000057,ARI-00000063,23381.35,,0.928,Número impreso en el concepto e importe exacto
+TXN-00000058,API-00000064,76.69,,0.455,"Número impreso, partida ya cobrada"
+TXN-00000059,ARI-00000065,2740.50,,0.986,Número impreso en el concepto e importe exacto
+TXN-00000060,API-00000066,4439.97,,0.953,Número impreso en el concepto e importe exacto
+TXN-00000062,ARI-00000068,2549.38,,0.955,Número impreso en el concepto e importe exacto
+TXN-00000063,ARI-00000069,606.15,,0.968,Número impreso en el concepto e importe exacto
+TXN-00000064,ARI-00000070,511.29,,0.989,Número impreso en el concepto e importe exacto
+TXN-00000065,ARI-00000071,1459.41,,0.480,"Número impreso, partida ya cobrada"
+TXN-00000066,ARI-00000072,3666.03,SHORT_DISCOUNT,0.781,Diferencia compatible con la excepción
+TXN-00000067,ARI-00000073,978.72,,0.823,Factura neta de abono
+TXN-00000067,ARC-00000074,-102.77,,0.823,Factura neta de abono
+TXN-00000068,API-00000075,257.41,,0.950,Número impreso en el concepto e importe exacto
+TXN-00000069,API-00000076,53932.03,,0.963,Número impreso en el concepto e importe exacto
+TXN-00000070,API-00000077,1781.07,,0.878,Mismo tercero e importe exacto
+TXN-00000071,ARI-00000078,844.10,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000072,ARI-00000079,3307.26,,0.827,Mismo tercero e importe exacto
+TXN-00000074,API-00000080,3462.04,,0.829,Mismo tercero e importe exacto
+TXN-00000075,ARI-00000081,1502.10,,0.881,Mismo tercero e importe exacto
+TXN-00000076,API-00000082,804.38,,0.950,Número impreso en el concepto e importe exacto
+TXN-00000077,API-00000083,390.92,,0.988,Número impreso en el concepto e importe exacto
+TXN-00000078,ARI-00000084,2133.31,,0.970,Número impreso en el concepto e importe exacto
+TXN-00000079,API-00000085,72172.07,,0.958,Número impreso en el concepto e importe exacto
+TXN-00000080,ARI-00000086,1370.80,,0.785,Mismo tercero e importe exacto
+TXN-00000081,ARI-00000087,1131.77,,0.734,La combinación suma el importe
+TXN-00000081,ARI-00000088,1222.93,,0.734,La combinación suma el importe
+TXN-00000081,ARI-00000089,2621.72,,0.734,La combinación suma el importe
+TXN-00000082,API-00000090,539.09,FX_DIFFERENCE,0.564,"Número impreso, conversión de divisa"
+TXN-00000084,API-00000091,4797.71,,0.817,Mismo tercero e importe exacto
+TXN-00000086,API-00000092,2604.61,,0.633,La combinación suma el importe
+TXN-00000086,API-00000093,2084.53,,0.633,La combinación suma el importe
+TXN-00000087,ARI-00000094,1760.48,,0.889,Mismo tercero e importe exacto
+TXN-00000088,ARI-00000095,922.26,,0.405,Importe inferior sin causa clara
+TXN-00000089,ARI-00000096,6268.68,SHORT_DISPUTE,0.587,Diferencia compatible con la excepción
+TXN-00000090,ARI-00000097,2567.67,,0.848,La combinación suma el importe
+TXN-00000090,ARI-00000098,389.73,,0.848,La combinación suma el importe
+TXN-00000090,ARI-00000099,2259.26,,0.848,La combinación suma el importe
+TXN-00000091,ARI-00000100,3474.05,,0.963,Número impreso en el concepto e importe exacto
+TXN-00000092,API-00000101,2781.88,,0.835,La combinación suma el importe
+TXN-00000092,API-00000102,2690.41,,0.835,La combinación suma el importe
+TXN-00000093,ARI-00000103,3208.45,,0.645,Factura neta de abono
+TXN-00000093,ARC-00000104,-523.38,,0.645,Factura neta de abono
+TXN-00000094,ARI-00000105,2724.58,,0.882,Mismo tercero e importe exacto
+TXN-00000095,ARI-00000106,880.41,,0.952,Número impreso en el concepto e importe exacto
+TXN-00000096,ARI-00000107,3682.08,,0.930,Número impreso en el concepto e importe exacto
+TXN-00000097,ARI-00000108,7570.22,SHORT_WITHHOLDING,0.804,Diferencia compatible con la excepción
+TXN-00000099,API-00000110,4126.50,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000100,API-00000111,18077.15,,0.986,Número impreso en el concepto e importe exacto
+TXN-00000101,ARI-00000112,8781.11,,0.348,Importe inferior sin causa clara
+TXN-00000103,ARI-00000113,144.86,,0.965,Número impreso en el concepto e importe exacto
+TXN-00000104,ARI-00000114,665.61,,0.363,"Coincide el tercero, combinación incompleta"
+TXN-00000105,ARI-00000116,10875.06,,0.840,Mismo tercero e importe exacto
+TXN-00000106,ARI-00000117,1489.07,,0.940,Número impreso en el concepto e importe exacto
+TXN-00000107,ARI-00000118,3014.61,,0.987,Número impreso en el concepto e importe exacto
+TXN-00000108,ARI-00000119,1257.65,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000109,ARI-00000120,196.39,,0.793,La combinación suma el importe
+TXN-00000109,ARI-00000121,2741.56,,0.793,La combinación suma el importe
+TXN-00000109,ARI-00000122,914.28,,0.793,La combinación suma el importe
+TXN-00000110,ARI-00000123,2608.62,,0.462,"Coincide el tercero, combinación incompleta"
+TXN-00000111,ARI-00000127,701.78,,0.971,Número impreso en el concepto e importe exacto
+TXN-00000112,ARI-00000128,3766.14,,0.917,Mismo tercero e importe exacto
+TXN-00000113,ARI-00000129,1062.17,,0.691,Factura neta de abono
+TXN-00000113,ARC-00000130,-81.90,,0.691,Factura neta de abono
+TXN-00000114,ARI-00000131,3209.54,,0.941,Número impreso en el concepto e importe exacto
+TXN-00000115,API-00000133,3199.98,,0.780,Varias partidas iguales del mismo tercero
+TXN-00000116,ARI-00000134,4341.38,,0.810,Mismo tercero e importe exacto
+TXN-00000117,ARI-00000135,3323.90,OVERPAYMENT,0.762,El movimiento supera la partida
+TXN-00000118,ARI-00000136,3408.92,,0.900,Mismo tercero e importe exacto
+TXN-00000119,ARI-00000137,891.05,,0.984,Número impreso en el concepto e importe exacto
+TXN-00000120,ARI-00000138,1874.53,,0.936,Número impreso en el concepto e importe exacto
+TXN-00000121,API-00000139,54434.44,,0.818,Mismo tercero e importe exacto
+TXN-00000122,API-00000140,551.61,,0.751,Mismo tercero e importe exacto
+TXN-00000123,ARI-00000141,850.99,,0.653,La combinación suma el importe
+TXN-00000123,ARI-00000142,843.99,,0.653,La combinación suma el importe
+TXN-00000123,ARI-00000143,1811.50,,0.653,La combinación suma el importe
+TXN-00000124,ARI-00000144,3969.06,,0.788,"Número impreso, conversión de divisa"
+TXN-00000125,API-00000145,1507.32,,0.893,Mismo tercero e importe exacto
+TXN-00000127,ARI-00000146,1524.58,,0.974,Número impreso en el concepto e importe exacto
+TXN-00000128,ARI-00000147,24371.35,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000129,API-00000148,546.16,,0.998,Número impreso en el concepto e importe exacto
+TXN-00000130,API-00000149,350.53,PARTIAL,0.666,"Número impreso, importe inferior"
+TXN-00000131,API-00000150,262.03,,0.976,Número impreso en el concepto e importe exacto
+TXN-00000134,API-00000156,1398.36,,0.989,Número impreso en el concepto e importe exacto
+TXN-00000135,ARI-00000157,41.84,,0.934,Número impreso en el concepto e importe exacto
+TXN-00000136,ARI-00000158,895.11,,0.301,Importe inferior sin causa clara
+TXN-00000137,API-00000159,2624.63,,0.979,Número impreso en el concepto e importe exacto
+TXN-00000139,ARI-00000161,3861.67,,0.905,Mismo tercero e importe exacto
+TXN-00000140,ARI-00000162,1360.45,,0.828,Factura neta de abono
+TXN-00000140,ARC-00000163,-152.06,,0.828,Factura neta de abono
+TXN-00000142,ARI-00000165,2961.78,,0.810,La combinación suma el importe
+TXN-00000142,ARI-00000166,1479.35,,0.810,La combinación suma el importe
+TXN-00000142,ARI-00000167,78.38,,0.810,La combinación suma el importe
+TXN-00000143,ARI-00000168,4555.67,,0.922,Número impreso en el concepto e importe exacto
+TXN-00000144,ARI-00000169,9755.27,,0.938,Número impreso en el concepto e importe exacto
+TXN-00000146,ARI-00000173,3156.61,,0.821,Factura neta de abono
+TXN-00000146,ARC-00000174,-391.88,,0.821,Factura neta de abono
+TXN-00000147,ARI-00000175,2852.06,,0.838,La combinación suma el importe
+TXN-00000147,ARI-00000176,781.50,,0.838,La combinación suma el importe
+TXN-00000147,ARI-00000177,869.64,,0.838,La combinación suma el importe
+TXN-00000147,ARI-00000178,530.42,,0.838,La combinación suma el importe
+TXN-00000148,API-00000179,1121.80,,0.800,La combinación suma el importe
+TXN-00000148,API-00000180,1708.85,,0.800,La combinación suma el importe
+TXN-00000148,API-00000181,1612.18,,0.800,La combinación suma el importe
+TXN-00000150,API-00000182,1441.18,,0.953,Número impreso en el concepto e importe exacto
+TXN-00000151,API-00000183,5858.02,,0.510,"Número impreso, conversión de divisa"
+TXN-00000152,ARI-00000184,1962.48,,0.336,Importe inferior sin causa clara
+TXN-00000153,ARI-00000185,512.51,,0.928,Número impreso en el concepto e importe exacto
+TXN-00000154,ARI-00000186,4743.93,,0.815,Mismo tercero e importe exacto
+TXN-00000155,ARI-00000187,56453.04,,0.971,Número impreso en el concepto e importe exacto
+TXN-00000156,API-00000188,2117.99,,0.711,La combinación suma el importe
+TXN-00000156,API-00000189,2447.01,,0.711,La combinación suma el importe
+TXN-00000157,ARI-00000190,1217.82,,0.988,Número impreso en el concepto e importe exacto
+TXN-00000158,ARI-00000191,2486.44,,0.646,Factura neta de abono
+TXN-00000158,ARC-00000192,-476.70,,0.646,Factura neta de abono
+TXN-00000159,API-00000193,4477.45,,0.930,Número impreso en el concepto e importe exacto
+TXN-00000160,ARI-00000194,5012.98,,0.445,Importe inferior sin causa clara
+TXN-00000162,ARI-00000195,3834.91,,0.953,Número impreso en el concepto e importe exacto
+TXN-00000163,ARI-00000196,4589.90,,0.968,Número impreso en el concepto e importe exacto
+TXN-00000165,ARI-00000197,83694.26,,0.960,Número impreso en el concepto e importe exacto
+TXN-00000167,ARI-00000199,3766.94,,0.787,Varias partidas iguales del mismo tercero
+TXN-00000170,API-00000201,4056.26,,0.787,Varias partidas iguales del mismo tercero
+TXN-00000171,ARI-00000202,4377.12,,0.681,Varias partidas iguales del mismo tercero
+TXN-00000173,API-00000204,4211.95,,0.937,Número impreso en el concepto e importe exacto
+TXN-00000176,ARI-00000206,38465.46,,0.988,Número impreso en el concepto e importe exacto
+TXN-00000177,ARI-00000207,4382.58,,0.789,Varias partidas iguales del mismo tercero
+TXN-00000178,ARI-00000209,1026.16,,0.871,Mismo tercero e importe exacto
+TXN-00000179,,10016.16,RETURNED,0.849,El concepto indica devolución
+TXN-00000180,ARI-00000211,5481.50,SHORT_WITHHOLDING,0.658,Diferencia compatible con la excepción
+TXN-00000181,ARI-00000213,3872.05,,0.697,Varias partidas iguales del mismo tercero
+TXN-00000182,ARI-00000214,72347.06,,0.771,Varias partidas iguales del mismo tercero
+TXN-00000183,API-00000216,91.86,,0.921,Número impreso en el concepto e importe exacto
+TXN-00000185,API-00000217,1104.29,,0.963,Número impreso en el concepto e importe exacto
+TXN-00000186,ARI-00000218,657.47,,0.947,Número impreso en el concepto e importe exacto
+TXN-00000187,API-00000219,1868.53,,0.848,La combinación suma el importe
+TXN-00000187,API-00000220,518.80,,0.848,La combinación suma el importe
+TXN-00000188,ARI-00000221,904.17,,0.924,Mismo tercero e importe exacto
+TXN-00000189,ARI-00000222,50598.38,,0.955,Número impreso en el concepto e importe exacto
+TXN-00000190,ARI-00000223,1144.57,,0.623,La combinación suma el importe
+TXN-00000190,ARI-00000224,2300.29,,0.623,La combinación suma el importe
+TXN-00000190,ARI-00000225,896.76,,0.623,La combinación suma el importe
+TXN-00000191,API-00000226,2761.16,,0.968,Número impreso en el concepto e importe exacto
+TXN-00000193,ARI-00000227,872.18,,0.657,Factura neta de abono
+TXN-00000193,ARC-00000228,-212.10,,0.657,Factura neta de abono
+TXN-00000194,ARI-00000229,3841.18,,0.938,Número impreso en el concepto e importe exacto
+TXN-00000195,ARI-00000230,3879.35,,0.722,Factura neta de abono
+TXN-00000195,ARC-00000231,-366.04,,0.722,Factura neta de abono
+TXN-00000196,API-00000232,21328.67,,0.894,Mismo tercero e importe exacto
+TXN-00000197,ARI-00000233,1890.97,,0.791,Factura neta de abono
+TXN-00000197,ARC-00000234,-464.00,,0.791,Factura neta de abono
+TXN-00000198,ARI-00000235,530.36,,0.921,Número impreso en el concepto e importe exacto
+TXN-00000199,ARI-00000236,800.09,FX_DIFFERENCE,0.648,"Número impreso, conversión de divisa"
+TXN-00000200,API-00000237,3439.24,,0.894,Mismo tercero e importe exacto
+TXN-00000201,API-00000238,12872.64,PARTIAL,0.720,"Número impreso, importe inferior"
+TXN-00000202,ARI-00000239,3564.95,,0.925,Número impreso en el concepto e importe exacto
+TXN-00000203,API-00000240,2235.15,,0.925,Número impreso en el concepto e importe exacto
+TXN-00000204,ARI-00000241,5177.16,SHORT_DISPUTE,0.724,Diferencia compatible con la excepción
+TXN-00000206,ARI-00000244,762.86,,0.745,Varias partidas iguales del mismo tercero
+TXN-00000207,ARI-00000245,693.13,,0.464,"Número impreso, conversión de divisa"
+TXN-00000209,ARI-00000246,808.05,,0.632,La combinación suma el importe
+TXN-00000209,ARI-00000247,122.80,,0.632,La combinación suma el importe
+TXN-00000209,ARI-00000248,2342.42,,0.632,La combinación suma el importe
+TXN-00000210,ARI-00000249,2262.38,PARTIAL,0.580,"Número impreso, importe inferior"
+TXN-00000211,,62041.10,RETURNED,0.608,El concepto indica devolución
+TXN-00000212,ARI-00000251,793.67,,0.905,Mismo tercero e importe exacto
+TXN-00000213,ARI-00000252,3589.08,SHORT_WITHHOLDING,0.670,Diferencia compatible con la excepción
+TXN-00000215,ARI-00000253,3126.16,,0.615,Varias partidas iguales del mismo tercero
+TXN-00000216,ARI-00000255,1716.84,,0.338,"Coincide el tercero, combinación incompleta"
+TXN-00000217,API-00000258,421.97,,0.571,"Número impreso, conversión de divisa"
+TXN-00000218,API-00000259,3994.12,,0.978,Número impreso en el concepto e importe exacto
+TXN-00000219,ARI-00000260,749.59,,0.667,La combinación suma el importe
+TXN-00000219,ARI-00000261,720.02,,0.667,La combinación suma el importe
+TXN-00000222,ARI-00000263,907.19,,0.714,La combinación suma el importe
+TXN-00000222,ARI-00000264,846.85,,0.714,La combinación suma el importe
+TXN-00000223,ARI-00000266,1913.52,,0.587,Varias partidas iguales del mismo tercero
+TXN-00000224,,555.26,RETURNED,0.880,El concepto indica devolución
+TXN-00000225,ARI-00000268,6405.79,,0.322,Importe inferior sin causa clara
+TXN-00000226,API-00000269,926.60,,0.986,Número impreso en el concepto e importe exacto
+TXN-00000227,ARI-00000270,1541.25,,0.366,"Coincide el tercero, combinación incompleta"
+TXN-00000228,ARI-00000273,1643.03,,0.945,Número impreso en el concepto e importe exacto
+TXN-00000229,ARI-00000274,476.59,,0.953,Número impreso en el concepto e importe exacto
+TXN-00000230,ARI-00000275,5554.22,,0.454,Importe inferior sin causa clara
+TXN-00000231,ARI-00000276,4766.27,,0.951,Número impreso en el concepto e importe exacto
+TXN-00000232,API-00000277,1496.09,,0.776,Varias partidas iguales del mismo tercero
+TXN-00000234,ARI-00000279,2496.61,,0.718,La combinación suma el importe
+TXN-00000234,ARI-00000280,438.80,,0.718,La combinación suma el importe
+TXN-00000235,API-00000281,218.02,,0.778,Mismo tercero e importe exacto
+TXN-00000236,ARI-00000282,1063.45,,0.673,La combinación suma el importe
+TXN-00000236,ARI-00000283,688.64,,0.673,La combinación suma el importe
+TXN-00000236,ARI-00000284,687.67,,0.673,La combinación suma el importe
+TXN-00000237,ARI-00000285,66122.65,,0.938,Número impreso en el concepto e importe exacto
+TXN-00000238,ARI-00000286,1343.93,,0.927,Número impreso en el concepto e importe exacto
+TXN-00000240,ARI-00000288,1255.15,,0.730,Factura neta de abono
+TXN-00000240,ARC-00000289,-68.60,,0.730,Factura neta de abono
+TXN-00000241,ARI-00000290,1436.39,,0.799,Mismo tercero e importe exacto
+TXN-00000242,API-00000291,5493.13,,0.355,Importe inferior sin causa clara
+TXN-00000243,ARI-00000292,4622.20,,0.825,Mismo tercero e importe exacto
+TXN-00000246,ARI-00000294,5167.68,,0.498,"Número impreso, conversión de divisa"
+TXN-00000248,API-00000296,83691.44,,0.979,Número impreso en el concepto e importe exacto
+TXN-00000249,ARI-00000297,1459.91,OVERPAYMENT,0.750,El movimiento supera la partida
+TXN-00000252,ARI-00000298,2968.56,OVERPAYMENT,0.595,El movimiento supera la partida
+TXN-00000253,API-00000299,3249.60,,0.927,Número impreso en el concepto e importe exacto
+TXN-00000254,ARI-00000300,2372.39,,0.655,La combinación suma el importe
+TXN-00000254,ARI-00000301,1348.44,,0.655,La combinación suma el importe
+TXN-00000255,ARI-00000302,3916.28,,0.923,Número impreso en el concepto e importe exacto
+TXN-00000257,ARI-00000303,3279.53,,0.985,Número impreso en el concepto e importe exacto
+TXN-00000258,ARI-00000304,1862.58,,0.772,Mismo tercero e importe exacto
+TXN-00000259,ARI-00000305,2496.59,,0.913,Mismo tercero e importe exacto
+TXN-00000260,API-00000306,3313.59,,0.994,Número impreso en el concepto e importe exacto
+TXN-00000261,ARI-00000307,58763.66,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000262,ARI-00000308,1666.94,,0.960,Número impreso en el concepto e importe exacto
+TXN-00000263,ARI-00000309,2074.70,,0.968,Número impreso en el concepto e importe exacto
+TXN-00000265,ARI-00000311,3126.65,SHORT_DISCOUNT,0.577,Diferencia compatible con la excepción
+TXN-00000266,ARI-00000312,595.49,,0.611,Factura neta de abono
+TXN-00000266,ARC-00000313,-146.56,,0.611,Factura neta de abono
+TXN-00000267,ARI-00000314,4313.27,,0.962,Número impreso en el concepto e importe exacto
+TXN-00000268,ARI-00000315,1818.68,,0.781,Mismo tercero e importe exacto
+TXN-00000269,ARI-00000316,5507.50,SHORT_BANK_CHARGES,0.631,Diferencia compatible con la excepción
+TXN-00000270,ARI-00000317,4492.44,,0.779,Mismo tercero e importe exacto
+TXN-00000271,ARI-00000318,86.02,,0.992,Número impreso en el concepto e importe exacto
+TXN-00000272,API-00000319,2779.37,,0.863,Mismo tercero e importe exacto
+TXN-00000273,ARI-00000320,4054.84,,0.988,Número impreso en el concepto e importe exacto
+TXN-00000274,ARI-00000321,2668.07,,0.930,Número impreso en el concepto e importe exacto
+TXN-00000275,ARI-00000322,3865.44,,0.785,Mismo tercero e importe exacto
+TXN-00000277,ARI-00000324,5314.37,SHORT_DISPUTE,0.846,Diferencia compatible con la excepción
+TXN-00000278,ARI-00000325,1102.29,,0.742,Varias partidas iguales del mismo tercero
+TXN-00000279,API-00000327,10836.21,,0.885,Mismo tercero e importe exacto
+TXN-00000280,ARI-00000328,1381.99,PARTIAL,0.530,"Número impreso, importe inferior"
+TXN-00000281,ARI-00000329,4169.90,FX_DIFFERENCE,0.765,"Número impreso, conversión de divisa"
+TXN-00000282,ARI-00000330,3959.63,,0.741,Varias partidas iguales del mismo tercero
+TXN-00000283,ARI-00000332,4630.12,,0.808,Mismo tercero e importe exacto
+TXN-00000284,ARI-00000333,31539.42,,0.965,Número impreso en el concepto e importe exacto
+TXN-00000285,ARI-00000334,2619.09,,0.969,Número impreso en el concepto e importe exacto
+TXN-00000286,ARI-00000335,8025.03,,0.444,Importe inferior sin causa clara
+TXN-00000287,ARI-00000336,1120.06,,0.499,"Número impreso, conversión de divisa"
+TXN-00000288,,50926.88,RETURNED,0.615,El concepto indica devolución
+TXN-00000289,ARI-00000338,3707.16,,0.921,Número impreso en el concepto e importe exacto
+TXN-00000290,ARI-00000339,2040.00,,0.997,Número impreso en el concepto e importe exacto
+TXN-00000291,API-00000340,3263.93,,0.795,Mismo tercero e importe exacto
+TXN-00000292,ARI-00000341,584.37,,0.965,Número impreso en el concepto e importe exacto
+TXN-00000293,API-00000342,703.97,,0.985,Número impreso en el concepto e importe exacto
+TXN-00000295,ARI-00000345,2975.57,,0.942,Número impreso en el concepto e importe exacto
+TXN-00000296,ARI-00000346,3087.91,,0.898,Mismo tercero e importe exacto
+TXN-00000297,API-00000347,3703.56,FX_DIFFERENCE,0.719,"Número impreso, conversión de divisa"
+TXN-00000298,ARI-00000348,1810.79,,0.964,Número impreso en el concepto e importe exacto
+TXN-00000299,ARI-00000349,7187.20,SHORT_WITHHOLDING,0.565,Diferencia compatible con la excepción
+TXN-00000300,API-00000350,3054.88,,0.761,Mismo tercero e importe exacto
+TXN-00000301,API-00000351,439.58,,0.995,Número impreso en el concepto e importe exacto
+TXN-00000302,API-00000352,1299.35,PARTIAL,0.513,"Número impreso, importe inferior"
+TXN-00000303,ARI-00000353,3161.46,OVERPAYMENT,0.636,El movimiento supera la partida
+TXN-00000304,API-00000354,76873.70,,0.925,Número impreso en el concepto e importe exacto
+TXN-00000305,ARI-00000355,3394.10,,0.960,Número impreso en el concepto e importe exacto
+TXN-00000306,ARI-00000356,4541.49,SHORT_BANK_CHARGES,0.600,Diferencia compatible con la excepción
+TXN-00000307,ARI-00000357,1632.85,,0.993,Número impreso en el concepto e importe exacto
+TXN-00000308,ARI-00000358,203.55,,0.635,La combinación suma el importe
+TXN-00000308,ARI-00000359,502.60,,0.635,La combinación suma el importe
+TXN-00000308,ARI-00000360,1437.10,,0.635,La combinación suma el importe
+TXN-00000308,ARI-00000361,81.66,,0.635,La combinación suma el importe
+TXN-00000309,ARI-00000362,68586.94,,0.900,Mismo tercero e importe exacto
+TXN-00000311,ARI-00000364,33992.12,,0.869,Mismo tercero e importe exacto
+TXN-00000313,ARI-00000368,4431.56,,0.676,"Número impreso, conversión de divisa"
+TXN-00000314,ARI-00000369,5223.15,,0.463,Importe inferior sin causa clara
+TXN-00000316,ARI-00000371,6483.32,SHORT_WITHHOLDING,0.656,Diferencia compatible con la excepción
+TXN-00000317,ARI-00000372,35781.67,OVERPAYMENT,0.570,El movimiento supera la partida
+TXN-00000318,API-00000373,7238.17,,0.456,Importe inferior sin causa clara
+TXN-00000319,API-00000374,7764.66,SHORT_DISPUTE,0.550,Diferencia compatible con la excepción
+TXN-00000320,ARI-00000376,3859.22,,0.691,Varias partidas iguales del mismo tercero
+TXN-00000321,ARI-00000378,464.21,,0.774,Varias partidas iguales del mismo tercero
+TXN-00000322,ARI-00000379,1994.63,,0.931,Número impreso en el concepto e importe exacto
+TXN-00000323,API-00000380,81838.32,,0.926,Mismo tercero e importe exacto
+TXN-00000324,ARI-00000381,19180.13,,0.872,Mismo tercero e importe exacto
+TXN-00000325,ARI-00000382,4638.14,,0.937,Número impreso en el concepto e importe exacto
+TXN-00000326,ARI-00000383,936.27,PARTIAL,0.721,"Número impreso, importe inferior"
+TXN-00000327,ARI-00000384,6010.65,SHORT_DISCOUNT,0.762,Diferencia compatible con la excepción
+TXN-00000328,API-00000385,2569.17,,0.933,Número impreso en el concepto e importe exacto
+TXN-00000329,ARI-00000386,2304.56,,0.993,Número impreso en el concepto e importe exacto
+TXN-00000330,API-00000387,4284.58,,0.932,Número impreso en el concepto e importe exacto
+TXN-00000331,ARI-00000388,4311.27,,0.974,Número impreso en el concepto e importe exacto
+TXN-00000332,ARI-00000389,837.46,,0.763,La combinación suma el importe
+TXN-00000332,ARI-00000390,2754.94,,0.763,La combinación suma el importe
+TXN-00000332,ARI-00000391,2776.43,,0.763,La combinación suma el importe
+TXN-00000333,ARI-00000392,5073.72,PARTIAL,0.542,"Número impreso, importe inferior"
+TXN-00000334,ARI-00000393,3980.13,,0.926,Mismo tercero e importe exacto
+TXN-00000336,ARI-00000395,1184.12,,0.715,Factura neta de abono
+TXN-00000336,ARC-00000396,-103.23,,0.715,Factura neta de abono
+TXN-00000338,,4723.01,RETURNED,0.636,El concepto indica devolución
+TXN-00000339,ARI-00000400,5297.63,SHORT_DISCOUNT,0.558,Diferencia compatible con la excepción
+TXN-00000340,API-00000401,534.44,,0.918,Mismo tercero e importe exacto
+TXN-00000341,ARI-00000402,3475.92,,0.920,Número impreso en el concepto e importe exacto
+TXN-00000342,API-00000403,35830.84,,0.995,Número impreso en el concepto e importe exacto
+TXN-00000343,ARI-00000404,225.21,,0.827,La combinación suma el importe
+TXN-00000343,ARI-00000405,2474.24,,0.827,La combinación suma el importe
+TXN-00000343,ARI-00000406,2654.43,,0.827,La combinación suma el importe
+TXN-00000343,ARI-00000407,828.19,,0.827,La combinación suma el importe
+TXN-00000344,API-00000408,1544.88,PARTIAL,0.559,"Número impreso, importe inferior"
+TXN-00000345,ARI-00000409,9222.57,,0.816,Mismo tercero e importe exacto
+TXN-00000347,ARI-00000410,829.23,OVERPAYMENT,0.592,El movimiento supera la partida
+TXN-00000348,ARI-00000411,1024.63,,0.446,"Coincide el tercero, combinación incompleta"
+TXN-00000349,ARI-00000415,710.54,,0.724,Varias partidas iguales del mismo tercero
+TXN-00000350,ARI-00000417,41736.07,,0.929,Número impreso en el concepto e importe exacto
+TXN-00000351,ARI-00000418,3937.27,,0.932,Número impreso en el concepto e importe exacto
+TXN-00000352,ARI-00000419,255.36,,0.932,Número impreso en el concepto e importe exacto
+TXN-00000353,ARI-00000420,1725.55,,0.989,Número impreso en el concepto e importe exacto
+TXN-00000354,ARI-00000421,726.31,,0.772,Mismo tercero e importe exacto
+TXN-00000355,ARI-00000422,739.75,OVERPAYMENT,0.638,El movimiento supera la partida
+TXN-00000356,ARI-00000423,231.21,,0.699,Varias partidas iguales del mismo tercero
+TXN-00000357,ARI-00000425,4025.73,FX_DIFFERENCE,0.549,"Número impreso, conversión de divisa"
+TXN-00000358,ARI-00000426,2946.00,,0.856,La combinación suma el importe
+TXN-00000358,ARI-00000427,1480.62,,0.856,La combinación suma el importe
+TXN-00000359,ARI-00000428,3178.47,,0.936,Número impreso en el concepto e importe exacto
+TXN-00000360,ARI-00000429,299.82,,0.804,La combinación suma el importe
+TXN-00000360,ARI-00000430,2668.78,,0.804,La combinación suma el importe
+TXN-00000360,ARI-00000431,738.63,,0.804,La combinación suma el importe
+TXN-00000360,ARI-00000432,2217.97,,0.804,La combinación suma el importe
+TXN-00000361,ARI-00000433,781.92,,0.933,Número impreso en el concepto e importe exacto
+TXN-00000365,ARI-00000434,6413.38,SHORT_WITHHOLDING,0.750,Diferencia compatible con la excepción
+TXN-00000366,API-00000435,586.64,,0.677,La combinación suma el importe
+TXN-00000366,API-00000436,1289.67,,0.677,La combinación suma el importe
+TXN-00000366,API-00000437,2811.07,,0.677,La combinación suma el importe
+TXN-00000366,API-00000438,380.49,,0.677,La combinación suma el importe
+TXN-00000367,ARI-00000439,34945.75,,0.931,Número impreso en el concepto e importe exacto
+TXN-00000368,ARI-00000440,5902.58,SHORT_DISCOUNT,0.658,Diferencia compatible con la excepción
+TXN-00000369,ARI-00000441,2866.72,,0.690,"Número impreso, conversión de divisa"
+TXN-00000370,ARI-00000442,3728.92,SHORT_DISCOUNT,0.820,Diferencia compatible con la excepción
+TXN-00000371,ARI-00000443,240.47,,0.924,Número impreso en el concepto e importe exacto
+TXN-00000372,ARI-00000444,828.35,,0.759,La combinación suma el importe
+TXN-00000372,ARI-00000445,2885.72,,0.759,La combinación suma el importe
+TXN-00000372,ARI-00000446,477.87,,0.759,La combinación suma el importe
+TXN-00000372,ARI-00000447,402.35,,0.759,La combinación suma el importe
+TXN-00000375,ARI-00000449,4171.40,,0.980,Número impreso en el concepto e importe exacto
+TXN-00000376,API-00000450,2449.24,,0.763,Mismo tercero e importe exacto
+TXN-00000377,API-00000451,2490.18,,0.844,La combinación suma el importe
+TXN-00000377,API-00000452,111.93,,0.844,La combinación suma el importe
+TXN-00000379,ARI-00000455,880.72,PARTIAL,0.656,"Número impreso, importe inferior"
+TXN-00000380,ARI-00000456,469.14,,0.632,La combinación suma el importe
+TXN-00000380,ARI-00000457,1222.16,,0.632,La combinación suma el importe
+TXN-00000381,ARI-00000458,315.63,,0.973,Número impreso en el concepto e importe exacto
+TXN-00000382,ARI-00000459,4656.78,SHORT_DISCOUNT,0.843,Diferencia compatible con la excepción
+TXN-00000383,ARI-00000460,4000.13,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000384,API-00000461,874.49,,0.771,Mismo tercero e importe exacto
+TXN-00000385,ARI-00000462,1282.99,,0.922,Número impreso en el concepto e importe exacto
+TXN-00000387,ARI-00000463,4452.80,,0.475,Importe inferior sin causa clara
+TXN-00000388,ARI-00000464,2105.98,,0.763,Factura neta de abono
+TXN-00000388,ARC-00000465,-301.74,,0.763,Factura neta de abono
+TXN-00000389,ARI-00000466,2725.53,,0.953,Número impreso en el concepto e importe exacto
+TXN-00000390,ARI-00000467,3147.61,,0.882,Mismo tercero e importe exacto
+TXN-00000391,API-00000468,5169.55,SHORT_WITHHOLDING,0.586,Diferencia compatible con la excepción
+TXN-00000392,API-00000469,3436.56,,0.503,"Número impreso, conversión de divisa"
+TXN-00000393,ARI-00000470,3915.48,,0.991,Número impreso en el concepto e importe exacto
+TXN-00000394,ARI-00000471,810.72,,0.972,Número impreso en el concepto e importe exacto
+TXN-00000395,ARI-00000472,62401.51,,0.986,Número impreso en el concepto e importe exacto
+TXN-00000396,,2144.77,RETURNED,0.754,El concepto indica devolución
+TXN-00000397,API-00000474,260.25,,0.970,Número impreso en el concepto e importe exacto
+TXN-00000398,ARI-00000475,3697.37,,0.926,Número impreso en el concepto e importe exacto
+TXN-00000401,ARI-00000477,20515.56,,0.923,Número impreso en el concepto e importe exacto
+TXN-00000402,ARI-00000478,2625.70,,0.922,Número impreso en el concepto e importe exacto
+TXN-00000403,ARI-00000479,1825.81,,0.937,Número impreso en el concepto e importe exacto
+TXN-00000404,ARI-00000480,61.31,,0.873,Mismo tercero e importe exacto
+TXN-00000405,ARI-00000481,1635.29,,0.907,Mismo tercero e importe exacto
+TXN-00000406,ARI-00000482,2831.82,OVERPAYMENT,0.735,El movimiento supera la partida
+TXN-00000407,ARI-00000483,1831.59,,0.814,La combinación suma el importe
+TXN-00000407,ARI-00000484,890.83,,0.814,La combinación suma el importe
+TXN-00000407,ARI-00000485,1626.95,,0.814,La combinación suma el importe
+TXN-00000409,ARI-00000486,33457.20,,0.839,Mismo tercero e importe exacto
+TXN-00000410,API-00000487,3323.06,,0.931,Número impreso en el concepto e importe exacto
+TXN-00000411,ARI-00000488,6977.85,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000412,ARI-00000489,63603.63,,0.941,Número impreso en el concepto e importe exacto
+TXN-00000413,ARI-00000490,917.97,PARTIAL,0.591,"Número impreso, importe inferior"
+TXN-00000414,API-00000491,54359.34,,0.988,Número impreso en el concepto e importe exacto
+TXN-00000415,ARI-00000492,2380.86,,0.989,Número impreso en el concepto e importe exacto
+TXN-00000416,ARI-00000493,2214.74,,0.888,Mismo tercero e importe exacto
+TXN-00000417,API-00000494,4740.59,,0.671,Varias partidas iguales del mismo tercero
+TXN-00000419,ARI-00000496,55759.15,,0.902,Mismo tercero e importe exacto
+TXN-00000421,ARI-00000499,23409.86,,0.753,Mismo tercero e importe exacto
+TXN-00000422,ARI-00000500,512.48,,0.726,Factura neta de abono
+TXN-00000422,ARC-00000501,-79.26,,0.726,Factura neta de abono
+TXN-00000423,API-00000502,2051.01,,0.830,Mismo tercero e importe exacto
+TXN-00000425,ARI-00000504,3538.41,,0.323,Importe inferior sin causa clara
+TXN-00000426,,1185.67,RETURNED,0.622,El concepto indica devolución
+TXN-00000429,ARI-00000507,222.21,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000430,ARI-00000508,1777.28,PARTIAL,0.667,"Número impreso, importe inferior"
+TXN-00000432,API-00000510,3461.14,,0.942,Número impreso en el concepto e importe exacto
+TXN-00000433,ARI-00000511,1756.60,,0.680,La combinación suma el importe
+TXN-00000433,ARI-00000512,642.65,,0.680,La combinación suma el importe
+TXN-00000433,ARI-00000513,2127.63,,0.680,La combinación suma el importe
+TXN-00000434,ARI-00000514,13376.37,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000436,API-00000515,1763.72,,0.952,Número impreso en el concepto e importe exacto
+TXN-00000437,API-00000516,2779.74,,0.354,Importe inferior sin causa clara
+TXN-00000438,ARI-00000517,3549.93,,0.844,Mismo tercero e importe exacto
+TXN-00000439,ARI-00000518,272.13,,0.765,Mismo tercero e importe exacto
+TXN-00000440,ARI-00000519,4621.91,,0.934,Número impreso en el concepto e importe exacto
+TXN-00000441,ARI-00000520,1371.35,,0.987,Número impreso en el concepto e importe exacto
+TXN-00000443,ARI-00000521,4760.57,,0.849,Mismo tercero e importe exacto
+TXN-00000444,ARI-00000522,41728.00,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000445,ARI-00000523,2439.51,,0.931,Número impreso en el concepto e importe exacto
+TXN-00000446,ARI-00000524,1824.63,,0.753,Mismo tercero e importe exacto
+TXN-00000447,ARI-00000525,4637.27,,0.969,Número impreso en el concepto e importe exacto
+TXN-00000448,API-00000526,1460.61,,0.623,La combinación suma el importe
+TXN-00000448,API-00000527,2844.82,,0.623,La combinación suma el importe
+TXN-00000448,API-00000528,1827.18,,0.623,La combinación suma el importe
+TXN-00000452,ARI-00000531,724.57,,0.775,Mismo tercero e importe exacto
+TXN-00000453,API-00000532,2319.08,,0.465,"Número impreso, conversión de divisa"
+TXN-00000454,ARI-00000533,2393.51,,0.680,Factura neta de abono
+TXN-00000454,ARC-00000534,-466.49,,0.680,Factura neta de abono
+TXN-00000455,API-00000536,28752.30,,0.658,Varias partidas iguales del mismo tercero
+TXN-00000456,ARI-00000537,50.43,,0.767,Mismo tercero e importe exacto
+TXN-00000457,ARI-00000538,886.85,,0.991,Número impreso en el concepto e importe exacto
+TXN-00000460,ARI-00000541,2912.96,,0.830,Mismo tercero e importe exacto
+TXN-00000461,API-00000542,2295.45,,0.860,Mismo tercero e importe exacto
+TXN-00000462,ARI-00000543,34122.94,,0.570,"Número impreso, partida ya cobrada"
+TXN-00000463,API-00000544,68585.77,,0.924,Mismo tercero e importe exacto
+TXN-00000464,ARI-00000545,2571.60,,0.998,Número impreso en el concepto e importe exacto
+TXN-00000465,ARI-00000546,1789.87,,0.607,La combinación suma el importe
+TXN-00000465,ARI-00000547,2653.46,,0.607,La combinación suma el importe
+TXN-00000465,ARI-00000548,827.92,,0.607,La combinación suma el importe
+TXN-00000465,ARI-00000549,136.26,,0.607,La combinación suma el importe
+TXN-00000466,ARI-00000550,1954.67,,0.853,Mismo tercero e importe exacto
+TXN-00000467,,35143.93,RETURNED,0.670,El concepto indica devolución
+TXN-00000468,API-00000552,2226.62,,0.960,Número impreso en el concepto e importe exacto
+TXN-00000470,API-00000553,2522.65,,0.852,Mismo tercero e importe exacto
+TXN-00000471,ARI-00000554,122.32,,0.859,La combinación suma el importe
+TXN-00000471,ARI-00000555,1710.73,,0.859,La combinación suma el importe
+TXN-00000471,ARI-00000556,2289.54,,0.859,La combinación suma el importe
+TXN-00000471,ARI-00000557,214.76,,0.859,La combinación suma el importe
+TXN-00000472,ARI-00000558,4062.91,,0.949,Número impreso en el concepto e importe exacto
+TXN-00000473,ARI-00000559,2743.58,,0.945,Número impreso en el concepto e importe exacto
+TXN-00000475,ARI-00000561,366.17,,0.963,Número impreso en el concepto e importe exacto
+TXN-00000476,ARI-00000562,1605.73,FX_DIFFERENCE,0.651,"Número impreso, conversión de divisa"
+TXN-00000477,API-00000563,4309.75,,0.976,Número impreso en el concepto e importe exacto
+TXN-00000478,ARI-00000564,2923.20,,0.921,Número impreso en el concepto e importe exacto
+TXN-00000479,API-00000565,1705.97,FX_DIFFERENCE,0.458,"Número impreso, conversión de divisa"
+TXN-00000480,ARI-00000566,24075.88,,0.941,Número impreso en el concepto e importe exacto
+TXN-00000481,ARI-00000567,256.91,,0.751,Mismo tercero e importe exacto
+TXN-00000482,ARI-00000568,29686.94,OVERPAYMENT,0.573,El movimiento supera la partida
+TXN-00000483,API-00000569,1924.16,PARTIAL,0.726,"Número impreso, importe inferior"
+TXN-00000486,ARI-00000571,3548.03,,0.850,Factura neta de abono
+TXN-00000486,ARC-00000572,-287.22,,0.850,Factura neta de abono
+TXN-00000488,ARI-00000574,1618.78,,0.969,Número impreso en el concepto e importe exacto
+TXN-00000489,ARI-00000575,4363.75,,0.983,Número impreso en el concepto e importe exacto
+TXN-00000490,ARI-00000576,3297.21,,0.871,Mismo tercero e importe exacto
+TXN-00000491,ARI-00000577,7623.17,,0.451,Importe inferior sin causa clara
+TXN-00000492,API-00000578,4053.96,,0.971,Número impreso en el concepto e importe exacto
+TXN-00000493,API-00000579,3568.11,,0.909,Mismo tercero e importe exacto
+TXN-00000494,ARI-00000580,3582.93,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000495,ARI-00000581,2599.60,SHORT_BANK_CHARGES,0.685,Diferencia compatible con la excepción
+TXN-00000496,ARI-00000582,1086.51,,0.982,Número impreso en el concepto e importe exacto
+TXN-00000497,ARI-00000583,4458.75,,0.955,Número impreso en el concepto e importe exacto
+TXN-00000498,API-00000584,25971.91,,0.945,Número impreso en el concepto e importe exacto
+TXN-00000499,ARI-00000585,4765.12,,0.925,Número impreso en el concepto e importe exacto
+TXN-00000500,ARI-00000586,50128.17,PARTIAL,0.531,"Número impreso, importe inferior"
+TXN-00000501,ARI-00000587,677.37,,0.799,Mismo tercero e importe exacto
+TXN-00000502,ARI-00000588,2715.67,SHORT_DISCOUNT,0.720,Diferencia compatible con la excepción
+TXN-00000504,ARI-00000589,1403.16,OVERPAYMENT,0.671,El movimiento supera la partida
+TXN-00000505,ARI-00000590,6008.78,,0.486,Importe inferior sin causa clara
+TXN-00000506,ARI-00000591,4756.10,,0.932,Número impreso en el concepto e importe exacto
+TXN-00000507,API-00000592,1276.53,,0.404,"Número impreso, partida ya cobrada"
+TXN-00000509,ARI-00000594,2038.91,,0.756,La combinación suma el importe
+TXN-00000509,ARI-00000595,156.27,,0.756,La combinación suma el importe
+TXN-00000509,ARI-00000596,411.64,,0.756,La combinación suma el importe
+TXN-00000509,ARI-00000597,1866.77,,0.756,La combinación suma el importe
+TXN-00000510,ARI-00000598,2661.58,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000512,ARI-00000600,439.24,,0.832,Mismo tercero e importe exacto
+TXN-00000513,ARI-00000601,1778.48,,0.832,Mismo tercero e importe exacto
+TXN-00000515,ARI-00000603,3551.59,,0.303,Importe inferior sin causa clara
+TXN-00000516,API-00000604,55583.84,,0.879,Mismo tercero e importe exacto
+TXN-00000517,ARI-00000605,82951.65,,0.920,Mismo tercero e importe exacto
+TXN-00000518,ARI-00000606,33212.94,,0.792,Mismo tercero e importe exacto
+TXN-00000519,ARI-00000607,4819.21,SHORT_WITHHOLDING,0.655,Diferencia compatible con la excepción
+TXN-00000520,API-00000608,79169.12,,0.924,Mismo tercero e importe exacto
+TXN-00000521,API-00000609,718.33,,0.939,Número impreso en el concepto e importe exacto
+TXN-00000522,API-00000610,60043.25,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000523,ARI-00000611,3798.19,,0.868,Mismo tercero e importe exacto
+TXN-00000524,ARI-00000612,2053.79,,0.795,La combinación suma el importe
+TXN-00000524,ARI-00000613,1778.34,,0.795,La combinación suma el importe
+TXN-00000524,ARI-00000614,2028.53,,0.795,La combinación suma el importe
+TXN-00000524,ARI-00000615,2288.47,,0.795,La combinación suma el importe
+TXN-00000525,ARI-00000616,2680.38,,0.359,Importe inferior sin causa clara
+TXN-00000526,ARI-00000617,1615.48,PARTIAL,0.641,"Número impreso, importe inferior"
+TXN-00000527,ARI-00000618,826.12,,0.758,Mismo tercero e importe exacto
+TXN-00000528,ARI-00000619,9466.44,,0.928,Número impreso en el concepto e importe exacto
+TXN-00000529,API-00000620,2858.71,,0.958,Número impreso en el concepto e importe exacto
+TXN-00000530,ARI-00000621,1779.70,,0.953,Número impreso en el concepto e importe exacto
+TXN-00000533,API-00000623,6712.43,SHORT_DISPUTE,0.611,Diferencia compatible con la excepción
+TXN-00000534,ARI-00000624,3105.59,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000537,ARI-00000627,3878.13,,0.808,Mismo tercero e importe exacto
+TXN-00000538,ARI-00000628,7622.04,SHORT_WITHHOLDING,0.762,Diferencia compatible con la excepción
+TXN-00000539,ARI-00000629,529.47,,0.463,"Número impreso, partida ya cobrada"
+TXN-00000540,ARI-00000630,22381.93,,0.819,Mismo tercero e importe exacto
+TXN-00000541,API-00000631,3906.54,,0.976,Número impreso en el concepto e importe exacto
+TXN-00000542,API-00000632,2441.29,,0.630,"Número impreso, conversión de divisa"
+TXN-00000543,API-00000633,87759.69,,0.990,Número impreso en el concepto e importe exacto
+TXN-00000544,ARI-00000634,5181.41,SHORT_WITHHOLDING,0.775,Diferencia compatible con la excepción
+TXN-00000545,ARI-00000635,3815.84,,0.468,Importe inferior sin causa clara
+TXN-00000547,API-00000636,2254.30,,0.791,Varias partidas iguales del mismo tercero
+TXN-00000548,API-00000638,4635.30,,0.585,Varias partidas iguales del mismo tercero
+TXN-00000550,ARI-00000641,37675.79,,0.935,Número impreso en el concepto e importe exacto
+TXN-00000551,ARI-00000642,75.22,,0.996,Número impreso en el concepto e importe exacto
+TXN-00000552,ARI-00000643,4613.27,SHORT_DISPUTE,0.694,Diferencia compatible con la excepción
+TXN-00000553,ARI-00000644,1649.73,PARTIAL,0.555,"Número impreso, importe inferior"
+TXN-00000555,ARI-00000645,988.05,,0.800,La combinación suma el importe
+TXN-00000555,ARI-00000646,1941.18,,0.800,La combinación suma el importe
+TXN-00000555,ARI-00000647,1177.30,,0.800,La combinación suma el importe
+TXN-00000557,API-00000648,1837.36,,0.988,Número impreso en el concepto e importe exacto
+TXN-00000558,API-00000649,1009.33,,0.945,Número impreso en el concepto e importe exacto
+TXN-00000559,API-00000650,44657.59,,0.963,Número impreso en el concepto e importe exacto
+TXN-00000560,API-00000651,1865.09,,0.960,Número impreso en el concepto e importe exacto
+TXN-00000561,ARI-00000652,3165.77,,0.874,Mismo tercero e importe exacto
+TXN-00000562,API-00000653,25599.48,,0.996,Número impreso en el concepto e importe exacto
+TXN-00000563,ARI-00000654,4634.38,,0.763,Mismo tercero e importe exacto
+TXN-00000564,ARI-00000655,9448.74,PARTIAL,0.627,"Número impreso, importe inferior"
+TXN-00000565,ARI-00000656,2880.79,,0.964,Número impreso en el concepto e importe exacto
+TXN-00000566,ARI-00000657,1654.61,,0.915,Mismo tercero e importe exacto
+TXN-00000567,API-00000658,2667.08,,0.794,"Número impreso, conversión de divisa"
+TXN-00000568,,4106.10,RETURNED,0.661,El concepto indica devolución
+TXN-00000569,ARI-00000660,6066.87,SHORT_DISPUTE,0.590,Diferencia compatible con la excepción
+TXN-00000570,ARI-00000661,3991.78,,0.931,Número impreso en el concepto e importe exacto
+TXN-00000571,API-00000662,1027.06,,0.797,La combinación suma el importe
+TXN-00000571,API-00000663,2829.72,,0.797,La combinación suma el importe
+TXN-00000572,ARI-00000664,4539.59,,0.901,Mismo tercero e importe exacto
+TXN-00000576,API-00000667,2373.65,,0.978,Número impreso en el concepto e importe exacto
+TXN-00000579,ARI-00000668,2632.00,,0.796,Factura neta de abono
+TXN-00000579,ARC-00000669,-570.14,,0.796,Factura neta de abono
+TXN-00000580,ARI-00000670,4153.93,,0.857,Mismo tercero e importe exacto
+TXN-00000581,ARI-00000671,4411.60,OVERPAYMENT,0.773,El movimiento supera la partida
+TXN-00000582,,1624.42,RETURNED,0.610,El concepto indica devolución
+TXN-00000583,ARI-00000673,45.18,,0.913,Mismo tercero e importe exacto
+TXN-00000584,ARI-00000674,60051.74,,0.770,Mismo tercero e importe exacto
+TXN-00000585,ARI-00000675,4460.36,,0.864,Mismo tercero e importe exacto
+TXN-00000586,ARI-00000677,1460.89,,0.639,Varias partidas iguales del mismo tercero
+TXN-00000587,ARI-00000678,87.75,,0.987,Número impreso en el concepto e importe exacto
+TXN-00000588,ARI-00000679,2761.69,,0.945,Número impreso en el concepto e importe exacto
+TXN-00000589,ARI-00000680,186.19,,0.931,Número impreso en el concepto e importe exacto
+TXN-00000590,ARI-00000681,2500.96,,0.730,La combinación suma el importe
+TXN-00000590,ARI-00000682,1996.11,,0.730,La combinación suma el importe
+TXN-00000590,ARI-00000683,2643.22,,0.730,La combinación suma el importe
+TXN-00000590,ARI-00000684,1019.62,,0.730,La combinación suma el importe
+TXN-00000591,ARI-00000685,8487.61,SHORT_DISCOUNT,0.758,Diferencia compatible con la excepción
+TXN-00000592,API-00000686,3091.58,,0.979,Número impreso en el concepto e importe exacto
+TXN-00000593,ARI-00000688,120.12,,0.653,Varias partidas iguales del mismo tercero
+TXN-00000595,ARI-00000689,1972.03,,0.711,Factura neta de abono
+TXN-00000595,ARC-00000690,-257.00,,0.711,Factura neta de abono
+TXN-00000599,ARI-00000691,2509.06,,0.771,La combinación suma el importe
+TXN-00000599,ARI-00000692,2429.24,,0.771,La combinación suma el importe
+TXN-00000600,API-00000693,1704.65,,0.994,Número impreso en el concepto e importe exacto
+TXN-00000601,ARI-00000694,2681.85,,0.975,Número impreso en el concepto e importe exacto
+TXN-00000603,API-00000696,1165.57,,0.850,Mismo tercero e importe exacto
+TXN-00000604,ARI-00000697,3945.80,,0.845,Mismo tercero e importe exacto
+TXN-00000606,ARI-00000698,2008.34,,0.786,Factura neta de abono
+TXN-00000606,ARC-00000699,-253.29,,0.786,Factura neta de abono
+TXN-00000608,API-00000701,926.20,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000609,ARI-00000702,3731.57,,0.809,Mismo tercero e importe exacto
+TXN-00000611,ARI-00000703,559.89,,0.935,Número impreso en el concepto e importe exacto
+TXN-00000612,API-00000704,1448.77,,0.915,Mismo tercero e importe exacto
+TXN-00000615,ARI-00000705,3972.57,,0.968,Número impreso en el concepto e importe exacto
+TXN-00000617,ARI-00000706,2239.50,PARTIAL,0.647,"Número impreso, importe inferior"
+TXN-00000618,ARI-00000707,1822.44,SHORT_WITHHOLDING,0.590,Diferencia compatible con la excepción
+TXN-00000619,ARI-00000708,4423.09,,0.954,Número impreso en el concepto e importe exacto
+TXN-00000620,ARI-00000709,2810.64,,0.779,Mismo tercero e importe exacto
+TXN-00000621,API-00000710,70518.82,,0.956,Número impreso en el concepto e importe exacto
+TXN-00000622,ARI-00000711,78438.64,,0.958,Número impreso en el concepto e importe exacto
+TXN-00000623,ARI-00000712,1554.32,,0.859,Mismo tercero e importe exacto
+TXN-00000624,ARI-00000713,1857.73,,0.922,Mismo tercero e importe exacto
+TXN-00000625,ARI-00000714,721.96,,0.950,Número impreso en el concepto e importe exacto
+TXN-00000627,ARI-00000717,2014.31,,0.833,Factura neta de abono
+TXN-00000627,ARC-00000718,-434.45,,0.833,Factura neta de abono
+TXN-00000628,ARI-00000719,2875.34,,0.492,Importe inferior sin causa clara
+TXN-00000629,ARI-00000720,1816.71,,0.942,Número impreso en el concepto e importe exacto
+TXN-00000630,ARI-00000721,3036.10,,0.927,Número impreso en el concepto e importe exacto
+TXN-00000631,API-00000722,2213.57,,0.948,Número impreso en el concepto e importe exacto
+TXN-00000632,ARI-00000723,510.23,,0.731,La combinación suma el importe
+TXN-00000632,ARI-00000724,1030.57,,0.731,La combinación suma el importe
+TXN-00000632,ARI-00000725,1602.93,,0.731,La combinación suma el importe
+TXN-00000632,ARI-00000726,943.85,,0.731,La combinación suma el importe
+TXN-00000634,API-00000729,2815.66,,0.761,La combinación suma el importe
+TXN-00000634,API-00000730,1265.61,,0.761,La combinación suma el importe
+TXN-00000634,API-00000731,750.73,,0.761,La combinación suma el importe
+TXN-00000635,ARI-00000732,2807.22,,0.853,Mismo tercero e importe exacto
+TXN-00000636,API-00000733,713.82,,0.612,La combinación suma el importe
+TXN-00000636,API-00000734,588.81,,0.612,La combinación suma el importe
+TXN-00000637,ARI-00000735,2307.23,,0.972,Número impreso en el concepto e importe exacto
+TXN-00000638,ARI-00000736,2864.40,,0.974,Número impreso en el concepto e importe exacto
+TXN-00000639,API-00000737,4460.15,,0.925,Número impreso en el concepto e importe exacto
+TXN-00000640,ARI-00000738,2308.68,,0.992,Número impreso en el concepto e importe exacto
+TXN-00000641,ARI-00000739,85088.69,,0.893,Mismo tercero e importe exacto
+TXN-00000642,ARI-00000740,3345.49,,0.787,Factura neta de abono
+TXN-00000642,ARC-00000741,-383.19,,0.787,Factura neta de abono
+TXN-00000643,ARI-00000742,1076.07,,0.635,Varias partidas iguales del mismo tercero
+TXN-00000644,ARI-00000744,2343.54,,0.450,"Coincide el tercero, combinación incompleta"
+TXN-00000645,ARI-00000746,3052.74,,0.792,Mismo tercero e importe exacto
+TXN-00000647,ARI-00000748,2943.94,,0.976,Número impreso en el concepto e importe exacto
+TXN-00000649,API-00000749,2945.09,,0.816,Mismo tercero e importe exacto
+TXN-00000650,API-00000750,33571.61,,0.928,Mismo tercero e importe exacto
+TXN-00000651,ARI-00000751,4755.99,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000652,ARI-00000752,2563.29,,0.480,"Coincide el tercero, combinación incompleta"
+TXN-00000654,API-00000755,990.77,,0.859,La combinación suma el importe
+TXN-00000654,API-00000756,1272.63,,0.859,La combinación suma el importe
+TXN-00000655,ARI-00000757,21466.52,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000656,ARI-00000758,3873.53,,0.934,Número impreso en el concepto e importe exacto
+TXN-00000657,ARI-00000759,389.43,,0.952,Número impreso en el concepto e importe exacto
+TXN-00000658,ARI-00000760,2842.23,,0.792,Mismo tercero e importe exacto
+TXN-00000659,ARI-00000761,1488.94,,0.738,La combinación suma el importe
+TXN-00000659,ARI-00000762,2763.60,,0.738,La combinación suma el importe
+TXN-00000659,ARI-00000763,1137.71,,0.738,La combinación suma el importe
+TXN-00000661,ARI-00000765,2545.29,SHORT_BANK_CHARGES,0.619,Diferencia compatible con la excepción
+TXN-00000662,API-00000766,69877.01,,0.913,Mismo tercero e importe exacto
+TXN-00000663,ARI-00000767,3241.44,OVERPAYMENT,0.595,El movimiento supera la partida
+TXN-00000664,ARI-00000768,1960.72,,0.947,Número impreso en el concepto e importe exacto
+TXN-00000665,ARI-00000769,563.81,,0.974,Número impreso en el concepto e importe exacto
+TXN-00000666,API-00000770,1940.82,,0.821,Mismo tercero e importe exacto
+TXN-00000667,API-00000771,38932.46,,0.938,Número impreso en el concepto e importe exacto
+TXN-00000669,ARI-00000773,3025.30,,0.996,Número impreso en el concepto e importe exacto
+TXN-00000670,ARI-00000774,2455.37,,0.951,Número impreso en el concepto e importe exacto
+TXN-00000672,API-00000775,1837.10,,0.715,La combinación suma el importe
+TXN-00000672,API-00000776,624.35,,0.715,La combinación suma el importe
+TXN-00000672,API-00000777,669.63,,0.715,La combinación suma el importe
+TXN-00000672,API-00000778,1945.47,,0.715,La combinación suma el importe
+TXN-00000673,ARI-00000779,1838.62,,0.784,La combinación suma el importe
+TXN-00000673,ARI-00000780,1212.35,,0.784,La combinación suma el importe
+TXN-00000674,ARI-00000781,2272.17,,0.982,Número impreso en el concepto e importe exacto
+TXN-00000675,ARI-00000782,2800.38,,0.991,Número impreso en el concepto e importe exacto
+TXN-00000677,ARI-00000783,850.56,,0.811,Mismo tercero e importe exacto
+TXN-00000679,ARI-00000784,1547.43,,0.941,Número impreso en el concepto e importe exacto
+TXN-00000680,API-00000785,2792.64,,0.836,La combinación suma el importe
+TXN-00000680,API-00000786,813.83,,0.836,La combinación suma el importe
+TXN-00000681,ARI-00000787,9575.23,,0.814,Mismo tercero e importe exacto
+TXN-00000683,API-00000789,17255.24,,0.975,Número impreso en el concepto e importe exacto
+TXN-00000684,ARI-00000790,3830.23,,0.859,Mismo tercero e importe exacto
+TXN-00000685,ARI-00000791,4619.39,,0.981,Número impreso en el concepto e importe exacto
+TXN-00000686,ARI-00000792,2024.08,,0.995,Número impreso en el concepto e importe exacto
+TXN-00000690,ARI-00000796,3182.22,,0.992,Número impreso en el concepto e importe exacto
+TXN-00000692,ARI-00000797,1305.51,,0.834,Factura neta de abono
+TXN-00000692,ARC-00000798,-278.82,,0.834,Factura neta de abono
+TXN-00000693,ARI-00000799,135.96,,0.809,Mismo tercero e importe exacto
+TXN-00000694,ARI-00000800,3761.33,,0.978,Número impreso en el concepto e importe exacto
+TXN-00000695,ARI-00000801,4455.97,,0.935,Número impreso en el concepto e importe exacto
+TXN-00000697,,436.62,RETURNED,0.826,El concepto indica devolución
+TXN-00000698,API-00000804,4217.66,,0.976,Número impreso en el concepto e importe exacto
+TXN-00000699,ARI-00000805,85350.69,,0.841,Mismo tercero e importe exacto
+TXN-00000700,ARI-00000806,2737.35,,0.958,Número impreso en el concepto e importe exacto
+TXN-00000701,API-00000807,3756.29,,0.928,Número impreso en el concepto e importe exacto
+TXN-00000703,ARI-00000809,1930.39,,0.905,Mismo tercero e importe exacto
+TXN-00000704,API-00000810,80370.91,,0.770,Mismo tercero e importe exacto
+TXN-00000705,ARI-00000811,2296.57,,0.617,La combinación suma el importe
+TXN-00000705,ARI-00000812,1829.80,,0.617,La combinación suma el importe
+TXN-00000705,ARI-00000813,412.28,,0.617,La combinación suma el importe
+TXN-00000705,ARI-00000814,2628.62,,0.617,La combinación suma el importe
+TXN-00000706,ARI-00000815,3683.69,,0.403,Importe inferior sin causa clara
+TXN-00000708,ARI-00000816,2421.94,,0.958,Número impreso en el concepto e importe exacto
+TXN-00000709,API-00000817,2403.43,,0.492,Importe inferior sin causa clara
+TXN-00000710,ARI-00000818,4288.18,,0.950,Número impreso en el concepto e importe exacto
+TXN-00000711,API-00000819,1455.54,,0.771,La combinación suma el importe
+TXN-00000711,API-00000820,1872.10,,0.771,La combinación suma el importe
+TXN-00000711,API-00000821,1022.86,,0.771,La combinación suma el importe
+TXN-00000712,ARI-00000822,2255.52,,0.851,Mismo tercero e importe exacto
+TXN-00000713,ARI-00000823,7916.38,SHORT_BANK_CHARGES,0.636,Diferencia compatible con la excepción
+TXN-00000714,ARI-00000825,83157.16,,0.721,Varias partidas iguales del mismo tercero
+TXN-00000715,API-00000826,2133.32,,0.725,Varias partidas iguales del mismo tercero
+TXN-00000716,ARI-00000828,2028.57,,0.944,Número impreso en el concepto e importe exacto
+TXN-00000717,ARI-00000829,2112.40,,0.317,Importe inferior sin causa clara
+TXN-00000718,ARI-00000830,3095.08,SHORT_WITHHOLDING,0.682,Diferencia compatible con la excepción
+TXN-00000719,ARI-00000831,1249.56,,0.918,Mismo tercero e importe exacto
+TXN-00000722,ARI-00000834,1162.63,,0.850,Mismo tercero e importe exacto
+TXN-00000723,ARI-00000835,7220.71,SHORT_BANK_CHARGES,0.622,Diferencia compatible con la excepción
+TXN-00000727,ARI-00000838,4675.67,FX_DIFFERENCE,0.590,"Número impreso, conversión de divisa"
+TXN-00000728,ARI-00000839,5856.77,SHORT_DISCOUNT,0.827,Diferencia compatible con la excepción
+TXN-00000729,API-00000840,61357.43,,0.989,Número impreso en el concepto e importe exacto
+TXN-00000730,ARI-00000841,2210.86,,0.928,Mismo tercero e importe exacto
+TXN-00000731,ARI-00000842,3358.91,,0.857,Mismo tercero e importe exacto
+TXN-00000732,ARI-00000843,4006.39,,0.892,Mismo tercero e importe exacto
+TXN-00000733,ARI-00000844,3443.45,,0.752,Mismo tercero e importe exacto
+TXN-00000734,ARI-00000845,1445.40,,0.981,Número impreso en el concepto e importe exacto
+TXN-00000735,ARI-00000846,988.93,,0.943,Número impreso en el concepto e importe exacto
+TXN-00000737,ARI-00000847,2309.05,,0.993,Número impreso en el concepto e importe exacto
+TXN-00000738,ARI-00000848,683.76,,0.505,"Coincide el tercero, combinación incompleta"
+TXN-00000739,API-00000851,4078.31,,0.920,Número impreso en el concepto e importe exacto
+TXN-00000740,ARI-00000852,4377.53,,0.916,Mismo tercero e importe exacto
+TXN-00000741,ARI-00000853,2224.91,,0.381,"Coincide el tercero, combinación incompleta"
+TXN-00000742,ARI-00000857,1389.89,,0.980,Número impreso en el concepto e importe exacto
+TXN-00000743,ARI-00000858,2518.26,,0.998,Número impreso en el concepto e importe exacto
+TXN-00000746,ARI-00000862,79044.90,,0.558,Varias partidas iguales del mismo tercero
+TXN-00000747,ARI-00000864,74342.11,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000749,API-00000865,1491.57,,0.772,La combinación suma el importe
+TXN-00000749,API-00000866,1360.44,,0.772,La combinación suma el importe
+TXN-00000750,ARI-00000867,1162.71,,0.667,Factura neta de abono
+TXN-00000750,ARC-00000868,-251.18,,0.667,Factura neta de abono
+TXN-00000751,API-00000869,1409.17,FX_DIFFERENCE,0.636,"Número impreso, conversión de divisa"
+TXN-00000752,API-00000870,63367.21,,0.967,Número impreso en el concepto e importe exacto
+TXN-00000753,ARI-00000871,1675.22,,0.843,Mismo tercero e importe exacto
+TXN-00000754,ARI-00000872,1837.63,,0.947,Número impreso en el concepto e importe exacto
+TXN-00000755,ARI-00000873,59130.58,,0.793,Mismo tercero e importe exacto
+TXN-00000756,API-00000874,1546.96,,0.963,Número impreso en el concepto e importe exacto
+TXN-00000757,ARI-00000875,3133.20,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000760,ARI-00000876,2803.29,PARTIAL,0.770,"Número impreso, importe inferior"
+TXN-00000761,ARI-00000877,2990.26,,0.736,Varias partidas iguales del mismo tercero
+TXN-00000763,API-00000879,2461.85,,0.660,La combinación suma el importe
+TXN-00000763,API-00000880,708.56,,0.660,La combinación suma el importe
+TXN-00000763,API-00000881,2906.44,,0.660,La combinación suma el importe
+TXN-00000764,API-00000882,2454.11,,0.942,Número impreso en el concepto e importe exacto
+TXN-00000765,ARI-00000883,1018.93,,0.939,Número impreso en el concepto e importe exacto
+TXN-00000766,ARI-00000884,3213.49,,0.898,Mismo tercero e importe exacto
+TXN-00000767,ARI-00000885,529.34,,0.939,Número impreso en el concepto e importe exacto
+TXN-00000768,ARI-00000886,30628.09,PARTIAL,0.555,"Número impreso, importe inferior"
+TXN-00000769,ARI-00000887,3633.81,,0.959,Número impreso en el concepto e importe exacto
+TXN-00000770,ARI-00000888,2385.21,,0.728,Factura neta de abono
+TXN-00000770,ARC-00000889,-514.25,,0.728,Factura neta de abono
+TXN-00000771,ARI-00000890,2545.17,,0.967,Número impreso en el concepto e importe exacto
+TXN-00000772,ARI-00000891,19155.09,,0.800,Mismo tercero e importe exacto
+TXN-00000774,ARI-00000893,42929.85,,0.766,Mismo tercero e importe exacto
+TXN-00000775,ARI-00000894,981.35,,0.534,"Número impreso, partida ya cobrada"
+TXN-00000776,,641.93,RETURNED,0.763,El concepto indica devolución
+TXN-00000777,ARI-00000896,2257.26,,0.933,Número impreso en el concepto e importe exacto
+TXN-00000778,ARI-00000897,2894.70,,0.937,Número impreso en el concepto e importe exacto
+TXN-00000779,ARI-00000898,2790.65,,0.892,Mismo tercero e importe exacto
+TXN-00000780,ARI-00000899,3092.62,,0.981,Número impreso en el concepto e importe exacto
+TXN-00000781,API-00000900,639.72,OVERPAYMENT,0.672,El movimiento supera la partida
+TXN-00000782,ARI-00000901,5488.50,,0.664,"Número impreso, conversión de divisa"
+TXN-00000783,ARI-00000902,765.65,,0.774,Factura neta de abono
+TXN-00000783,ARC-00000903,-80.51,,0.774,Factura neta de abono
+TXN-00000784,ARI-00000904,4316.12,SHORT_BANK_CHARGES,0.651,Diferencia compatible con la excepción
+TXN-00000785,ARI-00000905,2099.12,OVERPAYMENT,0.673,El movimiento supera la partida
+TXN-00000786,API-00000906,87535.67,,0.922,Número impreso en el concepto e importe exacto
+TXN-00000787,ARI-00000907,3026.94,PARTIAL,0.566,"Número impreso, importe inferior"
+TXN-00000789,ARI-00000908,3697.50,OVERPAYMENT,0.558,El movimiento supera la partida
+TXN-00000790,ARI-00000909,4422.12,,0.760,Mismo tercero e importe exacto
+TXN-00000791,,843.61,RETURNED,0.844,El concepto indica devolución
+TXN-00000793,API-00000911,5665.51,SHORT_DISPUTE,0.573,Diferencia compatible con la excepción
+TXN-00000794,ARI-00000912,71293.31,OVERPAYMENT,0.595,El movimiento supera la partida
+TXN-00000795,API-00000913,24969.72,,0.967,Número impreso en el concepto e importe exacto
+TXN-00000796,ARI-00000914,3535.13,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000797,API-00000915,78.54,,0.451,"Coincide el tercero, combinación incompleta"
+TXN-00000798,ARI-00000918,32540.95,,0.998,Número impreso en el concepto e importe exacto
+TXN-00000799,ARI-00000919,1117.75,,0.954,Número impreso en el concepto e importe exacto
+TXN-00000800,API-00000920,1840.02,,0.957,Número impreso en el concepto e importe exacto
+TXN-00000803,ARI-00000922,4464.47,,0.584,Varias partidas iguales del mismo tercero
+TXN-00000804,API-00000924,1263.46,PARTIAL,0.589,"Número impreso, importe inferior"
+TXN-00000805,ARI-00000925,4196.61,,0.845,Mismo tercero e importe exacto
+TXN-00000806,ARI-00000926,525.09,,0.943,Número impreso en el concepto e importe exacto
+TXN-00000807,API-00000927,7312.37,SHORT_DISPUTE,0.817,Diferencia compatible con la excepción
+TXN-00000808,ARI-00000928,4188.65,,0.738,Varias partidas iguales del mismo tercero
+TXN-00000809,ARI-00000930,1357.51,,0.965,Número impreso en el concepto e importe exacto
+TXN-00000811,ARI-00000933,924.98,,0.959,Número impreso en el concepto e importe exacto
+TXN-00000812,ARI-00000934,630.14,SHORT_WITHHOLDING,0.712,Diferencia compatible con la excepción
+TXN-00000813,API-00000935,3050.76,,0.761,Varias partidas iguales del mismo tercero
+TXN-00000814,API-00000937,4330.49,,0.611,"Número impreso, partida ya cobrada"
+TXN-00000816,API-00000938,4401.22,,0.304,Importe inferior sin causa clara
+TXN-00000818,ARI-00000939,863.37,,0.929,Número impreso en el concepto e importe exacto
+TXN-00000821,ARI-00000941,6763.85,,0.697,"Número impreso, conversión de divisa"
+TXN-00000822,ARI-00000942,1580.08,,0.824,Mismo tercero e importe exacto
+TXN-00000824,ARI-00000943,598.95,,0.928,Número impreso en el concepto e importe exacto
+TXN-00000825,ARI-00000944,2302.49,SHORT_DISCOUNT,0.837,Diferencia compatible con la excepción
+TXN-00000826,API-00000945,235.61,OVERPAYMENT,0.732,El movimiento supera la partida
+TXN-00000827,ARI-00000946,2391.52,,0.931,Número impreso en el concepto e importe exacto
+TXN-00000828,ARI-00000947,3998.03,SHORT_DISCOUNT,0.689,Diferencia compatible con la excepción
+TXN-00000829,ARI-00000948,29297.30,,0.969,Número impreso en el concepto e importe exacto
+TXN-00000830,API-00000949,2905.17,,0.568,Varias partidas iguales del mismo tercero
+TXN-00000832,ARI-00000955,3143.52,,0.807,Mismo tercero e importe exacto
+TXN-00000833,ARI-00000956,4560.98,,0.410,Importe inferior sin causa clara
+TXN-00000834,API-00000957,2710.23,PARTIAL,0.664,"Número impreso, importe inferior"
+TXN-00000835,ARI-00000958,2355.20,,0.535,"Número impreso, partida ya cobrada"
+TXN-00000836,API-00000959,4637.44,,0.986,Número impreso en el concepto e importe exacto
+TXN-00000837,ARI-00000960,170.83,,0.782,La combinación suma el importe
+TXN-00000837,ARI-00000961,2028.52,,0.782,La combinación suma el importe
+TXN-00000837,ARI-00000962,2764.62,,0.782,La combinación suma el importe
+TXN-00000839,ARI-00000963,32470.70,,0.937,Número impreso en el concepto e importe exacto
+TXN-00000841,ARI-00000964,985.67,,0.815,Factura neta de abono
+TXN-00000841,ARC-00000965,-191.86,,0.815,Factura neta de abono
+TXN-00000842,ARI-00000966,1727.10,,0.610,Varias partidas iguales del mismo tercero
+TXN-00000843,ARI-00000968,3588.18,,0.927,Mismo tercero e importe exacto
+TXN-00000844,ARI-00000969,4101.00,,0.977,Número impreso en el concepto e importe exacto
+TXN-00000845,ARI-00000970,738.03,PARTIAL,0.691,"Número impreso, importe inferior"
+TXN-00000847,ARI-00000972,4451.00,,0.563,Varias partidas iguales del mismo tercero
+TXN-00000848,ARI-00000974,82528.77,OVERPAYMENT,0.607,El movimiento supera la partida
+TXN-00000849,API-00000975,884.75,,0.994,Número impreso en el concepto e importe exacto
+TXN-00000850,ARI-00000976,1540.42,,0.749,La combinación suma el importe
+TXN-00000850,ARI-00000977,286.22,,0.749,La combinación suma el importe
+TXN-00000850,ARI-00000978,2351.10,,0.749,La combinación suma el importe
+TXN-00000850,ARI-00000979,2199.96,,0.749,La combinación suma el importe
+TXN-00000851,ARI-00000980,4301.02,,0.978,Número impreso en el concepto e importe exacto
+TXN-00000852,ARI-00000981,3842.21,,0.746,Factura neta de abono
+TXN-00000852,ARC-00000982,-324.46,,0.746,Factura neta de abono
+TXN-00000853,API-00000983,649.75,,0.928,Número impreso en el concepto e importe exacto
+TXN-00000854,API-00000984,5758.32,,0.329,Importe inferior sin causa clara
+TXN-00000855,API-00000985,349.30,,0.823,Mismo tercero e importe exacto
+TXN-00000856,ARI-00000986,3601.08,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000857,API-00000987,6522.82,SHORT_WITHHOLDING,0.701,Diferencia compatible con la excepción
+TXN-00000858,ARI-00000988,17767.73,,0.972,Número impreso en el concepto e importe exacto
+TXN-00000859,ARI-00000989,3470.47,,0.936,Número impreso en el concepto e importe exacto
+TXN-00000860,ARI-00000990,57846.54,,0.803,Mismo tercero e importe exacto
+TXN-00000862,ARI-00000993,53916.50,,0.897,Mismo tercero e importe exacto
+TXN-00000863,ARI-00000994,4051.25,,0.926,Número impreso en el concepto e importe exacto
+TXN-00000867,ARI-00000996,3677.84,,0.779,Mismo tercero e importe exacto
+TXN-00000868,ARI-00000997,34933.48,,0.925,Número impreso en el concepto e importe exacto
+TXN-00000869,ARI-00000998,63587.77,OVERPAYMENT,0.783,El movimiento supera la partida
+TXN-00000871,ARI-00001000,977.55,,0.997,Número impreso en el concepto e importe exacto
+TXN-00000872,ARI-00001001,2439.51,,0.911,Mismo tercero e importe exacto
+TXN-00000874,API-00001002,1461.78,,0.806,La combinación suma el importe
+TXN-00000874,API-00001003,2997.61,,0.806,La combinación suma el importe
+TXN-00000874,API-00001004,2095.73,,0.806,La combinación suma el importe
+TXN-00000874,API-00001005,1109.28,,0.806,La combinación suma el importe
+TXN-00000875,ARI-00001006,2040.39,,0.953,Número impreso en el concepto e importe exacto
+TXN-00000876,,14587.21,RETURNED,0.681,El concepto indica devolución
+TXN-00000877,ARI-00001008,422.00,,0.955,Número impreso en el concepto e importe exacto
+TXN-00000878,ARI-00001009,266.63,,0.636,La combinación suma el importe
+TXN-00000878,ARI-00001010,1339.61,,0.636,La combinación suma el importe
+TXN-00000878,ARI-00001011,2110.27,,0.636,La combinación suma el importe
+TXN-00000879,ARI-00001012,4022.72,,0.693,"Número impreso, conversión de divisa"
+TXN-00000880,ARI-00001013,2723.43,,0.478,"Coincide el tercero, combinación incompleta"
+TXN-00000881,,52190.76,RETURNED,0.641,El concepto indica devolución
+TXN-00000882,ARI-00001016,684.75,FX_DIFFERENCE,0.517,"Número impreso, conversión de divisa"
+TXN-00000883,ARI-00001017,3269.66,,0.438,Importe inferior sin causa clara
+TXN-00000884,ARI-00001018,2624.44,,0.801,La combinación suma el importe
+TXN-00000884,ARI-00001019,2667.10,,0.801,La combinación suma el importe
+TXN-00000886,ARI-00001020,3089.61,,0.970,Número impreso en el concepto e importe exacto
+TXN-00000889,ARI-00001022,1519.46,,0.874,La combinación suma el importe
+TXN-00000889,ARI-00001023,1990.82,,0.874,La combinación suma el importe
+TXN-00000889,ARI-00001024,2326.22,,0.874,La combinación suma el importe
+TXN-00000889,ARI-00001025,1518.04,,0.874,La combinación suma el importe
+TXN-00000891,ARI-00001030,4658.74,,0.850,Mismo tercero e importe exacto
+TXN-00000893,API-00001031,2097.30,PARTIAL,0.652,"Número impreso, importe inferior"
+TXN-00000894,API-00001032,4401.68,,0.949,Número impreso en el concepto e importe exacto
+TXN-00000895,ARI-00001033,994.84,,0.938,Número impreso en el concepto e importe exacto
+TXN-00000896,,47345.34,RETURNED,0.642,El concepto indica devolución
+TXN-00000897,ARI-00001035,66031.64,,0.921,Número impreso en el concepto e importe exacto
+TXN-00000898,API-00001036,18037.86,,0.756,Mismo tercero e importe exacto
+TXN-00000899,ARI-00001037,3903.98,,0.917,Mismo tercero e importe exacto
+TXN-00000900,ARI-00001038,1904.02,,0.863,La combinación suma el importe
+TXN-00000900,ARI-00001039,1806.90,,0.863,La combinación suma el importe
+TXN-00000900,ARI-00001040,2261.75,,0.863,La combinación suma el importe
+TXN-00000900,ARI-00001041,2519.50,,0.863,La combinación suma el importe
+TXN-00000901,ARI-00001042,28180.31,PARTIAL,0.571,"Número impreso, importe inferior"
+TXN-00000902,ARI-00001043,500.03,,0.969,Número impreso en el concepto e importe exacto
+TXN-00000903,API-00001044,61027.73,,0.944,Número impreso en el concepto e importe exacto
+TXN-00000904,ARI-00001045,4067.32,,0.640,"Número impreso, conversión de divisa"
+TXN-00000905,API-00001046,855.47,SHORT_BANK_CHARGES,0.845,Diferencia compatible con la excepción
+TXN-00000906,ARI-00001047,44298.97,,0.981,Número impreso en el concepto e importe exacto
+TXN-00000907,ARI-00001048,3457.72,,0.933,Número impreso en el concepto e importe exacto
+TXN-00000909,ARI-00001050,3484.86,,0.942,Número impreso en el concepto e importe exacto
+TXN-00000911,ARI-00001051,2331.24,,0.947,Número impreso en el concepto e importe exacto
+TXN-00000912,API-00001052,3227.91,,0.751,Mismo tercero e importe exacto
+TXN-00000913,ARI-00001053,1332.60,,0.890,Mismo tercero e importe exacto
+TXN-00000914,ARI-00001054,2400.52,,0.387,"Coincide el tercero, combinación incompleta"
+TXN-00000916,ARI-00001057,4687.89,,0.995,Número impreso en el concepto e importe exacto
+TXN-00000918,ARI-00001058,84535.74,,0.607,Varias partidas iguales del mismo tercero
+TXN-00000919,API-00001060,893.53,SHORT_DISCOUNT,0.756,Diferencia compatible con la excepción
+TXN-00000920,ARI-00001061,512.89,,0.368,"Coincide el tercero, combinación incompleta"
+TXN-00000922,ARI-00001064,3376.34,,0.841,Factura neta de abono
+TXN-00000922,ARC-00001065,-763.13,,0.841,Factura neta de abono
+TXN-00000923,API-00001066,4910.18,,0.442,Importe inferior sin causa clara
+TXN-00000924,ARI-00001067,3750.61,,0.716,Factura neta de abono
+TXN-00000924,ARC-00001068,-620.83,,0.716,Factura neta de abono
+TXN-00000925,API-00001069,747.11,,0.962,Número impreso en el concepto e importe exacto
+TXN-00000926,API-00001070,2893.37,FX_DIFFERENCE,0.602,"Número impreso, conversión de divisa"
+TXN-00000927,API-00001071,2792.02,,0.767,Mismo tercero e importe exacto
+TXN-00000929,ARI-00001073,3471.94,,0.584,Varias partidas iguales del mismo tercero
+TXN-00000930,ARI-00001075,765.03,,0.963,Número impreso en el concepto e importe exacto
+TXN-00000931,API-00001076,1021.35,,0.940,Número impreso en el concepto e importe exacto
+TXN-00000932,API-00001077,2037.11,,0.937,Número impreso en el concepto e importe exacto
+TXN-00000933,ARI-00001078,2205.94,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000935,ARI-00001079,2227.29,,0.673,Factura neta de abono
+TXN-00000935,ARC-00001080,-382.98,,0.673,Factura neta de abono
+TXN-00000936,API-00001081,1372.10,,0.982,Número impreso en el concepto e importe exacto
+TXN-00000938,ARI-00001082,4252.53,,0.930,Número impreso en el concepto e importe exacto
+TXN-00000939,API-00001083,621.06,PARTIAL,0.713,"Número impreso, importe inferior"
+TXN-00000941,ARI-00001084,2619.98,,0.841,Mismo tercero e importe exacto
+TXN-00000943,ARI-00001086,2575.11,,0.733,La combinación suma el importe
+TXN-00000943,ARI-00001087,1077.68,,0.733,La combinación suma el importe
+TXN-00000947,ARI-00001091,3688.42,,0.910,Mismo tercero e importe exacto
+TXN-00000948,ARI-00001092,556.85,,0.923,Mismo tercero e importe exacto
+TXN-00000949,ARI-00001093,1304.89,,0.463,Importe inferior sin causa clara
+TXN-00000950,ARI-00001094,595.04,,0.988,Número impreso en el concepto e importe exacto
+TXN-00000951,ARI-00001095,1059.54,PARTIAL,0.571,"Número impreso, importe inferior"
+TXN-00000952,ARI-00001096,1515.53,,0.952,Número impreso en el concepto e importe exacto
+TXN-00000953,ARI-00001097,187.19,PARTIAL,0.775,"Número impreso, importe inferior"
+TXN-00000954,API-00001098,2396.67,SHORT_DISCOUNT,0.803,Diferencia compatible con la excepción
+TXN-00000955,API-00001099,33635.56,,0.939,Número impreso en el concepto e importe exacto
+TXN-00000956,ARI-00001100,1765.37,,0.309,Importe inferior sin causa clara
+TXN-00000957,API-00001101,18133.75,,0.941,Número impreso en el concepto e importe exacto
+TXN-00000958,ARI-00001102,7856.83,,0.965,Número impreso en el concepto e importe exacto
+TXN-00000961,ARI-00001105,576.47,,0.942,Número impreso en el concepto e importe exacto
+TXN-00000962,ARI-00001106,202.93,,0.946,Número impreso en el concepto e importe exacto
+TXN-00000963,ARI-00001107,3724.96,SHORT_DISCOUNT,0.750,Diferencia compatible con la excepción
+TXN-00000964,ARI-00001108,461.33,,0.961,Número impreso en el concepto e importe exacto
+TXN-00000965,ARI-00001109,1502.37,,0.694,"Número impreso, conversión de divisa"
+TXN-00000966,API-00001110,2319.67,,0.802,La combinación suma el importe
+TXN-00000966,API-00001111,338.40,,0.802,La combinación suma el importe
+TXN-00000966,API-00001112,631.12,,0.802,La combinación suma el importe
+TXN-00000967,ARI-00001113,3578.40,,0.765,Mismo tercero e importe exacto
+TXN-00000968,ARI-00001114,144.64,,0.970,Número impreso en el concepto e importe exacto
+TXN-00000969,ARI-00001115,3882.63,,0.966,Número impreso en el concepto e importe exacto
+TXN-00000970,ARI-00001116,472.60,PARTIAL,0.626,"Número impreso, importe inferior"
+TXN-00000971,,75724.90,RETURNED,0.878,El concepto indica devolución
+TXN-00000972,API-00001118,782.43,SHORT_DISPUTE,0.658,Diferencia compatible con la excepción
+TXN-00000974,API-00001119,2083.42,,0.922,Número impreso en el concepto e importe exacto
+TXN-00000975,ARI-00001120,1065.71,SHORT_BANK_CHARGES,0.616,Diferencia compatible con la excepción
+TXN-00000976,API-00001121,63641.58,,0.557,Varias partidas iguales del mismo tercero
+TXN-00000977,API-00001123,3974.86,,0.959,Número impreso en el concepto e importe exacto
+TXN-00000978,ARI-00001124,1197.09,,0.599,Varias partidas iguales del mismo tercero
+TXN-00000981,ARI-00001126,624.06,,0.857,Mismo tercero e importe exacto
+TXN-00000982,ARI-00001127,69776.30,,0.937,Número impreso en el concepto e importe exacto
+TXN-00000983,ARI-00001128,4401.55,,0.922,Número impreso en el concepto e importe exacto
+TXN-00000986,ARI-00001130,40152.58,,0.982,Número impreso en el concepto e importe exacto
+TXN-00000987,API-00001131,3904.78,,0.966,Número impreso en el concepto e importe exacto
+TXN-00000988,ARI-00001132,1272.41,,0.827,La combinación suma el importe
+TXN-00000988,ARI-00001133,1437.05,,0.827,La combinación suma el importe
+TXN-00000988,ARI-00001134,1089.19,,0.827,La combinación suma el importe
+TXN-00000988,ARI-00001135,2815.30,,0.827,La combinación suma el importe
+TXN-00000989,ARI-00001136,1206.27,,0.880,Mismo tercero e importe exacto
+TXN-00000990,ARI-00001137,7034.92,SHORT_BANK_CHARGES,0.740,Diferencia compatible con la excepción
+TXN-00000991,ARI-00001138,67360.02,,0.827,Mismo tercero e importe exacto
+TXN-00000993,ARI-00001139,3670.11,,0.928,Número impreso en el concepto e importe exacto
+TXN-00000994,API-00001140,47.95,,0.617,"Número impreso, partida ya cobrada"
+TXN-00000995,ARI-00001141,204.19,,0.896,Mismo tercero e importe exacto
+TXN-00000996,ARI-00001142,4303.16,,0.795,Mismo tercero e importe exacto
+TXN-00001002,ARI-00001144,1963.22,,0.490,Importe inferior sin causa clara
+TXN-00001003,ARI-00001145,3749.44,,0.579,Varias partidas iguales del mismo tercero
+TXN-00001004,ARI-00001147,1902.66,FX_DIFFERENCE,0.598,"Número impreso, conversión de divisa"
+TXN-00001005,ARI-00001148,3192.97,SHORT_DISCOUNT,0.794,Diferencia compatible con la excepción
+TXN-00001006,ARI-00001149,2233.55,PARTIAL,0.553,"Número impreso, importe inferior"
+TXN-00001007,API-00001150,3225.39,,0.970,Número impreso en el concepto e importe exacto
+TXN-00001008,API-00001151,11729.99,,0.972,Número impreso en el concepto e importe exacto
+TXN-00001009,ARI-00001152,970.43,,0.796,Factura neta de abono
+TXN-00001009,ARC-00001153,-177.85,,0.796,Factura neta de abono
+TXN-00001010,ARI-00001154,1065.89,,0.977,Número impreso en el concepto e importe exacto
+TXN-00001011,ARI-00001155,5061.38,,0.321,Importe inferior sin causa clara
+TXN-00001014,ARI-00001156,2900.20,,0.990,Número impreso en el concepto e importe exacto
+TXN-00001015,ARI-00001157,2913.90,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001016,ARI-00001158,805.78,,0.826,Factura neta de abono
+TXN-00001016,ARC-00001159,-105.12,,0.826,Factura neta de abono
+TXN-00001019,API-00001162,259.30,PARTIAL,0.767,"Número impreso, importe inferior"
+TXN-00001021,API-00001164,1308.53,,0.806,Mismo tercero e importe exacto
+TXN-00001022,ARI-00001165,3915.40,SHORT_WITHHOLDING,0.711,Diferencia compatible con la excepción
+TXN-00001024,ARI-00001168,3586.63,,0.628,Factura neta de abono
+TXN-00001024,ARC-00001169,-716.39,,0.628,Factura neta de abono
+TXN-00001026,ARI-00001171,2178.35,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001027,ARI-00001172,1255.35,,0.999,Número impreso en el concepto e importe exacto
+TXN-00001028,ARI-00001173,2950.82,,0.633,Factura neta de abono
+TXN-00001028,ARC-00001174,-190.23,,0.633,Factura neta de abono
+TXN-00001029,ARI-00001175,2246.36,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001030,ARI-00001176,1949.57,,0.834,Mismo tercero e importe exacto
+TXN-00001031,ARI-00001177,778.49,,0.924,Número impreso en el concepto e importe exacto
+TXN-00001032,API-00001178,18718.28,,0.996,Número impreso en el concepto e importe exacto
+TXN-00001033,API-00001179,4610.40,,0.921,Número impreso en el concepto e importe exacto
+TXN-00001034,ARI-00001180,16626.00,PARTIAL,0.728,"Número impreso, importe inferior"
+TXN-00001035,API-00001181,4095.76,,0.967,Número impreso en el concepto e importe exacto
+TXN-00001036,API-00001182,4064.07,,0.943,Número impreso en el concepto e importe exacto
+TXN-00001038,API-00001184,1430.68,,0.593,Varias partidas iguales del mismo tercero
+TXN-00001039,ARI-00001186,3152.14,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001040,ARI-00001187,183.92,,0.851,La combinación suma el importe
+TXN-00001040,ARI-00001188,1093.60,,0.851,La combinación suma el importe
+TXN-00001041,API-00001189,3782.46,,0.950,Número impreso en el concepto e importe exacto
+TXN-00001042,API-00001190,203.96,,0.998,Número impreso en el concepto e importe exacto
+TXN-00001044,ARI-00001192,4298.61,,0.829,Mismo tercero e importe exacto
+TXN-00001045,API-00001193,3450.28,,0.925,Número impreso en el concepto e importe exacto
+TXN-00001047,ARI-00001196,1791.96,,0.975,Número impreso en el concepto e importe exacto
+TXN-00001048,ARI-00001197,1009.83,,0.891,Mismo tercero e importe exacto
+TXN-00001049,ARI-00001198,2916.00,,0.793,Factura neta de abono
+TXN-00001049,ARC-00001199,-351.11,,0.793,Factura neta de abono
+TXN-00001052,ARI-00001200,2630.26,,0.489,"Coincide el tercero, combinación incompleta"
+TXN-00001053,API-00001204,1168.73,,0.809,Mismo tercero e importe exacto
+TXN-00001054,API-00001205,1929.77,,0.985,Número impreso en el concepto e importe exacto
+TXN-00001055,ARI-00001206,1553.28,,0.987,Número impreso en el concepto e importe exacto
+TXN-00001056,ARI-00001207,35948.59,,0.962,Número impreso en el concepto e importe exacto
+TXN-00001057,ARI-00001208,2789.74,,0.936,Número impreso en el concepto e importe exacto
+TXN-00001058,ARI-00001209,1682.32,,0.970,Número impreso en el concepto e importe exacto
+TXN-00001059,ARI-00001210,2188.44,,0.929,Número impreso en el concepto e importe exacto
+TXN-00001060,ARI-00001211,72.04,,0.934,Número impreso en el concepto e importe exacto
+TXN-00001061,ARI-00001212,2699.30,,0.897,Mismo tercero e importe exacto
+TXN-00001063,ARI-00001214,1847.73,,0.770,Mismo tercero e importe exacto
+TXN-00001065,ARI-00001215,3930.13,,0.978,Número impreso en el concepto e importe exacto
+TXN-00001066,ARI-00001216,11247.07,,0.818,Mismo tercero e importe exacto
+TXN-00001067,ARI-00001217,3552.48,,0.933,Número impreso en el concepto e importe exacto
+TXN-00001068,ARI-00001218,2867.95,FX_DIFFERENCE,0.574,"Número impreso, conversión de divisa"
+TXN-00001069,API-00001219,564.04,,0.929,Número impreso en el concepto e importe exacto
+TXN-00001070,ARI-00001220,3017.82,,0.972,Número impreso en el concepto e importe exacto
+TXN-00001071,ARI-00001222,8755.61,,0.616,Varias partidas iguales del mismo tercero
+TXN-00001072,ARI-00001223,4161.89,,0.987,Número impreso en el concepto e importe exacto
+TXN-00001073,ARI-00001224,117.98,,0.969,Número impreso en el concepto e importe exacto
+TXN-00001075,ARI-00001226,325.26,,0.959,Número impreso en el concepto e importe exacto
+TXN-00001076,ARI-00001227,81602.03,,0.947,Número impreso en el concepto e importe exacto
+TXN-00001077,ARI-00001228,4815.49,,0.494,Importe inferior sin causa clara
+TXN-00001078,ARI-00001229,296.50,,0.757,La combinación suma el importe
+TXN-00001078,ARI-00001230,698.82,,0.757,La combinación suma el importe
+TXN-00001079,ARI-00001231,1319.96,PARTIAL,0.589,"Número impreso, importe inferior"
+TXN-00001080,ARI-00001232,1543.42,,0.952,Número impreso en el concepto e importe exacto
+TXN-00001082,ARI-00001233,801.55,,0.952,Número impreso en el concepto e importe exacto
+TXN-00001083,API-00001234,22044.91,,0.938,Número impreso en el concepto e importe exacto
+TXN-00001085,API-00001235,1902.92,,0.969,Número impreso en el concepto e importe exacto
+TXN-00001086,ARI-00001236,39066.93,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001087,API-00001237,627.16,,0.896,Mismo tercero e importe exacto
+TXN-00001088,ARI-00001238,2883.12,,0.653,La combinación suma el importe
+TXN-00001088,ARI-00001239,2318.74,,0.653,La combinación suma el importe
+TXN-00001089,ARI-00001240,2669.02,,0.745,Factura neta de abono
+TXN-00001089,ARC-00001241,-393.04,,0.745,Factura neta de abono
+TXN-00001091,ARI-00001242,5675.26,,0.716,"Número impreso, conversión de divisa"
+TXN-00001092,ARI-00001243,3847.68,,0.620,Factura neta de abono
+TXN-00001092,ARC-00001244,-386.39,,0.620,Factura neta de abono
+TXN-00001093,ARI-00001245,2566.82,,0.997,Número impreso en el concepto e importe exacto
+TXN-00001094,ARI-00001246,5281.88,,0.761,"Número impreso, conversión de divisa"
+TXN-00001096,ARI-00001249,448.67,,0.872,Mismo tercero e importe exacto
+TXN-00001097,ARI-00001250,1951.19,,0.618,Varias partidas iguales del mismo tercero
+TXN-00001098,ARI-00001252,61753.85,,0.988,Número impreso en el concepto e importe exacto
+TXN-00001099,API-00001253,6622.33,PARTIAL,0.573,"Número impreso, importe inferior"
+TXN-00001101,API-00001254,1731.86,,0.915,Mismo tercero e importe exacto
+TXN-00001102,API-00001255,1646.24,,0.601,La combinación suma el importe
+TXN-00001102,API-00001256,1659.11,,0.601,La combinación suma el importe
+TXN-00001103,ARI-00001257,196.70,,0.806,Mismo tercero e importe exacto
+TXN-00001104,,61946.60,RETURNED,0.729,El concepto indica devolución
+TXN-00001107,ARI-00001259,3149.60,,0.824,Mismo tercero e importe exacto
+TXN-00001108,ARI-00001260,1735.32,,0.933,Número impreso en el concepto e importe exacto
+TXN-00001109,ARI-00001261,8390.97,,0.351,Importe inferior sin causa clara
+TXN-00001110,ARI-00001262,4534.00,,0.336,Importe inferior sin causa clara
+TXN-00001111,ARI-00001263,23204.21,,0.957,Número impreso en el concepto e importe exacto
+TXN-00001112,ARI-00001264,1290.74,PARTIAL,0.513,"Número impreso, importe inferior"
+TXN-00001113,ARI-00001265,589.73,,0.986,Número impreso en el concepto e importe exacto
+TXN-00001114,ARI-00001266,74675.59,,0.889,Mismo tercero e importe exacto
+TXN-00001115,ARI-00001267,836.88,,0.753,Mismo tercero e importe exacto
+TXN-00001116,API-00001268,1806.79,PARTIAL,0.693,"Número impreso, importe inferior"
+TXN-00001117,API-00001269,4585.13,,0.954,Número impreso en el concepto e importe exacto
+TXN-00001118,ARI-00001270,12531.75,,0.902,Mismo tercero e importe exacto
+TXN-00001119,ARI-00001271,7120.63,,0.472,Importe inferior sin causa clara
+TXN-00001120,ARI-00001272,439.54,,0.960,Número impreso en el concepto e importe exacto
+TXN-00001121,API-00001273,4612.00,,0.444,"Número impreso, partida ya cobrada"
+TXN-00001122,ARI-00001274,3216.53,,0.788,Mismo tercero e importe exacto
+TXN-00001124,ARI-00001275,3658.25,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001125,ARI-00001276,1248.36,PARTIAL,0.721,"Número impreso, importe inferior"
+TXN-00001126,ARI-00001277,65430.59,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001127,API-00001278,2200.02,,0.951,Número impreso en el concepto e importe exacto
+TXN-00001128,ARI-00001279,9383.61,,0.905,Mismo tercero e importe exacto
+TXN-00001129,API-00001280,191.36,,0.972,Número impreso en el concepto e importe exacto
+TXN-00001131,API-00001281,1358.60,,0.444,"Coincide el tercero, combinación incompleta"
+TXN-00001132,API-00001284,2589.41,,0.649,La combinación suma el importe
+TXN-00001132,API-00001285,2448.99,,0.649,La combinación suma el importe
+TXN-00001134,ARI-00001286,3766.67,,0.905,Mismo tercero e importe exacto
+TXN-00001135,ARI-00001287,8267.60,SHORT_DISCOUNT,0.826,Diferencia compatible con la excepción
+TXN-00001137,ARI-00001289,4254.12,,0.954,Número impreso en el concepto e importe exacto
+TXN-00001138,API-00001290,1299.88,,0.997,Número impreso en el concepto e importe exacto
+TXN-00001139,ARI-00001291,4473.29,,0.854,Mismo tercero e importe exacto
+TXN-00001140,ARI-00001292,2510.19,,0.930,Número impreso en el concepto e importe exacto
+TXN-00001141,ARI-00001293,2176.17,,0.731,Factura neta de abono
+TXN-00001141,ARC-00001294,-475.07,,0.731,Factura neta de abono
+TXN-00001142,ARI-00001296,3987.02,,0.787,Varias partidas iguales del mismo tercero
+TXN-00001144,ARI-00001297,85350.40,,0.946,Número impreso en el concepto e importe exacto
+TXN-00001145,API-00001298,4549.88,SHORT_DISPUTE,0.821,Diferencia compatible con la excepción
+TXN-00001146,API-00001299,4002.64,,0.983,Número impreso en el concepto e importe exacto
+TXN-00001147,ARI-00001300,1307.60,,0.874,Mismo tercero e importe exacto
+TXN-00001148,ARI-00001301,1883.96,,0.995,Número impreso en el concepto e importe exacto
+TXN-00001149,ARI-00001302,47806.67,,0.961,Número impreso en el concepto e importe exacto
+TXN-00001150,ARI-00001303,72489.84,,0.922,Número impreso en el concepto e importe exacto
+TXN-00001151,ARI-00001304,712.23,,0.904,Mismo tercero e importe exacto
+TXN-00001153,API-00001305,55884.46,,0.856,Mismo tercero e importe exacto
+TXN-00001154,API-00001306,7524.11,SHORT_WITHHOLDING,0.570,Diferencia compatible con la excepción
+TXN-00001155,ARI-00001307,71644.87,,0.975,Número impreso en el concepto e importe exacto
+TXN-00001156,ARI-00001308,4285.03,,0.998,Número impreso en el concepto e importe exacto
+TXN-00001157,API-00001309,674.82,,0.771,Mismo tercero e importe exacto
+TXN-00001158,API-00001310,675.91,,0.533,"Número impreso, conversión de divisa"
+TXN-00001159,ARI-00001311,4143.38,,0.850,Mismo tercero e importe exacto
+TXN-00001160,API-00001312,3402.12,,0.776,Mismo tercero e importe exacto
+TXN-00001161,ARI-00001313,4484.81,,0.834,Mismo tercero e importe exacto
+TXN-00001162,API-00001314,1427.23,,0.685,"Número impreso, conversión de divisa"
+TXN-00001163,ARI-00001315,2234.02,,0.816,Mismo tercero e importe exacto
+TXN-00001164,API-00001316,636.31,,0.962,Número impreso en el concepto e importe exacto
+TXN-00001165,API-00001317,59174.49,,0.793,Mismo tercero e importe exacto
+TXN-00001166,ARI-00001318,1639.54,PARTIAL,0.588,"Número impreso, importe inferior"
+TXN-00001167,API-00001319,967.74,,0.761,Mismo tercero e importe exacto
+TXN-00001168,ARI-00001320,756.71,,0.994,Número impreso en el concepto e importe exacto
+TXN-00001169,ARI-00001321,1034.73,SHORT_DISCOUNT,0.583,Diferencia compatible con la excepción
+TXN-00001171,ARI-00001322,2188.54,,0.939,Número impreso en el concepto e importe exacto
+TXN-00001172,ARI-00001323,505.44,,0.938,Número impreso en el concepto e importe exacto
+TXN-00001173,API-00001324,2666.53,,0.941,Número impreso en el concepto e importe exacto
+TXN-00001174,ARI-00001325,3123.78,,0.762,"Número impreso, conversión de divisa"
+TXN-00001175,API-00001326,2945.26,,0.744,Varias partidas iguales del mismo tercero
+TXN-00001177,ARI-00001328,259.08,,0.947,Número impreso en el concepto e importe exacto
+TXN-00001178,API-00001329,2271.18,,0.849,La combinación suma el importe
+TXN-00001178,API-00001330,1047.58,,0.849,La combinación suma el importe
+TXN-00001178,API-00001331,1504.51,,0.849,La combinación suma el importe
+TXN-00001178,API-00001332,2063.04,,0.849,La combinación suma el importe
+TXN-00001179,ARI-00001333,1958.36,FX_DIFFERENCE,0.786,"Número impreso, conversión de divisa"
+TXN-00001180,API-00001334,7246.97,SHORT_BANK_CHARGES,0.819,Diferencia compatible con la excepción
+TXN-00001181,ARI-00001335,2977.46,,0.855,Mismo tercero e importe exacto
+TXN-00001183,ARI-00001337,3912.97,,0.951,Número impreso en el concepto e importe exacto
+TXN-00001184,ARI-00001338,1265.84,,0.562,Varias partidas iguales del mismo tercero
+TXN-00001185,API-00001340,3613.28,,0.412,Importe inferior sin causa clara
+TXN-00001186,,2745.92,RETURNED,0.828,El concepto indica devolución
+TXN-00001187,ARI-00001342,55573.14,,0.991,Número impreso en el concepto e importe exacto
+TXN-00001188,ARI-00001343,4322.15,,0.435,Importe inferior sin causa clara
+TXN-00001189,ARI-00001344,4256.53,,0.927,Mismo tercero e importe exacto
+TXN-00001191,ARI-00001346,4492.01,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001192,API-00001347,6678.00,SHORT_DISPUTE,0.601,Diferencia compatible con la excepción
+TXN-00001193,ARI-00001348,1847.05,,0.935,Número impreso en el concepto e importe exacto
+TXN-00001194,ARI-00001349,3447.02,,0.923,Mismo tercero e importe exacto
+TXN-00001195,ARI-00001350,2845.95,,0.978,Número impreso en el concepto e importe exacto
+TXN-00001197,ARI-00001351,232.93,,0.775,Mismo tercero e importe exacto
+TXN-00001198,ARI-00001352,4023.53,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001199,ARI-00001353,3164.71,,0.909,Mismo tercero e importe exacto
+TXN-00001200,API-00001354,3694.09,SHORT_WITHHOLDING,0.553,Diferencia compatible con la excepción
+TXN-00001201,API-00001355,1108.84,,0.688,Varias partidas iguales del mismo tercero
+TXN-00001202,ARI-00001357,6751.60,,0.481,Importe inferior sin causa clara
+TXN-00001203,ARI-00001358,1111.49,,0.996,Número impreso en el concepto e importe exacto
+TXN-00001204,ARI-00001359,11239.44,,0.961,Número impreso en el concepto e importe exacto
+TXN-00001205,ARI-00001360,4452.46,FX_DIFFERENCE,0.471,"Número impreso, conversión de divisa"
+TXN-00001206,API-00001361,267.05,,0.443,"Coincide el tercero, combinación incompleta"
+TXN-00001207,ARI-00001365,3963.43,SHORT_BANK_CHARGES,0.835,Diferencia compatible con la excepción
+TXN-00001208,ARI-00001366,9218.14,,0.869,Mismo tercero e importe exacto
+TXN-00001209,ARI-00001367,3256.07,,0.969,Número impreso en el concepto e importe exacto
+TXN-00001210,ARI-00001368,1698.94,,0.930,Número impreso en el concepto e importe exacto
+TXN-00001211,ARI-00001369,2634.84,,0.784,La combinación suma el importe
+TXN-00001211,ARI-00001370,2337.47,,0.784,La combinación suma el importe
+TXN-00001211,ARI-00001371,1628.33,,0.784,La combinación suma el importe
+TXN-00001212,API-00001372,2062.92,,0.789,La combinación suma el importe
+TXN-00001212,API-00001373,1890.81,,0.789,La combinación suma el importe
+TXN-00001213,ARI-00001374,2758.13,,0.820,Mismo tercero e importe exacto
+TXN-00001215,ARI-00001375,4708.50,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001216,ARI-00001376,2018.71,,0.740,La combinación suma el importe
+TXN-00001216,ARI-00001377,1559.15,,0.740,La combinación suma el importe
+TXN-00001216,ARI-00001378,1587.47,,0.740,La combinación suma el importe
+TXN-00001217,ARI-00001379,3912.96,,0.404,"Número impreso, partida ya cobrada"
+TXN-00001218,ARI-00001380,2306.79,,0.649,Varias partidas iguales del mismo tercero
+TXN-00001219,ARI-00001382,3743.72,,0.991,Número impreso en el concepto e importe exacto
+TXN-00001220,ARI-00001383,2208.54,,0.856,Mismo tercero e importe exacto
+TXN-00001221,ARI-00001384,1747.92,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001222,ARI-00001385,1504.14,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001223,API-00001387,15045.12,,0.568,Varias partidas iguales del mismo tercero
+TXN-00001224,ARI-00001388,360.26,,0.774,Factura neta de abono
+TXN-00001224,ARC-00001389,-42.21,,0.774,Factura neta de abono
+TXN-00001225,ARI-00001390,396.58,,0.619,Varias partidas iguales del mismo tercero
+TXN-00001226,ARI-00001392,3549.17,,0.953,Número impreso en el concepto e importe exacto
+TXN-00001227,API-00001393,216.54,,0.636,La combinación suma el importe
+TXN-00001227,API-00001394,1991.95,,0.636,La combinación suma el importe
+TXN-00001228,ARI-00001395,4178.21,,0.763,Mismo tercero e importe exacto
+TXN-00001229,API-00001396,3432.89,,0.942,Número impreso en el concepto e importe exacto
+TXN-00001230,API-00001397,4254.25,,0.889,Mismo tercero e importe exacto
+TXN-00001231,ARI-00001398,2410.81,,0.858,La combinación suma el importe
+TXN-00001231,ARI-00001399,871.18,,0.858,La combinación suma el importe
+TXN-00001231,ARI-00001400,55.73,,0.858,La combinación suma el importe
+TXN-00001231,ARI-00001401,1646.58,,0.858,La combinación suma el importe
+TXN-00001232,ARI-00001402,716.34,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001233,API-00001403,85690.35,,0.902,Mismo tercero e importe exacto
+TXN-00001234,ARI-00001404,2591.12,,0.746,Factura neta de abono
+TXN-00001234,ARC-00001405,-144.37,,0.746,Factura neta de abono
+TXN-00001235,ARI-00001406,2787.05,,0.680,Factura neta de abono
+TXN-00001235,ARC-00001407,-313.71,,0.680,Factura neta de abono
+TXN-00001236,ARI-00001408,4354.58,,0.923,Mismo tercero e importe exacto
+TXN-00001237,ARI-00001409,4615.92,,0.954,Número impreso en el concepto e importe exacto
+TXN-00001239,ARI-00001413,1405.12,,0.877,Mismo tercero e importe exacto
+TXN-00001243,ARI-00001416,1774.70,PARTIAL,0.550,"Número impreso, importe inferior"
+TXN-00001247,API-00001419,21056.37,,0.966,Número impreso en el concepto e importe exacto
+TXN-00001248,ARI-00001420,604.81,,0.770,Mismo tercero e importe exacto
+TXN-00001249,API-00001421,7310.45,,0.353,Importe inferior sin causa clara
+TXN-00001250,ARI-00001422,3671.40,,0.926,Número impreso en el concepto e importe exacto
+TXN-00001251,ARI-00001423,4171.00,,0.764,Mismo tercero e importe exacto
+TXN-00001252,ARI-00001424,3364.70,,0.981,Número impreso en el concepto e importe exacto
+TXN-00001253,API-00001425,2090.40,SHORT_DISPUTE,0.753,Diferencia compatible con la excepción
+TXN-00001254,API-00001426,4299.77,,0.951,Número impreso en el concepto e importe exacto
+TXN-00001255,ARI-00001427,596.60,,0.862,Mismo tercero e importe exacto
+TXN-00001256,API-00001428,2991.40,,0.952,Número impreso en el concepto e importe exacto
+TXN-00001258,ARI-00001430,55434.68,,0.959,Número impreso en el concepto e importe exacto
+TXN-00001259,ARI-00001431,1035.91,,0.807,Factura neta de abono
+TXN-00001259,ARC-00001432,-163.48,,0.807,Factura neta de abono
+TXN-00001260,API-00001433,2081.85,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001261,API-00001434,2254.54,,0.957,Número impreso en el concepto e importe exacto
+TXN-00001262,ARI-00001435,2970.01,,0.578,Varias partidas iguales del mismo tercero
+TXN-00001263,API-00001437,414.04,,0.806,Mismo tercero e importe exacto
+TXN-00001264,ARI-00001438,6465.02,,0.305,Importe inferior sin causa clara
+TXN-00001266,ARI-00001439,5924.45,,0.359,Importe inferior sin causa clara
+TXN-00001267,API-00001440,20483.05,,0.959,Número impreso en el concepto e importe exacto
+TXN-00001268,ARI-00001441,12558.51,,0.952,Número impreso en el concepto e importe exacto
+TXN-00001269,API-00001442,4647.61,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001270,ARI-00001443,278.72,,0.930,Número impreso en el concepto e importe exacto
+TXN-00001271,ARI-00001444,3699.99,,0.927,Mismo tercero e importe exacto
+TXN-00001272,ARI-00001445,2230.01,,0.884,Mismo tercero e importe exacto
+TXN-00001273,API-00001446,78261.40,,0.834,Mismo tercero e importe exacto
+TXN-00001274,ARI-00001447,85935.07,,0.955,Número impreso en el concepto e importe exacto
+TXN-00001275,ARI-00001448,4413.70,,0.928,Mismo tercero e importe exacto
+TXN-00001276,ARI-00001449,6938.33,FX_DIFFERENCE,0.759,"Número impreso, conversión de divisa"
+TXN-00001277,ARI-00001450,684.40,,0.926,Número impreso en el concepto e importe exacto
+TXN-00001278,ARI-00001451,4410.18,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001279,API-00001452,4550.51,,0.789,Mismo tercero e importe exacto
+TXN-00001280,API-00001453,690.44,,0.948,Número impreso en el concepto e importe exacto
+TXN-00001281,API-00001454,4294.97,,0.949,Número impreso en el concepto e importe exacto
+TXN-00001282,ARI-00001455,910.59,,0.976,Número impreso en el concepto e importe exacto
+TXN-00001283,ARI-00001456,2906.28,PARTIAL,0.710,"Número impreso, importe inferior"
+TXN-00001284,ARI-00001457,2837.11,,0.713,Factura neta de abono
+TXN-00001284,ARC-00001458,-386.34,,0.713,Factura neta de abono
+TXN-00001285,ARI-00001459,20007.91,,0.552,Varias partidas iguales del mismo tercero
+TXN-00001287,ARI-00001461,4715.85,,0.771,Mismo tercero e importe exacto
+TXN-00001288,ARI-00001462,77123.19,,0.788,Mismo tercero e importe exacto
+TXN-00001289,API-00001463,1975.82,,0.964,Número impreso en el concepto e importe exacto
+TXN-00001290,ARI-00001464,6569.18,SHORT_BANK_CHARGES,0.654,Diferencia compatible con la excepción
+TXN-00001291,ARI-00001465,4147.32,,0.960,Número impreso en el concepto e importe exacto
+TXN-00001292,ARI-00001466,4466.59,,0.994,Número impreso en el concepto e importe exacto
+TXN-00001293,ARI-00001467,15628.69,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001294,ARI-00001468,63720.71,,0.946,Número impreso en el concepto e importe exacto
+TXN-00001295,ARI-00001469,943.95,,0.985,Número impreso en el concepto e importe exacto
+TXN-00001296,API-00001470,83064.80,,0.592,"Número impreso, partida ya cobrada"
+TXN-00001298,API-00001471,3131.37,,0.913,Mismo tercero e importe exacto
+TXN-00001299,ARI-00001472,214.46,PARTIAL,0.767,"Número impreso, importe inferior"
+TXN-00001301,API-00001473,35215.23,,0.834,Mismo tercero e importe exacto
+TXN-00001303,ARI-00001474,4343.65,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001304,ARI-00001475,12938.74,,0.610,Varias partidas iguales del mismo tercero
+TXN-00001305,ARI-00001477,2273.75,,0.344,Importe inferior sin causa clara
+TXN-00001306,API-00001478,7185.63,SHORT_DISPUTE,0.845,Diferencia compatible con la excepción
+TXN-00001307,ARI-00001479,793.62,,0.791,La combinación suma el importe
+TXN-00001307,ARI-00001480,846.44,,0.791,La combinación suma el importe
+TXN-00001307,ARI-00001481,1564.30,,0.791,La combinación suma el importe
+TXN-00001307,ARI-00001482,1753.37,,0.791,La combinación suma el importe
+TXN-00001308,ARI-00001483,1886.67,,0.822,Mismo tercero e importe exacto
+TXN-00001310,ARI-00001484,2238.22,PARTIAL,0.548,"Número impreso, importe inferior"
+TXN-00001311,API-00001485,858.26,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001312,ARI-00001486,4651.00,,0.935,Número impreso en el concepto e importe exacto
+TXN-00001313,ARI-00001487,1467.85,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001314,ARI-00001488,6800.86,SHORT_BANK_CHARGES,0.844,Diferencia compatible con la excepción
+TXN-00001315,ARI-00001489,2414.01,,0.957,Número impreso en el concepto e importe exacto
+TXN-00001316,ARI-00001490,2885.47,,0.879,Mismo tercero e importe exacto
+TXN-00001318,ARI-00001492,4540.25,,0.539,"Número impreso, partida ya cobrada"
+TXN-00001320,ARI-00001493,2972.07,,0.804,La combinación suma el importe
+TXN-00001320,ARI-00001494,2475.76,,0.804,La combinación suma el importe
+TXN-00001320,ARI-00001495,69.19,,0.804,La combinación suma el importe
+TXN-00001320,ARI-00001496,1412.25,,0.804,La combinación suma el importe
+TXN-00001322,ARI-00001497,3123.36,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001323,API-00001498,55345.17,,0.590,Varias partidas iguales del mismo tercero
+TXN-00001324,ARI-00001500,7738.42,SHORT_BANK_CHARGES,0.653,Diferencia compatible con la excepción
+TXN-00001325,ARI-00001501,3065.39,,0.805,Mismo tercero e importe exacto
+TXN-00001326,ARI-00001502,259.59,,0.864,La combinación suma el importe
+TXN-00001326,ARI-00001503,68.46,,0.864,La combinación suma el importe
+TXN-00001326,ARI-00001504,2515.11,,0.864,La combinación suma el importe
+TXN-00001326,ARI-00001505,2703.41,,0.864,La combinación suma el importe
+TXN-00001327,ARI-00001506,2048.73,PARTIAL,0.728,"Número impreso, importe inferior"
+TXN-00001328,ARI-00001507,1256.28,,0.852,La combinación suma el importe
+TXN-00001328,ARI-00001508,2314.91,,0.852,La combinación suma el importe
+TXN-00001329,ARI-00001509,971.43,,0.943,Número impreso en el concepto e importe exacto
+TXN-00001330,ARI-00001510,3866.84,,0.929,Número impreso en el concepto e importe exacto
+TXN-00001331,ARI-00001511,4183.08,,0.469,"Número impreso, partida ya cobrada"
+TXN-00001332,ARI-00001512,72355.53,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001333,ARI-00001513,3543.86,,0.927,Número impreso en el concepto e importe exacto
+TXN-00001335,ARI-00001517,4188.13,OVERPAYMENT,0.735,El movimiento supera la partida
+TXN-00001336,ARI-00001518,1363.47,,0.994,Número impreso en el concepto e importe exacto
+TXN-00001337,ARI-00001519,1462.87,,0.680,La combinación suma el importe
+TXN-00001337,ARI-00001520,1557.84,,0.680,La combinación suma el importe
+TXN-00001338,ARI-00001521,4216.90,,0.943,Número impreso en el concepto e importe exacto
+TXN-00001339,ARI-00001522,828.08,,0.868,Mismo tercero e importe exacto
+TXN-00001340,ARI-00001523,1293.35,,0.882,Mismo tercero e importe exacto
+TXN-00001341,ARI-00001524,4530.47,,0.952,Número impreso en el concepto e importe exacto
+TXN-00001342,ARI-00001525,555.12,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001343,ARI-00001526,1654.02,,0.962,Número impreso en el concepto e importe exacto
+TXN-00001344,ARI-00001527,3601.86,OVERPAYMENT,0.679,El movimiento supera la partida
+TXN-00001345,ARI-00001528,2127.57,PARTIAL,0.524,"Número impreso, importe inferior"
+TXN-00001346,ARI-00001529,7572.46,,0.325,Importe inferior sin causa clara
+TXN-00001347,ARI-00001530,3646.51,,0.609,Varias partidas iguales del mismo tercero
+TXN-00001348,ARI-00001532,2431.92,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001349,ARI-00001533,278.07,,0.827,La combinación suma el importe
+TXN-00001349,ARI-00001534,2925.16,,0.827,La combinación suma el importe
+TXN-00001349,ARI-00001535,2844.14,,0.827,La combinación suma el importe
+TXN-00001349,ARI-00001536,1012.94,,0.827,La combinación suma el importe
+TXN-00001350,API-00001537,444.63,,0.812,Mismo tercero e importe exacto
+TXN-00001351,ARI-00001538,4724.06,,0.929,Número impreso en el concepto e importe exacto
+TXN-00001352,ARI-00001539,1033.57,,0.842,Mismo tercero e importe exacto
+TXN-00001353,ARI-00001540,618.42,,0.966,Número impreso en el concepto e importe exacto
+TXN-00001354,ARI-00001541,1427.67,,0.925,Mismo tercero e importe exacto
+TXN-00001355,ARI-00001542,756.13,,0.693,La combinación suma el importe
+TXN-00001355,ARI-00001543,2669.15,,0.693,La combinación suma el importe
+TXN-00001356,ARI-00001544,551.77,,0.830,Mismo tercero e importe exacto
+TXN-00001357,ARI-00001545,2034.69,,0.984,Número impreso en el concepto e importe exacto
+TXN-00001358,ARI-00001546,3243.05,,0.978,Número impreso en el concepto e importe exacto
+TXN-00001359,API-00001547,1064.95,,0.766,Mismo tercero e importe exacto
+TXN-00001361,API-00001548,82261.86,,0.964,Número impreso en el concepto e importe exacto
+TXN-00001362,ARI-00001549,3184.27,,0.935,Número impreso en el concepto e importe exacto
+TXN-00001364,ARI-00001551,89897.26,,0.996,Número impreso en el concepto e importe exacto
+TXN-00001365,API-00001552,2375.20,,0.801,Mismo tercero e importe exacto
+TXN-00001366,ARI-00001553,239.58,PARTIAL,0.667,"Número impreso, importe inferior"
+TXN-00001368,ARI-00001554,4422.79,,0.940,Número impreso en el concepto e importe exacto
+TXN-00001369,ARI-00001555,3318.41,,0.940,Número impreso en el concepto e importe exacto
+TXN-00001370,,2180.32,RETURNED,0.709,El concepto indica devolución
+TXN-00001371,ARI-00001557,3156.84,,0.998,Número impreso en el concepto e importe exacto
+TXN-00001372,ARI-00001558,4676.10,,0.723,"Número impreso, conversión de divisa"
+TXN-00001373,ARI-00001559,600.95,,0.943,Número impreso en el concepto e importe exacto
+TXN-00001374,API-00001560,14397.17,,0.995,Número impreso en el concepto e importe exacto
+TXN-00001375,ARI-00001561,1953.45,,0.812,La combinación suma el importe
+TXN-00001375,ARI-00001562,2623.41,,0.812,La combinación suma el importe
+TXN-00001375,ARI-00001563,1587.09,,0.812,La combinación suma el importe
+TXN-00001375,ARI-00001564,2260.77,,0.812,La combinación suma el importe
+TXN-00001377,ARI-00001566,499.95,,0.996,Número impreso en el concepto e importe exacto
+TXN-00001381,API-00001569,60529.17,,0.978,Número impreso en el concepto e importe exacto
+TXN-00001382,ARI-00001570,5619.18,,0.374,Importe inferior sin causa clara
+TXN-00001383,ARI-00001571,35607.83,,0.929,Número impreso en el concepto e importe exacto
+TXN-00001386,API-00001575,4762.78,,0.937,Número impreso en el concepto e importe exacto
+TXN-00001387,ARI-00001576,1364.06,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001388,ARI-00001577,3862.70,,0.782,Mismo tercero e importe exacto
+TXN-00001390,ARI-00001578,2255.47,,0.976,Número impreso en el concepto e importe exacto
+TXN-00001391,ARI-00001579,4722.30,,0.977,Número impreso en el concepto e importe exacto
+TXN-00001392,API-00001580,746.80,,0.554,Varias partidas iguales del mismo tercero
+TXN-00001393,ARI-00001582,54637.33,,0.561,Varias partidas iguales del mismo tercero
+TXN-00001394,ARI-00001584,1861.10,,0.754,La combinación suma el importe
+TXN-00001394,ARI-00001585,1310.26,,0.754,La combinación suma el importe
+TXN-00001395,ARI-00001586,65234.07,,0.991,Número impreso en el concepto e importe exacto
+TXN-00001396,API-00001587,2677.17,,0.936,Número impreso en el concepto e importe exacto
+TXN-00001397,ARI-00001588,61773.53,,0.954,Número impreso en el concepto e importe exacto
+TXN-00001398,ARI-00001589,3437.26,,0.901,Mismo tercero e importe exacto
+TXN-00001399,ARI-00001590,2787.77,SHORT_DISPUTE,0.809,Diferencia compatible con la excepción
+TXN-00001400,API-00001591,4083.99,,0.978,Número impreso en el concepto e importe exacto
+TXN-00001401,API-00001592,7200.29,SHORT_BANK_CHARGES,0.618,Diferencia compatible con la excepción
+TXN-00001402,ARI-00001593,4240.30,,0.922,Mismo tercero e importe exacto
+TXN-00001403,ARI-00001594,4470.56,,0.889,Mismo tercero e importe exacto
+TXN-00001404,ARI-00001595,4402.90,,0.961,Número impreso en el concepto e importe exacto
+TXN-00001405,ARI-00001596,1381.67,,0.812,Mismo tercero e importe exacto
+TXN-00001406,ARI-00001597,2315.07,SHORT_WITHHOLDING,0.640,Diferencia compatible con la excepción
+TXN-00001407,ARI-00001598,3895.37,,0.903,Mismo tercero e importe exacto
+TXN-00001408,ARI-00001599,1653.46,SHORT_DISCOUNT,0.827,Diferencia compatible con la excepción
+TXN-00001409,ARI-00001600,864.73,,0.702,La combinación suma el importe
+TXN-00001409,ARI-00001601,2296.03,,0.702,La combinación suma el importe
+TXN-00001409,ARI-00001602,1265.74,,0.702,La combinación suma el importe
+TXN-00001409,ARI-00001603,1648.38,,0.702,La combinación suma el importe
+TXN-00001410,API-00001604,2205.01,PARTIAL,0.609,"Número impreso, importe inferior"
+TXN-00001411,ARI-00001605,4100.51,,0.997,Número impreso en el concepto e importe exacto
+TXN-00001412,API-00001606,1748.60,,0.937,Número impreso en el concepto e importe exacto
+TXN-00001413,ARI-00001607,896.40,,0.928,Número impreso en el concepto e importe exacto
+TXN-00001414,ARI-00001608,54672.95,,0.762,Mismo tercero e importe exacto
+TXN-00001415,API-00001609,87130.60,,0.988,Número impreso en el concepto e importe exacto
+TXN-00001416,ARI-00001610,2739.74,,0.632,La combinación suma el importe
+TXN-00001416,ARI-00001611,2069.65,,0.632,La combinación suma el importe
+TXN-00001416,ARI-00001612,1310.36,,0.632,La combinación suma el importe
+TXN-00001416,ARI-00001613,766.45,,0.632,La combinación suma el importe
+TXN-00001419,ARI-00001618,7633.76,SHORT_WITHHOLDING,0.684,Diferencia compatible con la excepción
+TXN-00001420,ARI-00001619,3237.01,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001423,ARI-00001620,1871.83,,0.869,La combinación suma el importe
+TXN-00001423,ARI-00001621,267.70,,0.869,La combinación suma el importe
+TXN-00001423,ARI-00001622,1483.42,,0.869,La combinación suma el importe
+TXN-00001424,API-00001623,2755.49,,0.817,La combinación suma el importe
+TXN-00001424,API-00001624,711.80,,0.817,La combinación suma el importe
+TXN-00001425,ARI-00001625,7651.81,SHORT_DISCOUNT,0.689,Diferencia compatible con la excepción
+TXN-00001426,ARI-00001626,135.65,,0.989,Número impreso en el concepto e importe exacto
+TXN-00001428,API-00001628,1501.73,,0.777,Mismo tercero e importe exacto
+TXN-00001429,ARI-00001629,1685.68,PARTIAL,0.779,"Número impreso, importe inferior"
+TXN-00001430,ARI-00001631,3369.59,,0.730,Varias partidas iguales del mismo tercero
+TXN-00001431,API-00001633,4742.83,,0.791,Varias partidas iguales del mismo tercero
+TXN-00001432,API-00001634,3095.35,,0.890,Mismo tercero e importe exacto
+TXN-00001433,ARI-00001635,3166.59,,0.454,Importe inferior sin causa clara
+TXN-00001434,API-00001636,2088.49,,0.967,Número impreso en el concepto e importe exacto
+TXN-00001436,API-00001637,62100.82,,0.985,Número impreso en el concepto e importe exacto
+TXN-00001437,ARI-00001638,6737.70,,0.408,Importe inferior sin causa clara
+TXN-00001438,ARI-00001639,2973.51,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001439,ARI-00001640,836.50,,0.949,Número impreso en el concepto e importe exacto
+TXN-00001440,API-00001641,2019.38,,0.925,Número impreso en el concepto e importe exacto
+TXN-00001441,ARI-00001642,12595.62,,0.956,Número impreso en el concepto e importe exacto
+TXN-00001442,API-00001643,204.40,,0.772,La combinación suma el importe
+TXN-00001442,API-00001644,1347.12,,0.772,La combinación suma el importe
+TXN-00001442,API-00001645,1925.41,,0.772,La combinación suma el importe
+TXN-00001442,API-00001646,1120.58,,0.772,La combinación suma el importe
+TXN-00001443,,3364.23,RETURNED,0.894,El concepto indica devolución
+TXN-00001444,API-00001648,3708.55,,0.953,Número impreso en el concepto e importe exacto
+TXN-00001447,ARI-00001651,874.05,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001449,ARI-00001652,1888.51,,0.790,Varias partidas iguales del mismo tercero
+TXN-00001450,API-00001654,151.02,,0.775,La combinación suma el importe
+TXN-00001450,API-00001655,2524.99,,0.775,La combinación suma el importe
+TXN-00001450,API-00001656,83.21,,0.775,La combinación suma el importe
+TXN-00001450,API-00001657,2923.38,,0.775,La combinación suma el importe
+TXN-00001451,ARI-00001658,1780.72,,0.876,Mismo tercero e importe exacto
+TXN-00001453,ARI-00001659,64609.96,,0.981,Número impreso en el concepto e importe exacto
+TXN-00001454,ARI-00001660,2854.76,,0.999,Número impreso en el concepto e importe exacto
+TXN-00001455,ARI-00001661,49505.06,,0.775,Mismo tercero e importe exacto
+TXN-00001456,ARI-00001662,3065.69,,0.911,Mismo tercero e importe exacto
+TXN-00001457,ARI-00001663,3367.91,,0.928,Número impreso en el concepto e importe exacto
+TXN-00001458,API-00001664,2874.49,,0.844,Mismo tercero e importe exacto
+TXN-00001460,API-00001665,2920.79,,0.968,Número impreso en el concepto e importe exacto
+TXN-00001461,ARI-00001666,3258.02,,0.708,Factura neta de abono
+TXN-00001461,ARC-00001667,-436.67,,0.708,Factura neta de abono
+TXN-00001462,ARI-00001668,547.59,,0.663,Factura neta de abono
+TXN-00001462,ARC-00001669,-134.45,,0.663,Factura neta de abono
+TXN-00001463,ARI-00001670,17262.17,,0.987,Número impreso en el concepto e importe exacto
+TXN-00001464,ARI-00001671,4418.45,,0.920,Número impreso en el concepto e importe exacto
+TXN-00001467,ARI-00001672,1695.58,,0.969,Número impreso en el concepto e importe exacto
+TXN-00001469,ARI-00001673,785.79,,0.554,Varias partidas iguales del mismo tercero
+TXN-00001470,ARI-00001675,2648.34,,0.754,La combinación suma el importe
+TXN-00001470,ARI-00001676,80.37,,0.754,La combinación suma el importe
+TXN-00001470,ARI-00001677,1144.39,,0.754,La combinación suma el importe
+TXN-00001470,ARI-00001678,2305.57,,0.754,La combinación suma el importe
+TXN-00001472,API-00001679,3559.36,,0.936,Número impreso en el concepto e importe exacto
+TXN-00001473,ARI-00001680,23317.65,PARTIAL,0.742,"Número impreso, importe inferior"
+TXN-00001474,ARI-00001681,4333.20,,0.945,Número impreso en el concepto e importe exacto
+TXN-00001475,API-00001682,759.29,,0.997,Número impreso en el concepto e importe exacto
+TXN-00001476,API-00001683,888.08,,0.450,"Coincide el tercero, combinación incompleta"
+TXN-00001477,API-00001685,3788.10,,0.960,Número impreso en el concepto e importe exacto
+TXN-00001478,API-00001686,3353.67,,0.797,Mismo tercero e importe exacto
+TXN-00001479,API-00001687,26383.76,,0.987,Número impreso en el concepto e importe exacto
+TXN-00001480,API-00001688,2669.88,,0.766,Mismo tercero e importe exacto
+TXN-00001481,ARI-00001689,2048.86,,0.859,Mismo tercero e importe exacto
+TXN-00001482,ARI-00001690,44780.67,,0.975,Número impreso en el concepto e importe exacto
+TXN-00001483,ARI-00001691,39425.23,,0.991,Número impreso en el concepto e importe exacto
+TXN-00001484,ARI-00001692,6637.41,SHORT_DISPUTE,0.667,Diferencia compatible con la excepción
+TXN-00001485,ARI-00001693,7242.55,FX_DIFFERENCE,0.542,"Número impreso, conversión de divisa"
+TXN-00001486,ARI-00001695,3212.31,,0.780,Varias partidas iguales del mismo tercero
+TXN-00001487,ARI-00001696,989.33,,0.935,Número impreso en el concepto e importe exacto
+TXN-00001488,API-00001697,1831.83,,0.796,Mismo tercero e importe exacto
+TXN-00001489,ARI-00001698,1032.93,SHORT_DISPUTE,0.699,Diferencia compatible con la excepción
+TXN-00001490,API-00001699,2408.34,,0.927,Número impreso en el concepto e importe exacto
+TXN-00001491,API-00001700,252.80,,0.800,La combinación suma el importe
+TXN-00001491,API-00001701,1574.61,,0.800,La combinación suma el importe
+TXN-00001491,API-00001702,976.33,,0.800,La combinación suma el importe
+TXN-00001492,ARI-00001703,641.50,,0.428,Importe inferior sin causa clara
+TXN-00001495,ARI-00001705,3521.58,,0.647,Factura neta de abono
+TXN-00001495,ARC-00001706,-392.64,,0.647,Factura neta de abono
+TXN-00001497,API-00001708,624.62,,0.812,Mismo tercero e importe exacto
+TXN-00001498,ARI-00001709,1978.61,,0.743,Factura neta de abono
+TXN-00001498,ARC-00001710,-243.07,,0.743,Factura neta de abono
+TXN-00001499,ARI-00001711,85434.59,,0.944,Número impreso en el concepto e importe exacto
+TXN-00001500,API-00001712,2712.64,,0.675,La combinación suma el importe
+TXN-00001500,API-00001713,1340.44,,0.675,La combinación suma el importe
+TXN-00001500,API-00001714,410.35,,0.675,La combinación suma el importe
+TXN-00001501,ARI-00001715,4014.60,,0.770,Varias partidas iguales del mismo tercero
+TXN-00001502,ARI-00001717,882.60,,0.955,Número impreso en el concepto e importe exacto
+TXN-00001504,ARI-00001719,991.19,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001505,API-00001720,758.26,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001507,API-00001721,691.74,,0.884,Mismo tercero e importe exacto
+TXN-00001508,ARI-00001722,63098.92,,0.896,Mismo tercero e importe exacto
+TXN-00001509,ARI-00001723,3405.81,,0.950,Número impreso en el concepto e importe exacto
+TXN-00001510,ARI-00001724,2275.74,,0.601,Factura neta de abono
+TXN-00001510,ARC-00001725,-389.27,,0.601,Factura neta de abono
+TXN-00001511,ARI-00001726,6891.86,SHORT_DISCOUNT,0.642,Diferencia compatible con la excepción
+TXN-00001512,ARI-00001727,291.64,,0.829,La combinación suma el importe
+TXN-00001512,ARI-00001728,1502.44,,0.829,La combinación suma el importe
+TXN-00001513,ARI-00001729,78415.29,,0.965,Número impreso en el concepto e importe exacto
+TXN-00001514,ARI-00001730,3787.50,,0.977,Número impreso en el concepto e importe exacto
+TXN-00001515,API-00001731,5069.96,,0.379,Importe inferior sin causa clara
+TXN-00001517,ARI-00001732,1465.49,,0.816,Factura neta de abono
+TXN-00001517,ARC-00001733,-258.34,,0.816,Factura neta de abono
+TXN-00001518,ARI-00001734,3704.26,,0.930,Número impreso en el concepto e importe exacto
+TXN-00001519,ARI-00001735,1799.48,,0.491,Importe inferior sin causa clara
+TXN-00001521,ARI-00001737,3998.83,,0.934,Número impreso en el concepto e importe exacto
+TXN-00001522,ARI-00001738,2670.98,,0.854,Mismo tercero e importe exacto
+TXN-00001523,API-00001739,4222.82,,0.993,Número impreso en el concepto e importe exacto
+TXN-00001524,ARI-00001740,3147.28,,0.978,Número impreso en el concepto e importe exacto
+TXN-00001525,ARI-00001741,33096.67,,0.987,Número impreso en el concepto e importe exacto
+TXN-00001526,ARI-00001742,7547.38,,0.923,Número impreso en el concepto e importe exacto
+TXN-00001528,ARI-00001744,1172.34,,0.698,Varias partidas iguales del mismo tercero
+TXN-00001529,ARI-00001746,18098.21,,0.975,Número impreso en el concepto e importe exacto
+TXN-00001532,ARI-00001748,2099.63,,0.959,Número impreso en el concepto e importe exacto
+TXN-00001534,ARI-00001749,7339.26,,0.707,"Número impreso, conversión de divisa"
+TXN-00001536,ARI-00001751,63296.50,,0.405,"Número impreso, partida ya cobrada"
+TXN-00001538,API-00001754,2284.29,,0.986,Número impreso en el concepto e importe exacto
+TXN-00001540,ARI-00001755,1550.95,PARTIAL,0.791,"Número impreso, importe inferior"
+TXN-00001541,ARI-00001756,4077.52,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001542,ARI-00001757,1146.86,SHORT_BANK_CHARGES,0.780,Diferencia compatible con la excepción
+TXN-00001543,ARI-00001758,58376.94,,0.915,Mismo tercero e importe exacto
+TXN-00001544,ARI-00001759,1791.85,OVERPAYMENT,0.599,El movimiento supera la partida
+TXN-00001545,ARI-00001760,406.38,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001546,API-00001761,57644.88,,0.946,Número impreso en el concepto e importe exacto
+TXN-00001547,ARI-00001762,2834.22,,0.964,Número impreso en el concepto e importe exacto
+TXN-00001549,ARI-00001764,1822.38,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001550,API-00001765,2995.86,,0.965,Número impreso en el concepto e importe exacto
+TXN-00001551,API-00001766,1302.73,,0.880,Mismo tercero e importe exacto
+TXN-00001552,ARI-00001767,3139.99,,0.671,Varias partidas iguales del mismo tercero
+TXN-00001554,ARI-00001769,4690.70,,0.868,Mismo tercero e importe exacto
+TXN-00001555,ARI-00001770,6991.28,SHORT_WITHHOLDING,0.616,Diferencia compatible con la excepción
+TXN-00001556,ARI-00001771,2209.17,,0.970,Número impreso en el concepto e importe exacto
+TXN-00001557,API-00001772,436.55,,0.444,Importe inferior sin causa clara
+TXN-00001559,API-00001773,3114.34,,0.961,Número impreso en el concepto e importe exacto
+TXN-00001560,ARI-00001774,810.41,,0.973,Número impreso en el concepto e importe exacto
+TXN-00001561,ARI-00001775,839.41,,0.830,Factura neta de abono
+TXN-00001561,ARC-00001776,-75.08,,0.830,Factura neta de abono
+TXN-00001562,ARI-00001777,85231.82,,0.929,Número impreso en el concepto e importe exacto
+TXN-00001564,ARI-00001778,3039.93,OVERPAYMENT,0.674,El movimiento supera la partida
+TXN-00001565,ARI-00001779,3278.47,,0.955,Número impreso en el concepto e importe exacto
+TXN-00001566,ARI-00001780,3806.84,,0.943,Número impreso en el concepto e importe exacto
+TXN-00001567,API-00001781,51889.90,,0.929,Número impreso en el concepto e importe exacto
+TXN-00001568,ARI-00001782,1398.93,PARTIAL,0.719,"Número impreso, importe inferior"
+TXN-00001569,ARI-00001783,4028.59,,0.909,Mismo tercero e importe exacto
+TXN-00001570,ARI-00001785,24162.42,,0.759,Varias partidas iguales del mismo tercero
+TXN-00001571,API-00001786,22155.26,,0.962,Número impreso en el concepto e importe exacto
+TXN-00001572,ARI-00001787,3924.66,,0.997,Número impreso en el concepto e importe exacto
+TXN-00001573,API-00001788,54770.38,,0.938,Número impreso en el concepto e importe exacto
+TXN-00001574,ARI-00001789,2825.93,,0.871,La combinación suma el importe
+TXN-00001574,ARI-00001790,1614.99,,0.871,La combinación suma el importe
+TXN-00001574,ARI-00001791,1966.46,,0.871,La combinación suma el importe
+TXN-00001576,ARI-00001792,2781.89,,0.386,"Coincide el tercero, combinación incompleta"
+TXN-00001577,API-00001795,1685.36,,0.959,Número impreso en el concepto e importe exacto
+TXN-00001578,ARI-00001796,5885.25,,0.332,Importe inferior sin causa clara
+TXN-00001579,ARI-00001797,1347.64,,0.755,La combinación suma el importe
+TXN-00001579,ARI-00001798,2052.23,,0.755,La combinación suma el importe
+TXN-00001579,ARI-00001799,2473.79,,0.755,La combinación suma el importe
+TXN-00001580,ARI-00001800,2712.58,FX_DIFFERENCE,0.619,"Número impreso, conversión de divisa"
+TXN-00001581,ARI-00001801,1450.57,,0.846,Mismo tercero e importe exacto
+TXN-00001583,API-00001802,2165.34,,0.301,"Coincide el tercero, combinación incompleta"
+TXN-00001584,API-00001806,4125.37,,0.813,Mismo tercero e importe exacto
+TXN-00001585,API-00001807,2242.43,,0.959,Número impreso en el concepto e importe exacto
+TXN-00001586,ARI-00001808,2834.43,,0.795,Factura neta de abono
+TXN-00001586,ARC-00001809,-232.16,,0.795,Factura neta de abono
+TXN-00001587,API-00001810,1042.72,,0.955,Número impreso en el concepto e importe exacto
+TXN-00001588,API-00001811,8771.97,SHORT_DISCOUNT,0.731,Diferencia compatible con la excepción
+TXN-00001589,ARI-00001812,20662.08,,0.990,Número impreso en el concepto e importe exacto
+TXN-00001591,ARI-00001815,2819.16,SHORT_DISPUTE,0.713,Diferencia compatible con la excepción
+TXN-00001592,ARI-00001816,67094.37,,0.962,Número impreso en el concepto e importe exacto
+TXN-00001593,ARI-00001817,4353.56,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001594,API-00001818,1069.86,,0.758,Mismo tercero e importe exacto
+TXN-00001595,ARI-00001819,3923.09,,0.871,Mismo tercero e importe exacto
+TXN-00001596,ARI-00001820,2848.33,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001597,ARI-00001821,2377.39,SHORT_BANK_CHARGES,0.626,Diferencia compatible con la excepción
+TXN-00001600,ARI-00001822,2283.61,,0.753,La combinación suma el importe
+TXN-00001600,ARI-00001823,870.74,,0.753,La combinación suma el importe
+TXN-00001600,ARI-00001824,94.67,,0.753,La combinación suma el importe
+TXN-00001601,ARI-00001825,2441.06,,0.865,Mismo tercero e importe exacto
+TXN-00001602,ARI-00001826,83807.11,OVERPAYMENT,0.731,El movimiento supera la partida
+TXN-00001603,ARI-00001827,4440.95,,0.987,Número impreso en el concepto e importe exacto
+TXN-00001604,ARI-00001828,7602.59,,0.500,"Número impreso, conversión de divisa"
+TXN-00001606,ARI-00001829,2745.03,,0.967,Número impreso en el concepto e importe exacto
+TXN-00001607,ARI-00001830,3876.23,,0.499,Importe inferior sin causa clara
+TXN-00001608,ARI-00001831,1183.68,,0.957,Número impreso en el concepto e importe exacto
+TXN-00001609,ARI-00001832,723.45,,0.790,Varias partidas iguales del mismo tercero
+TXN-00001611,ARI-00001834,409.39,,0.645,Varias partidas iguales del mismo tercero
+TXN-00001612,ARI-00001836,4454.21,,0.390,Importe inferior sin causa clara
+TXN-00001613,ARI-00001837,4929.41,SHORT_DISPUTE,0.783,Diferencia compatible con la excepción
+TXN-00001614,ARI-00001838,4031.58,,0.777,Mismo tercero e importe exacto
+TXN-00001615,ARI-00001839,1142.21,,0.812,La combinación suma el importe
+TXN-00001615,ARI-00001840,2894.70,,0.812,La combinación suma el importe
+TXN-00001615,ARI-00001841,2286.83,,0.812,La combinación suma el importe
+TXN-00001616,ARI-00001842,1015.06,PARTIAL,0.545,"Número impreso, importe inferior"
+TXN-00001618,API-00001843,143.68,OVERPAYMENT,0.620,El movimiento supera la partida
+TXN-00001619,API-00001844,204.56,FX_DIFFERENCE,0.509,"Número impreso, conversión de divisa"
+TXN-00001620,ARI-00001845,6989.65,,0.894,Mismo tercero e importe exacto
+TXN-00001622,ARI-00001846,2397.76,,0.833,Mismo tercero e importe exacto
+TXN-00001623,ARI-00001847,1894.38,,0.450,"Coincide el tercero, combinación incompleta"
+TXN-00001624,API-00001850,1104.80,,0.940,Número impreso en el concepto e importe exacto
+TXN-00001625,ARI-00001851,1935.81,,0.743,Factura neta de abono
+TXN-00001625,ARC-00001852,-351.29,,0.743,Factura neta de abono
+TXN-00001626,ARI-00001853,4575.89,,0.581,Varias partidas iguales del mismo tercero
+TXN-00001627,ARI-00001855,4023.03,,0.372,Importe inferior sin causa clara
+TXN-00001628,ARI-00001856,4392.56,,0.487,"Número impreso, conversión de divisa"
+TXN-00001629,,2211.11,RETURNED,0.790,El concepto indica devolución
+TXN-00001630,API-00001858,4027.46,,0.795,Mismo tercero e importe exacto
+TXN-00001632,API-00001859,221.44,PARTIAL,0.636,"Número impreso, importe inferior"
+TXN-00001633,API-00001860,505.23,SHORT_BANK_CHARGES,0.845,Diferencia compatible con la excepción
+TXN-00001634,API-00001861,1452.10,,0.436,"Coincide el tercero, combinación incompleta"
+TXN-00001636,API-00001866,5033.68,,0.341,Importe inferior sin causa clara
+TXN-00001637,ARI-00001867,18300.31,,0.837,Mismo tercero e importe exacto
+TXN-00001638,ARI-00001868,2238.27,,0.825,Mismo tercero e importe exacto
+TXN-00001639,ARI-00001869,51.09,PARTIAL,0.574,"Número impreso, importe inferior"
+TXN-00001640,ARI-00001870,2063.14,,0.991,Número impreso en el concepto e importe exacto
+TXN-00001641,ARI-00001871,3699.26,,0.711,"Número impreso, conversión de divisa"
+TXN-00001642,API-00001872,510.91,,0.334,"Coincide el tercero, combinación incompleta"
+TXN-00001643,ARI-00001876,4747.41,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001644,API-00001877,4144.16,,0.333,Importe inferior sin causa clara
+TXN-00001646,ARI-00001879,2265.87,,0.323,"Coincide el tercero, combinación incompleta"
+TXN-00001647,API-00001881,1797.72,,0.947,Número impreso en el concepto e importe exacto
+TXN-00001648,ARI-00001882,4040.16,,0.925,Número impreso en el concepto e importe exacto
+TXN-00001650,ARI-00001883,3168.22,,0.924,Número impreso en el concepto e importe exacto
+TXN-00001651,API-00001884,1216.13,PARTIAL,0.672,"Número impreso, importe inferior"
+TXN-00001652,ARI-00001885,5648.12,,0.382,Importe inferior sin causa clara
+TXN-00001653,ARI-00001886,30654.66,,0.819,Mismo tercero e importe exacto
+TXN-00001654,ARI-00001887,368.20,,0.303,Importe inferior sin causa clara
+TXN-00001655,ARI-00001888,2175.22,,0.904,Mismo tercero e importe exacto
+TXN-00001656,,10631.03,RETURNED,0.827,El concepto indica devolución
+TXN-00001658,ARI-00001890,5572.31,,0.477,Importe inferior sin causa clara
+TXN-00001659,ARI-00001891,6910.69,SHORT_WITHHOLDING,0.614,Diferencia compatible con la excepción
+TXN-00001661,API-00001892,2836.27,,0.902,Mismo tercero e importe exacto
+TXN-00001662,ARI-00001893,3509.64,OVERPAYMENT,0.787,El movimiento supera la partida
+TXN-00001663,API-00001894,2573.00,,0.655,La combinación suma el importe
+TXN-00001663,API-00001895,1576.71,,0.655,La combinación suma el importe
+TXN-00001663,API-00001896,565.72,,0.655,La combinación suma el importe
+TXN-00001664,ARI-00001897,2883.71,,0.853,La combinación suma el importe
+TXN-00001664,ARI-00001898,850.05,,0.853,La combinación suma el importe
+TXN-00001664,ARI-00001899,988.90,,0.853,La combinación suma el importe
+TXN-00001664,ARI-00001900,1757.72,,0.853,La combinación suma el importe
+TXN-00001665,ARI-00001901,66609.77,,0.950,Número impreso en el concepto e importe exacto
+TXN-00001666,ARI-00001902,3470.58,,0.822,Mismo tercero e importe exacto
+TXN-00001667,API-00001903,2980.83,,0.831,Mismo tercero e importe exacto
+TXN-00001668,ARI-00001904,4793.51,,0.934,Número impreso en el concepto e importe exacto
+TXN-00001670,ARI-00001905,1656.11,,0.941,Número impreso en el concepto e importe exacto
+TXN-00001671,ARI-00001906,3635.86,,0.746,Varias partidas iguales del mismo tercero
+TXN-00001672,ARI-00001908,3233.27,,0.920,Mismo tercero e importe exacto
+TXN-00001674,ARI-00001910,2516.02,,0.954,Número impreso en el concepto e importe exacto
+TXN-00001675,ARI-00001911,1081.68,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001676,ARI-00001912,1281.95,,0.741,La combinación suma el importe
+TXN-00001676,ARI-00001913,222.49,,0.741,La combinación suma el importe
+TXN-00001676,ARI-00001914,1850.28,,0.741,La combinación suma el importe
+TXN-00001677,ARI-00001915,2821.06,,0.808,La combinación suma el importe
+TXN-00001677,ARI-00001916,200.22,,0.808,La combinación suma el importe
+TXN-00001678,ARI-00001918,3449.20,,0.554,Varias partidas iguales del mismo tercero
+TXN-00001679,ARI-00001919,2888.78,,0.804,Mismo tercero e importe exacto
+TXN-00001680,ARI-00001920,2378.26,,0.983,Número impreso en el concepto e importe exacto
+TXN-00001681,API-00001921,29357.91,,0.849,Mismo tercero e importe exacto
+TXN-00001683,ARI-00001922,7770.62,SHORT_DISCOUNT,0.746,Diferencia compatible con la excepción
+TXN-00001684,ARI-00001923,46560.18,,0.926,Número impreso en el concepto e importe exacto
+TXN-00001686,API-00001927,67277.32,,0.762,Mismo tercero e importe exacto
+TXN-00001687,ARI-00001928,2746.60,,0.577,Varias partidas iguales del mismo tercero
+TXN-00001688,ARI-00001930,2114.59,,0.803,Mismo tercero e importe exacto
+TXN-00001689,ARI-00001931,3679.77,,0.926,Número impreso en el concepto e importe exacto
+TXN-00001690,ARI-00001932,2418.07,,0.798,La combinación suma el importe
+TXN-00001690,ARI-00001933,1794.18,,0.798,La combinación suma el importe
+TXN-00001690,ARI-00001934,2629.65,,0.798,La combinación suma el importe
+TXN-00001691,ARI-00001935,3423.76,,0.853,Mismo tercero e importe exacto
+TXN-00001693,ARI-00001936,1250.77,,0.989,Número impreso en el concepto e importe exacto
+TXN-00001694,ARI-00001937,939.38,,0.869,Mismo tercero e importe exacto
+TXN-00001696,ARI-00001938,2086.70,FX_DIFFERENCE,0.778,"Número impreso, conversión de divisa"
+TXN-00001697,ARI-00001939,2803.07,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001698,API-00001940,23244.49,,0.999,Número impreso en el concepto e importe exacto
+TXN-00001699,ARI-00001941,758.02,,0.946,Número impreso en el concepto e importe exacto
+TXN-00001700,ARI-00001942,1452.35,,0.849,La combinación suma el importe
+TXN-00001700,ARI-00001943,1017.28,,0.849,La combinación suma el importe
+TXN-00001700,ARI-00001944,1279.13,,0.849,La combinación suma el importe
+TXN-00001702,ARI-00001945,3820.68,,0.963,Número impreso en el concepto e importe exacto
+TXN-00001703,API-00001946,2726.12,SHORT_BANK_CHARGES,0.685,Diferencia compatible con la excepción
+TXN-00001704,ARI-00001947,2895.20,,0.878,Mismo tercero e importe exacto
+TXN-00001705,ARI-00001948,4284.20,,0.941,Número impreso en el concepto e importe exacto
+TXN-00001708,API-00001949,6237.38,FX_DIFFERENCE,0.632,"Número impreso, conversión de divisa"
+TXN-00001709,API-00001950,4888.33,,0.434,Importe inferior sin causa clara
+TXN-00001710,ARI-00001951,903.18,PARTIAL,0.703,"Número impreso, importe inferior"
+TXN-00001711,ARI-00001952,614.82,,0.991,Número impreso en el concepto e importe exacto
+TXN-00001712,ARI-00001953,1252.99,,0.943,Número impreso en el concepto e importe exacto
+TXN-00001713,API-00001954,3031.30,,0.968,Número impreso en el concepto e importe exacto
+TXN-00001714,ARI-00001955,3654.93,,0.985,Número impreso en el concepto e importe exacto
+TXN-00001715,ARI-00001956,149.15,,0.361,"Coincide el tercero, combinación incompleta"
+TXN-00001716,ARI-00001959,3606.01,,0.986,Número impreso en el concepto e importe exacto
+TXN-00001717,API-00001960,4155.89,,0.828,Mismo tercero e importe exacto
+TXN-00001718,ARI-00001961,6590.88,FX_DIFFERENCE,0.799,"Número impreso, conversión de divisa"
+TXN-00001719,ARI-00001962,1555.10,PARTIAL,0.555,"Número impreso, importe inferior"
+TXN-00001720,ARI-00001963,353.43,,0.817,Factura neta de abono
+TXN-00001720,ARC-00001964,-39.01,,0.817,Factura neta de abono
+TXN-00001721,API-00001965,2123.64,OVERPAYMENT,0.560,El movimiento supera la partida
+TXN-00001722,ARI-00001966,51966.90,,0.936,Número impreso en el concepto e importe exacto
+TXN-00001724,ARI-00001967,3251.65,,0.771,Mismo tercero e importe exacto
+TXN-00001725,ARI-00001968,3212.88,,0.766,"Número impreso, conversión de divisa"
+TXN-00001726,API-00001969,873.55,,0.730,La combinación suma el importe
+TXN-00001726,API-00001970,2277.84,,0.730,La combinación suma el importe
+TXN-00001727,ARI-00001971,4813.97,SHORT_DISPUTE,0.563,Diferencia compatible con la excepción
+TXN-00001728,ARI-00001972,79.18,,0.818,Mismo tercero e importe exacto
+TXN-00001729,ARI-00001973,7318.15,,0.874,Mismo tercero e importe exacto
+TXN-00001730,ARI-00001974,624.83,PARTIAL,0.512,"Número impreso, importe inferior"
+TXN-00001731,ARI-00001975,14452.41,,0.822,Mismo tercero e importe exacto
+TXN-00001732,API-00001976,547.48,OVERPAYMENT,0.626,El movimiento supera la partida
+TXN-00001733,ARI-00001977,562.98,,0.922,Mismo tercero e importe exacto
+TXN-00001734,API-00001978,4734.32,,0.952,Número impreso en el concepto e importe exacto
+TXN-00001735,ARI-00001979,4213.37,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001736,ARI-00001980,42017.08,,0.879,Mismo tercero e importe exacto
+TXN-00001737,ARI-00001981,2505.52,OVERPAYMENT,0.606,El movimiento supera la partida
+TXN-00001738,ARI-00001982,1513.75,,0.919,Mismo tercero e importe exacto
+TXN-00001739,API-00001983,1097.05,,0.990,Número impreso en el concepto e importe exacto
+TXN-00001740,ARI-00001984,2486.27,,0.637,La combinación suma el importe
+TXN-00001740,ARI-00001985,2364.39,,0.637,La combinación suma el importe
+TXN-00001740,ARI-00001986,939.54,,0.637,La combinación suma el importe
+TXN-00001740,ARI-00001987,575.79,,0.637,La combinación suma el importe
+TXN-00001741,ARI-00001988,10128.74,,0.930,Número impreso en el concepto e importe exacto
+TXN-00001742,ARI-00001989,1194.43,,0.684,La combinación suma el importe
+TXN-00001742,ARI-00001990,612.29,,0.684,La combinación suma el importe
+TXN-00001742,ARI-00001991,1283.54,,0.684,La combinación suma el importe
+TXN-00001742,ARI-00001992,1366.71,,0.684,La combinación suma el importe
+TXN-00001744,ARI-00001994,56.48,,0.844,Mismo tercero e importe exacto
+TXN-00001745,ARI-00001995,6005.17,SHORT_BANK_CHARGES,0.714,Diferencia compatible con la excepción
+TXN-00001747,API-00001996,2236.27,SHORT_DISCOUNT,0.804,Diferencia compatible con la excepción
+TXN-00001748,ARI-00001997,926.51,,0.798,Mismo tercero e importe exacto
+TXN-00001749,ARI-00001998,3347.92,,0.772,Mismo tercero e importe exacto
+TXN-00001750,ARI-00001999,1422.00,,0.940,Número impreso en el concepto e importe exacto
+TXN-00001751,API-00002000,7186.56,FX_DIFFERENCE,0.462,"Número impreso, conversión de divisa"
+TXN-00001752,ARI-00002001,195.06,,0.878,Mismo tercero e importe exacto
+TXN-00001753,ARI-00002002,3774.73,,0.988,Número impreso en el concepto e importe exacto
+TXN-00001754,ARI-00002003,1178.22,,0.591,Varias partidas iguales del mismo tercero
+TXN-00001755,ARI-00002005,546.17,,0.843,Mismo tercero e importe exacto
+TXN-00001756,ARI-00002006,1597.73,,0.566,Varias partidas iguales del mismo tercero
+TXN-00001757,ARI-00002008,1104.93,,0.882,Mismo tercero e importe exacto
+TXN-00001758,ARI-00002009,1542.77,,0.984,Número impreso en el concepto e importe exacto
+TXN-00001759,API-00002010,1611.57,,0.983,Número impreso en el concepto e importe exacto
+TXN-00001760,ARI-00002011,82029.69,,0.949,Número impreso en el concepto e importe exacto
+TXN-00001761,API-00002012,849.21,OVERPAYMENT,0.598,El movimiento supera la partida
+TXN-00001762,ARI-00002013,1199.03,,0.895,Mismo tercero e importe exacto
+TXN-00001763,ARI-00002014,2109.20,,0.935,Número impreso en el concepto e importe exacto
+TXN-00001764,API-00002015,3530.52,,0.937,Número impreso en el concepto e importe exacto
+TXN-00001766,API-00002016,1178.40,,0.923,Número impreso en el concepto e importe exacto
+TXN-00001767,ARI-00002017,70566.77,,0.946,Número impreso en el concepto e importe exacto
+TXN-00001768,API-00002018,1259.12,,0.762,Mismo tercero e importe exacto
+TXN-00001769,ARI-00002019,999.65,PARTIAL,0.778,"Número impreso, importe inferior"
+TXN-00001770,ARI-00002020,697.99,SHORT_DISCOUNT,0.571,Diferencia compatible con la excepción
+TXN-00001771,API-00002021,2975.65,,0.856,La combinación suma el importe
+TXN-00001771,API-00002022,2746.87,,0.856,La combinación suma el importe
+TXN-00001771,API-00002023,312.92,,0.856,La combinación suma el importe
+TXN-00001771,API-00002024,1207.03,,0.856,La combinación suma el importe
+TXN-00001772,API-00002025,1978.13,,0.808,La combinación suma el importe
+TXN-00001772,API-00002026,1652.46,,0.808,La combinación suma el importe
+TXN-00001773,API-00002027,6714.13,,0.835,Mismo tercero e importe exacto
+TXN-00001774,API-00002028,1361.84,,0.938,Número impreso en el concepto e importe exacto
+TXN-00001775,ARI-00002029,479.23,,0.773,Mismo tercero e importe exacto
+TXN-00001776,ARI-00002030,3437.51,,0.867,Mismo tercero e importe exacto
+TXN-00001777,ARI-00002031,1830.80,SHORT_DISPUTE,0.828,Diferencia compatible con la excepción
+TXN-00001778,ARI-00002032,73813.66,,0.950,Número impreso en el concepto e importe exacto
+TXN-00001779,ARI-00002033,2504.21,FX_DIFFERENCE,0.464,"Número impreso, conversión de divisa"
+TXN-00001780,API-00002034,1931.60,,0.926,Número impreso en el concepto e importe exacto
+TXN-00001782,ARI-00002036,1612.28,PARTIAL,0.613,"Número impreso, importe inferior"
+TXN-00001783,API-00002037,179.87,,0.839,La combinación suma el importe
+TXN-00001783,API-00002038,194.50,,0.839,La combinación suma el importe
+TXN-00001783,API-00002039,1244.87,,0.839,La combinación suma el importe
+TXN-00001783,API-00002040,1874.39,,0.839,La combinación suma el importe
+TXN-00001784,ARI-00002041,5890.26,FX_DIFFERENCE,0.606,"Número impreso, conversión de divisa"
+TXN-00001785,ARI-00002042,2571.59,,0.936,Número impreso en el concepto e importe exacto
+TXN-00001786,API-00002043,523.70,,0.981,Número impreso en el concepto e importe exacto
+TXN-00001788,API-00002046,1121.10,,0.783,Mismo tercero e importe exacto
+TXN-00001789,ARI-00002048,3381.80,,0.768,Varias partidas iguales del mismo tercero
+TXN-00001790,ARI-00002049,931.82,,0.624,Factura neta de abono
+TXN-00001790,ARC-00002050,-224.69,,0.624,Factura neta de abono
+TXN-00001791,API-00002051,623.81,,0.820,La combinación suma el importe
+TXN-00001791,API-00002052,2898.09,,0.820,La combinación suma el importe
+TXN-00001791,API-00002053,2463.03,,0.820,La combinación suma el importe
+TXN-00001791,API-00002054,215.42,,0.820,La combinación suma el importe
+TXN-00001792,ARI-00002055,923.35,,0.868,Mismo tercero e importe exacto
+TXN-00001793,ARI-00002056,631.28,,0.920,Número impreso en el concepto e importe exacto
+TXN-00001794,ARI-00002057,1669.65,,0.981,Número impreso en el concepto e importe exacto
+TXN-00001795,ARI-00002058,2097.08,,0.830,Mismo tercero e importe exacto
+TXN-00001796,API-00002059,519.06,,0.768,Mismo tercero e importe exacto
+TXN-00001797,ARI-00002060,2393.56,SHORT_WITHHOLDING,0.653,Diferencia compatible con la excepción
+TXN-00001798,ARI-00002061,4008.57,,0.806,Mismo tercero e importe exacto
+TXN-00001799,ARI-00002062,6319.44,PARTIAL,0.780,"Número impreso, importe inferior"
+TXN-00001801,ARI-00002065,7710.36,,0.789,"Número impreso, conversión de divisa"
+TXN-00001802,ARI-00002066,4475.14,OVERPAYMENT,0.597,El movimiento supera la partida
+TXN-00001803,ARI-00002067,1635.25,,0.926,Mismo tercero e importe exacto
+TXN-00001804,ARI-00002068,24918.68,,0.977,Número impreso en el concepto e importe exacto
+TXN-00001805,ARI-00002069,23.00,PARTIAL,0.767,"Número impreso, importe inferior"
+TXN-00001806,API-00002070,817.36,,0.976,Número impreso en el concepto e importe exacto
+TXN-00001809,ARI-00002071,4033.56,,0.756,Mismo tercero e importe exacto
+TXN-00001811,API-00002073,1305.43,,0.715,La combinación suma el importe
+TXN-00001811,API-00002074,1663.95,,0.715,La combinación suma el importe
+TXN-00001812,ARI-00002075,1054.31,,0.602,Factura neta de abono
+TXN-00001812,ARC-00002076,-251.80,,0.602,Factura neta de abono
+TXN-00001813,ARI-00002077,1085.75,,0.981,Número impreso en el concepto e importe exacto
+TXN-00001814,ARI-00002078,2810.35,SHORT_DISCOUNT,0.751,Diferencia compatible con la excepción
+TXN-00001816,ARI-00002080,4144.34,,0.346,Importe inferior sin causa clara
+TXN-00001817,ARI-00002081,43033.21,,0.785,Mismo tercero e importe exacto
+TXN-00001818,ARI-00002082,2722.60,,0.399,Importe inferior sin causa clara
+TXN-00001819,ARI-00002083,340.95,,0.935,Número impreso en el concepto e importe exacto
+TXN-00001820,ARI-00002084,4340.37,,0.517,"Número impreso, conversión de divisa"
+TXN-00001821,,1178.01,RETURNED,0.783,El concepto indica devolución
+TXN-00001822,API-00002086,30306.09,PARTIAL,0.526,"Número impreso, importe inferior"
+TXN-00001824,ARI-00002087,3961.88,,0.807,Mismo tercero e importe exacto
+TXN-00001825,ARI-00002088,2136.03,,0.727,La combinación suma el importe
+TXN-00001825,ARI-00002089,1782.70,,0.727,La combinación suma el importe
+TXN-00001825,ARI-00002090,1695.80,,0.727,La combinación suma el importe
+TXN-00001826,ARI-00002091,768.03,,0.743,"Número impreso, conversión de divisa"
+TXN-00001828,API-00002092,45457.04,,0.773,Mismo tercero e importe exacto
+TXN-00001829,ARI-00002093,2698.33,,0.604,La combinación suma el importe
+TXN-00001829,ARI-00002094,1396.75,,0.604,La combinación suma el importe
+TXN-00001829,ARI-00002095,269.16,,0.604,La combinación suma el importe
+TXN-00001830,API-00002096,4696.38,,0.977,Número impreso en el concepto e importe exacto
+TXN-00001831,API-00002097,1652.18,,0.513,"Coincide el tercero, combinación incompleta"
+TXN-00001832,ARI-00002100,4683.91,,0.931,Número impreso en el concepto e importe exacto
+TXN-00001833,ARI-00002101,1762.55,SHORT_DISPUTE,0.613,Diferencia compatible con la excepción
+TXN-00001834,ARI-00002102,5442.33,SHORT_DISPUTE,0.816,Diferencia compatible con la excepción
+TXN-00001835,ARI-00002103,2264.27,,0.660,La combinación suma el importe
+TXN-00001835,ARI-00002104,471.24,,0.660,La combinación suma el importe
+TXN-00001836,API-00002105,1577.81,,0.637,La combinación suma el importe
+TXN-00001836,API-00002106,387.95,,0.637,La combinación suma el importe
+TXN-00001836,API-00002107,2311.29,,0.637,La combinación suma el importe
+TXN-00001838,ARI-00002108,607.61,,0.930,Número impreso en el concepto e importe exacto
+TXN-00001839,ARI-00002109,22598.51,,0.947,Número impreso en el concepto e importe exacto
+TXN-00001840,ARI-00002111,1283.33,,0.684,Varias partidas iguales del mismo tercero
+TXN-00001841,ARI-00002112,957.68,,0.947,Número impreso en el concepto e importe exacto
+TXN-00001842,API-00002113,7183.44,,0.472,Importe inferior sin causa clara
+TXN-00001843,API-00002114,6183.69,,0.459,Importe inferior sin causa clara
+TXN-00001844,ARI-00002115,7557.81,SHORT_WITHHOLDING,0.582,Diferencia compatible con la excepción
+TXN-00001845,ARI-00002116,1930.85,,0.927,Número impreso en el concepto e importe exacto
+TXN-00001846,ARI-00002117,3113.71,,0.821,Mismo tercero e importe exacto
+TXN-00001847,API-00002118,806.39,,0.925,Mismo tercero e importe exacto
+TXN-00001848,ARI-00002119,1520.89,,0.753,Mismo tercero e importe exacto
+TXN-00001849,API-00002120,2245.70,,0.832,La combinación suma el importe
+TXN-00001849,API-00002121,1755.62,,0.832,La combinación suma el importe
+TXN-00001849,API-00002122,1596.89,,0.832,La combinación suma el importe
+TXN-00001849,API-00002123,2240.27,,0.832,La combinación suma el importe
+TXN-00001850,ARI-00002124,4273.96,,0.634,"Número impreso, conversión de divisa"
+TXN-00001852,API-00002125,3837.35,,0.940,Número impreso en el concepto e importe exacto
+TXN-00001853,API-00002126,1718.34,,0.618,La combinación suma el importe
+TXN-00001853,API-00002127,1320.26,,0.618,La combinación suma el importe
+TXN-00001853,API-00002128,1339.17,,0.618,La combinación suma el importe
+TXN-00001853,API-00002129,118.14,,0.618,La combinación suma el importe
+TXN-00001855,ARI-00002130,1566.48,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001856,ARI-00002131,1370.43,,0.868,Mismo tercero e importe exacto
+TXN-00001857,ARI-00002132,2767.16,,0.387,"Coincide el tercero, combinación incompleta"
+TXN-00001858,ARI-00002135,1132.32,,0.967,Número impreso en el concepto e importe exacto
+TXN-00001859,ARI-00002136,4138.40,,0.699,Varias partidas iguales del mismo tercero
+TXN-00001860,API-00002138,1343.86,SHORT_BANK_CHARGES,0.628,Diferencia compatible con la excepción
+TXN-00001861,ARI-00002139,7915.31,SHORT_BANK_CHARGES,0.769,Diferencia compatible con la excepción
+TXN-00001862,ARI-00002140,374.41,,0.816,Mismo tercero e importe exacto
+TXN-00001864,ARI-00002141,4213.03,,0.994,Número impreso en el concepto e importe exacto
+TXN-00001865,API-00002142,1591.77,,0.965,Número impreso en el concepto e importe exacto
+TXN-00001867,ARI-00002143,7494.55,,0.461,Importe inferior sin causa clara
+TXN-00001868,ARI-00002144,182.10,,0.691,La combinación suma el importe
+TXN-00001868,ARI-00002145,2493.10,,0.691,La combinación suma el importe
+TXN-00001868,ARI-00002146,1620.64,,0.691,La combinación suma el importe
+TXN-00001868,ARI-00002147,541.84,,0.691,La combinación suma el importe
+TXN-00001869,API-00002148,7256.12,,0.494,Importe inferior sin causa clara
+TXN-00001870,API-00002149,4589.12,,0.993,Número impreso en el concepto e importe exacto
+TXN-00001871,ARI-00002150,1847.53,,0.959,Número impreso en el concepto e importe exacto
+TXN-00001872,ARI-00002151,491.43,,0.779,Factura neta de abono
+TXN-00001872,ARC-00002152,-79.90,,0.779,Factura neta de abono
+TXN-00001873,API-00002153,1210.55,,0.985,Número impreso en el concepto e importe exacto
+TXN-00001876,ARI-00002154,4559.37,,0.962,Número impreso en el concepto e importe exacto
+TXN-00001877,ARI-00002156,3471.47,,0.616,Varias partidas iguales del mismo tercero
+TXN-00001878,ARI-00002157,2775.32,,0.973,Número impreso en el concepto e importe exacto
+TXN-00001879,ARI-00002158,1028.71,,0.786,Mismo tercero e importe exacto
+TXN-00001881,ARI-00002159,4260.44,FX_DIFFERENCE,0.694,"Número impreso, conversión de divisa"
+TXN-00001882,ARI-00002160,2942.10,,0.936,Número impreso en el concepto e importe exacto
+TXN-00001884,ARI-00002161,503.27,,0.641,Factura neta de abono
+TXN-00001884,ARC-00002162,-43.90,,0.641,Factura neta de abono
+TXN-00001885,ARI-00002163,47825.23,,0.972,Número impreso en el concepto e importe exacto
+TXN-00001886,ARI-00002164,2363.92,,0.990,Número impreso en el concepto e importe exacto
+TXN-00001887,API-00002165,2616.96,,0.961,Número impreso en el concepto e importe exacto
+TXN-00001888,ARI-00002166,2516.77,,0.908,Mismo tercero e importe exacto
+TXN-00001889,ARI-00002167,902.89,PARTIAL,0.768,"Número impreso, importe inferior"
+TXN-00001890,ARI-00002168,6322.40,SHORT_DISPUTE,0.574,Diferencia compatible con la excepción
+TXN-00001891,ARI-00002169,4475.57,,0.612,Varias partidas iguales del mismo tercero
+TXN-00001893,API-00002172,1974.30,FX_DIFFERENCE,0.673,"Número impreso, conversión de divisa"
+TXN-00001895,API-00002173,422.63,,0.921,Número impreso en el concepto e importe exacto
+TXN-00001896,API-00002174,2008.02,,0.839,Mismo tercero e importe exacto
+TXN-00001898,API-00002175,815.05,PARTIAL,0.567,"Número impreso, importe inferior"
+TXN-00001899,ARI-00002176,1486.66,,0.843,Mismo tercero e importe exacto
+TXN-00001900,API-00002178,39796.31,,0.711,Varias partidas iguales del mismo tercero
+TXN-00001902,ARI-00002180,1282.11,,0.810,Factura neta de abono
+TXN-00001902,ARC-00002181,-302.27,,0.810,Factura neta de abono
+TXN-00001903,ARI-00002182,2121.96,,0.639,"Número impreso, conversión de divisa"
+TXN-00001905,API-00002183,2821.12,,0.899,Mismo tercero e importe exacto
+TXN-00001906,ARI-00002184,4111.58,,0.859,Mismo tercero e importe exacto
+TXN-00001907,ARI-00002185,4296.18,SHORT_WITHHOLDING,0.672,Diferencia compatible con la excepción
+TXN-00001908,ARI-00002186,17320.65,,0.940,Número impreso en el concepto e importe exacto
+TXN-00001909,ARI-00002187,18512.18,,0.994,Número impreso en el concepto e importe exacto
+TXN-00001910,ARI-00002188,3376.56,,0.989,Número impreso en el concepto e importe exacto
+TXN-00001911,ARI-00002189,816.20,,0.680,La combinación suma el importe
+TXN-00001911,ARI-00002190,320.77,,0.680,La combinación suma el importe
+TXN-00001912,ARI-00002191,357.32,,0.923,Número impreso en el concepto e importe exacto
+TXN-00001915,,3471.29,RETURNED,0.826,El concepto indica devolución
+TXN-00001916,ARI-00002193,2730.68,,0.315,Importe inferior sin causa clara
+TXN-00001917,API-00002194,1009.78,PARTIAL,0.636,"Número impreso, importe inferior"
+TXN-00001918,API-00002195,2670.09,,0.627,"Número impreso, conversión de divisa"
+TXN-00001919,API-00002196,309.34,,0.944,Número impreso en el concepto e importe exacto
+TXN-00001920,ARI-00002197,76557.02,,0.760,Mismo tercero e importe exacto
+TXN-00001921,ARI-00002198,2768.36,,0.837,Mismo tercero e importe exacto
+TXN-00001922,API-00002199,2892.47,,0.950,Número impreso en el concepto e importe exacto
+TXN-00001923,API-00002200,381.22,,0.995,Número impreso en el concepto e importe exacto
+TXN-00001926,API-00002202,4685.99,,0.961,Número impreso en el concepto e importe exacto
+TXN-00001927,ARI-00002203,2097.13,,0.877,La combinación suma el importe
+TXN-00001927,ARI-00002204,709.61,,0.877,La combinación suma el importe
+TXN-00001927,ARI-00002205,1522.88,,0.877,La combinación suma el importe
+TXN-00001927,ARI-00002206,2924.24,,0.877,La combinación suma el importe
+TXN-00001928,ARI-00002207,67559.22,,0.938,Número impreso en el concepto e importe exacto
+TXN-00001929,ARI-00002208,2491.76,FX_DIFFERENCE,0.793,"Número impreso, conversión de divisa"
+TXN-00001930,ARI-00002209,606.61,,0.776,"Número impreso, conversión de divisa"
+TXN-00001931,ARI-00002210,4710.44,,0.981,Número impreso en el concepto e importe exacto
+TXN-00001932,API-00002211,6021.34,,0.892,Mismo tercero e importe exacto
+TXN-00001933,API-00002212,4180.32,,0.924,Número impreso en el concepto e importe exacto
+TXN-00001934,API-00002214,330.35,,0.617,Varias partidas iguales del mismo tercero
+TXN-00001935,ARI-00002215,802.00,,0.994,Número impreso en el concepto e importe exacto
+TXN-00001936,ARI-00002216,3174.86,,0.848,Mismo tercero e importe exacto
+TXN-00001937,ARI-00002217,3504.31,,0.796,Mismo tercero e importe exacto
+TXN-00001938,ARI-00002218,21332.03,,0.989,Número impreso en el concepto e importe exacto
+TXN-00001939,API-00002220,1341.72,,0.683,Varias partidas iguales del mismo tercero
+TXN-00001940,API-00002221,2790.39,,0.976,Número impreso en el concepto e importe exacto
+TXN-00001941,ARI-00002222,2212.24,,0.537,"Coincide el tercero, combinación incompleta"
+TXN-00001942,API-00002225,2615.81,,0.851,Mismo tercero e importe exacto
+TXN-00001944,ARI-00002226,598.49,,0.983,Número impreso en el concepto e importe exacto
+TXN-00001947,ARI-00002227,1891.13,,0.392,Importe inferior sin causa clara
+TXN-00001948,ARI-00002228,357.54,,0.792,Mismo tercero e importe exacto
+TXN-00001950,ARI-00002229,622.68,,0.705,Factura neta de abono
+TXN-00001950,ARC-00002230,-98.23,,0.705,Factura neta de abono
+TXN-00001951,API-00002231,2212.82,,0.934,Número impreso en el concepto e importe exacto
+TXN-00001952,ARI-00002232,3491.46,,0.919,Mismo tercero e importe exacto
+TXN-00001954,API-00002233,2592.92,,0.923,Número impreso en el concepto e importe exacto
+TXN-00001956,ARI-00002235,14769.75,,0.979,Número impreso en el concepto e importe exacto
+TXN-00001957,ARI-00002236,1534.43,,0.808,Mismo tercero e importe exacto
+TXN-00001959,API-00002237,6135.64,FX_DIFFERENCE,0.575,"Número impreso, conversión de divisa"
+TXN-00001960,ARI-00002238,3424.64,,0.980,Número impreso en el concepto e importe exacto
+TXN-00001961,ARI-00002239,1980.31,,0.480,"Coincide el tercero, combinación incompleta"
+TXN-00001962,ARI-00002241,1316.20,,0.992,Número impreso en el concepto e importe exacto
+TXN-00001963,API-00002242,1408.92,SHORT_DISPUTE,0.810,Diferencia compatible con la excepción
+TXN-00001964,ARI-00002243,817.94,,0.453,"Coincide el tercero, combinación incompleta"
+TXN-00001965,ARI-00002245,1530.02,,0.993,Número impreso en el concepto e importe exacto
+TXN-00001967,ARI-00002247,1889.83,,0.983,Número impreso en el concepto e importe exacto
+TXN-00001968,ARI-00002248,28544.64,,0.998,Número impreso en el concepto e importe exacto
+TXN-00001969,ARI-00002249,19500.44,PARTIAL,0.639,"Número impreso, importe inferior"
+TXN-00001970,ARI-00002251,1810.01,,0.610,Varias partidas iguales del mismo tercero
+TXN-00001971,ARI-00002252,2795.35,,0.932,Número impreso en el concepto e importe exacto
+TXN-00001973,ARI-00002253,83788.89,,0.937,Número impreso en el concepto e importe exacto
+TXN-00001975,ARI-00002254,2817.95,,0.923,Número impreso en el concepto e importe exacto
+TXN-00001977,ARI-00002255,4107.06,,0.940,Número impreso en el concepto e importe exacto
+TXN-00001978,ARI-00002256,3607.90,,0.728,Factura neta de abono
+TXN-00001978,ARC-00002257,-668.18,,0.728,Factura neta de abono
+TXN-00001979,API-00002258,5284.69,FX_DIFFERENCE,0.799,"Número impreso, conversión de divisa"
+TXN-00001980,ARI-00002259,2976.32,,0.932,Número impreso en el concepto e importe exacto
+TXN-00001981,API-00002260,48925.03,,0.866,Mismo tercero e importe exacto
+TXN-00001982,ARI-00002261,794.78,,0.751,Mismo tercero e importe exacto
+TXN-00001983,ARI-00002262,3810.56,,0.459,Importe inferior sin causa clara
+TXN-00001986,ARI-00002263,486.29,,0.337,"Coincide el tercero, combinación incompleta"
+TXN-00001987,ARI-00002266,322.34,,0.493,"Coincide el tercero, combinación incompleta"
+TXN-00001988,API-00002268,6695.74,SHORT_DISPUTE,0.717,Diferencia compatible con la excepción
+TXN-00001989,ARI-00002269,52951.43,,0.972,Número impreso en el concepto e importe exacto
+TXN-00001991,API-00002271,75.35,,0.932,Número impreso en el concepto e importe exacto
+TXN-00001992,ARI-00002272,3286.29,,0.788,Mismo tercero e importe exacto
+TXN-00001993,ARI-00002273,7881.47,,0.780,"Número impreso, conversión de divisa"
+TXN-00001994,API-00002274,1070.96,,0.914,Mismo tercero e importe exacto
+TXN-00001995,API-00002275,74231.35,,0.965,Número impreso en el concepto e importe exacto
+TXN-00001996,ARI-00002276,26888.19,OVERPAYMENT,0.573,El movimiento supera la partida
+TXN-00001997,API-00002277,964.44,PARTIAL,0.599,"Número impreso, importe inferior"
+TXN-00001998,API-00002278,494.68,,0.996,Número impreso en el concepto e importe exacto
+TXN-00001999,ARI-00002279,3318.92,,0.938,Número impreso en el concepto e importe exacto

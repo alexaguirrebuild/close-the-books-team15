@@ -1,0 +1,3 @@
+payment_terms,days,discount_pct
+NET30,30,0
+2-10-NET30,30,2
