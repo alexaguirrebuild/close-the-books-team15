@@ -319,7 +319,7 @@ class Engine:
     def m_dd_return(self, t):
         if t.amount >= 0:
             return False
-        if not re.search(r"DEVOLUCION RECIBO|IMPAYE|RUCKLASTSCHRIFT|RUECKLASTSCHRIFT|RETURN|RETOUR|R-TRANS|UNPAID|IMPAGADO", t.up):
+        if not re.search(r"DEVOLUCION RECIBO|DEVOL\.? ?RECIBO|IMPAYE|RUCKLASTSCHRIFT|RUECKLASTSCHRIFT|RETURN|RETOUR|R-TRANS|UNPAID|IMPAGADO", t.up):
             return False
         amt = -t.amount
         cand = []
@@ -344,7 +344,10 @@ class Engine:
             it = max(its, key=lambda i: i.issue or dt.date.min)
             self.emit(t, it, amt, "RETURNED", "dd_return_mandate", f"mandato {m.group(1)}")
             return True
-        r = max(cand, key=lambda x: x["collection_date"])
+        # cuotas iguales cada mes: la devuelta es la última cobrada ANTES de la devolución, nunca una futura
+        past = [x for x in cand if x.get("collection_date") and
+                0 <= (t.date - dt.date.fromisoformat(x["collection_date"][:10])).days <= 90]
+        r = max(past or cand, key=lambda x: x["collection_date"])
         it = self.item_by_number(r["remittance_info"], t.entity, kinds={"ARI"})
         if not it:
             return False
@@ -685,6 +688,10 @@ class Engine:
             # ya liquidadas: ¿pago duplicado? (POLICIES §3 DUPLICATE_PAYMENT)
             it = items[0]
             if abs(abs(t.amount) - self.to_bank(it.total, it, t)) <= max(2, it.total * 0.005):
+                if it.side == "AR" and it.method == "dd" and not re.search(r"ADEUDO|RECIBO|DIRECT DEBIT|LASTSCHRIFT|PRELEV", t.up):
+                    # recibo devuelto que el cliente vuelve a pagar por transferencia: no es duplicado
+                    self.emit(t, it, it.total, "", "ref_represented", f"ref {it.number} · recibo devuelto, pagado por transferencia")
+                    return True
                 self.emit(t, it, it.total, "DUPLICATE_PAYMENT", "ref_duplicate", f"ref {it.number}")
                 return True
             return False
@@ -762,6 +769,8 @@ class Engine:
             return self.settle(t, [i.id for i in sub], f"party_subset_{how}", f"contraparte {party}")
         inv = [i for i in its if self.sign(i, t) > 0]
         # una factura con descuento / retención / comisiones / FX
+        # descuento y retención son fórmulas exactas; las comisiones son una horquilla: primero lo exacto
+        found = {}
         for it in inv:
             exp = self.to_bank(it.open, it, t)
             short = exp - cash
@@ -769,7 +778,13 @@ class Engine:
                 cash_item = cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)
                 exc = self.explain_short(it, t, it.open - cash_item, cash_item)
                 if exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
-                    return self.settle(t, [it.id], f"party_short_{how}", f"contraparte {party}")
+                    found.setdefault(exc, it)
+        for exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
+            if exc in found:
+                return self.settle(t, [found[exc].id], f"party_short_{how}", f"contraparte {party}")
+        for it in inv:
+            exp = self.to_bank(it.open, it, t)
+            short = exp - cash
             if it.ccy != t.ccy and exp and abs(short) <= 0.03 * exp:
                 return self.settle(t, [it.id], f"party_fx_{how}", f"contraparte {party}")
         if re.search(r"A CUENTA|ON ACCOUNT|ACOMPTE|ABSCHLAG|PARCIAL", t.up) and inv:
