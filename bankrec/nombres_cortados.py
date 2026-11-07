@@ -28,6 +28,7 @@ def is_cut_name(tokens: list[str], start: int, name_tokens: list[str]) -> bool:
 
 
 def cut_names(engine, t, parties: set[str]) -> set[str]:
+    """Los terceros de `parties` cuyo nombre aparece cortado en alguna parte del texto del movimiento."""
     segments = [name_key(part) for part in re.split(r"\|", " | ".join(filter(None, (t.text, t.rmt, t.ref1, t.ref2))))]
     found: set[str] = set()
     for segment in segments:
@@ -40,14 +41,17 @@ def cut_names(engine, t, parties: set[str]) -> set[str]:
 
 
 def has_exact_invoice(engine, party: str, t) -> bool:
+    """Si alguna factura abierta del tercero vale exactamente lo cobrado. Es la evidencia que exige el nombre cortado."""
     return any(abs(engine.to_bank(item.open, item, t) - t.amount) <= EXACT_CENTS for item in engine.open_items_of(party, t, INVOICE_KINDS))
 
 
 def prepare(engine) -> None:
+    """Envuelve `scan_names`: añade el nombre cortado solo si el importe exacto señala a un único cliente."""
     original = engine.scan_names
     parties = parties_by_entity(engine)
 
     def scan_names(t):
+        """Lo que ya encontraba el motor y, solo en cobros, el único cliente con nombre cortado e importe exacto."""
         hits = original(t)
         if t.amount <= 0:
             return hits

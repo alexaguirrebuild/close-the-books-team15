@@ -23,16 +23,19 @@ def parties_by_entity(engine) -> dict[str, set[str]]:
 
 
 def scoped_index(name_index: Mapping[str, set[str]], parties: set[str]) -> dict[str, set[str]]:
+    """El índice de nombres reducido a `parties`, sin las palabras que se quedan sin ningún tercero."""
     scoped = {token: set(ids) & parties for token, ids in name_index.items()}
     return {token: ids for token, ids in scoped.items() if ids}
 
 
 def prepare(engine) -> None:
+    """Envuelve `scan_names` para buscar primero en la sociedad del movimiento. Los índices se crean la primera vez que se usan."""
     original = engine.scan_names
     parties = parties_by_entity(engine)
     indexes: dict[str, dict[str, set[str]]] = {}
 
     def scan_names(t):
+        """Los nombres encontrados entre los terceros de la sociedad; si no hay ninguno, la búsqueda de siempre."""
         whole = engine.ph.name_index
         if t.entity not in indexes:
             indexes[t.entity] = scoped_index(whole, parties.get(t.entity, set()))
