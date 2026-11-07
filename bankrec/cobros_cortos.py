@@ -54,8 +54,63 @@ def guarded(engine, where: str, fn, fallback):
             del engine.emit
 
 
+# --------------------------------------------------------------- regla 1: sobrepago según la forma del exceso
+# POLICIES §3 OVERPAYMENT: el cliente paga más que el saldo de UNA factura; la factura queda cerrada por su saldo.
+# En los 2.838 sobrepagos de TRAIN el exceso es siempre +1, 2, 5, 10, 50 o 100 unidades, o +1 % o +10 % (al céntimo).
+# Con esa forma es sobrepago aunque pase del 10 % que usa settle; sin ella, la diferencia es otra cosa (otra factura que
+# no vemos, un saldo mal llevado) y no se marca OVERPAYMENT.
+OVERPAY_STEPS_CENTS = (100, 200, 500, 1000, 5000, 10000)
+OVERPAY_RATES = (1.01, 1.10)
+ROUNDING_CENTS = 1
+
+
+def overpaid(cash: int, open_cents: int) -> bool:
+    """El cobro supera el saldo con la forma de un sobrepago."""
+    excess = cash - open_cents
+    if excess <= 2 * ROUNDING_CENTS:
+        return False
+    if any(abs(excess - step) <= ROUNDING_CENTS for step in OVERPAY_STEPS_CENTS):
+        return True
+    return any(abs(cash - round(open_cents * rate)) <= ROUNDING_CENTS for rate in OVERPAY_RATES)
+
+
+def _single_invoice(engine, t, cands):
+    """La única factura del cobro, en la divisa del banco y sin abonos; si no, None."""
+    if t.amount <= 0:
+        return None
+    items = [engine.items[c] for c in dict.fromkeys(cands)]
+    if len(items) != 1:
+        return None
+    it = items[0]
+    if engine.sign(it, t) <= 0 or it.ccy != t.ccy or it.open <= 0:
+        return None
+    return it
+
+
+def _wrap_settle(engine) -> None:
+    inner = engine.settle
+
+    def settle(t, cands, rule, ev="", party=None):
+        def rule_1():
+            it = _single_invoice(engine, t, cands)
+            if it is not None and overpaid(abs(t.amount), it.open):
+                engine.emit(t, it, it.open, "OVERPAYMENT", rule, ev)
+                return True
+            n_rows = len(engine.rows)
+            done = inner(t, cands, rule, ev, party)
+            if it is not None:
+                for row in engine.rows[n_rows:]:
+                    if row.exception == "OVERPAYMENT" and row.item == it.id:
+                        row.exception = ""  # sobra dinero sin forma de sobrepago: no se afirma la excepción
+            return done
+
+        return guarded(engine, "settle", rule_1, lambda: inner(t, cands, rule, ev, party))
+
+    engine.settle = settle
+
+
 def prepare(engine) -> None:
-    return None
+    _wrap_settle(engine)
 
 
 def _match(engine, t) -> bool:
