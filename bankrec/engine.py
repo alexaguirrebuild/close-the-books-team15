@@ -165,7 +165,8 @@ class Engine:
             for r in WITHHOLDING[country]:
                 if abs(short_item - it.total * r) <= max(2, it.total * 0.0005):
                     return "SHORT_WITHHOLDING"
-        cross = (t.orig_ccy is not None) or (country and country not in SEPA)
+        foreign = country and country not in SEPA and country != self.ph.entity_country.get(it.entity)
+        cross = t.orig_ccy is not None or "/CHGS/" in t.up or foreign  # un pago nacional no pasa por banco intermediario
         if cross and it.side == "AR":
             short_eur = self.ph.fx.conv(short_item, it.ccy, "EUR", t.date)
             if 0 < short_eur <= 6000 and short_item <= 0.02 * it.total:

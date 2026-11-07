@@ -167,6 +167,7 @@ class Phase:
         if name == "final" and final_m.exists():
             mdir = final_m
         self.mdir = mdir
+        self.entity_country = {r["entity"]: r.get("country") for r in rows(mdir / "entities.csv")}
         self.customers = {r["customer_id"]: r for r in rows(mdir / "customers.csv")}
         self.suppliers = {r["supplier_id"]: r for r in rows(mdir / "suppliers.csv")}
         self.accounts = {r["account_id"]: r for r in rows(mdir / "bank_accounts.csv")}
