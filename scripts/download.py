@@ -11,6 +11,7 @@ import json
 import sys
 import tarfile
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -20,6 +21,13 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
 OUT = ROOT / "data"
 UA = {"User-Agent": "team15-bankrec-downloader"}
+NO_SHA_FLAG = "--sin-sha"
+RANGE_NOT_SATISFIABLE, SERVER_ERROR = 416, 500
+REQUIRED_AFTER_EXTRACT = {"final": ("final/bank_transactions.csv.gz", "final/open_items_at_start.csv.gz", "final/masters_final")}
+
+
+class Refused(RuntimeError):
+    """El servidor ha dicho que no: reintentar enseguida no cambia nada, y FINAL da 403 hasta que se publica."""
 
 
 def config() -> dict:
@@ -61,6 +69,13 @@ def fetch(url: str, dest: Path, tries: int = 30) -> None:
                             last = time.time()
             print(f"  {dest.name}: {dest.stat().st_size >> 20} MB en {time.time() - t0:.0f}s", flush=True)
             return
+        except urllib.error.HTTPError as ex:
+            if ex.code == RANGE_NOT_SATISFIABLE and have:
+                return  # Ya estaba entero: el sha256 decide si vale.
+            if ex.code < SERVER_ERROR:
+                raise Refused(f"el servidor responde {ex.code}") from ex
+            print(f"  {dest.name}: error {ex.code}, reintento {attempt + 1}/{tries}", flush=True)
+            time.sleep(5)
         except (TimeoutError, OSError) as ex:
             print(f"  {dest.name}: corte ({type(ex).__name__}), reintento {attempt + 1}/{tries}", flush=True)
             time.sleep(5)
@@ -77,32 +92,60 @@ def extract(path: Path) -> None:
     print(f"  extraído {path.name}", flush=True)
 
 
-def main(ids: list[str]) -> int:
-    RAW.mkdir(parents=True, exist_ok=True)
-    cfg = config()
-    dls = {d["id"]: d for d in cfg["downloads"]}
-    ok = True
-    for i in ids:
-        d = dls.get(i)
-        if not d or not d.get("available"):
-            print(f"[{i}] no disponible todavía", flush=True)
-            ok = False
-            continue
-        dest = RAW / Path(d["url"]).name
-        if dest.exists() and d["sha256"] and sha256(dest) == d["sha256"]:
-            print(f"[{i}] ya estaba descargado", flush=True)
-        else:
-            print(f"[{i}] descargando {d['url']} ({d['size']})", flush=True)
+def verified(i: str, d: dict, dest: Path) -> bool:
+    """Un fichero con el sha256 mal se borra: si no, la siguiente descarga reanudaría sobre algo roto."""
+    if not d["sha256"]:
+        print(f"[{i}] sha256 SIN COMPROBAR: lo has pedido con {NO_SHA_FLAG}", flush=True)
+        return True
+    got = sha256(dest)
+    if got != d["sha256"]:
+        print(f"[{i}] SHA256 NO COINCIDE: {got} != {d['sha256']}. Fichero borrado: repite la descarga.", flush=True)
+        dest.unlink()
+        return False
+    print(f"[{i}] sha256 OK", flush=True)
+    return True
+
+
+def download_one(i: str, d: dict, allow_no_sha: bool) -> bool:
+    if not d.get("available"):
+        print(f"[{i}] no disponible todavía", flush=True)
+        return False
+    if not d["sha256"] and not allow_no_sha:
+        print(f"[{i}] config.json no trae sha256: no se puede comprobar. Repite en un minuto, o usa {NO_SHA_FLAG} solo si la organización lo confirma.", flush=True)
+        return False
+    dest = RAW / Path(d["url"]).name
+    if d["sha256"] and dest.exists() and sha256(dest) == d["sha256"]:
+        print(f"[{i}] ya estaba descargado", flush=True)
+    else:
+        print(f"[{i}] descargando {d['url']} ({d['size']})", flush=True)
+        try:
             fetch(BASE + d["url"], dest)
-        got = sha256(dest)
-        if d["sha256"] and got != d["sha256"]:
-            print(f"[{i}] SHA256 NO COINCIDE: {got} != {d['sha256']}", flush=True)
-            ok = False
-            continue
-        print(f"[{i}] sha256 OK", flush=True)
-        extract(dest)
-    return 0 if ok else 1
+        except RuntimeError as error:
+            print(f"[{i}] {error}. Si acaba de publicarse, repite en un minuto.", flush=True)
+            return False
+    if not verified(i, d, dest):
+        return False
+    extract(dest)
+    missing = [path for path in REQUIRED_AFTER_EXTRACT.get(i, ()) if not (OUT / path).exists()]
+    if missing:
+        print(f"[{i}] el archivo no tiene la forma esperada: falta {', '.join(missing)}", flush=True)
+        return False
+    return True
+
+
+def main(ids: list[str], allow_no_sha: bool = False) -> int:
+    RAW.mkdir(parents=True, exist_ok=True)
+    try:
+        cfg = config()
+    except (OSError, ValueError) as error:
+        print(f"No se puede leer config.json: {error}. Repite en un minuto.", flush=True)
+        return 1
+    dls = {d["id"]: d for d in cfg["downloads"]}
+    results = [download_one(i, dls.get(i, {}), allow_no_sha) for i in ids]
+    return 0 if all(results) else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:] or ["docs", "train-lite", "live"]))
+    arguments = sys.argv[1:]
+    wanted = [argument for argument in arguments if argument != NO_SHA_FLAG]
+    sys.exit(main(wanted or ["docs", "train-lite", "live"], allow_no_sha=NO_SHA_FLAG in arguments))

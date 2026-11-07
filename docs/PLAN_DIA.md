@@ -40,6 +40,8 @@
 
 ## Checklist FINAL (18:00–18:45)
 
+**El procedimiento vigente está en [`RUNBOOK_FINAL.md`](RUNBOOK_FINAL.md)** (`scripts/download.py final` y `scripts/final_run.py`). Esta lista queda como resumen.
+
 1. `python scripts/download.py final` → sha256 OK. Si la red de la sala va lenta, se descarga en el PC de casa.
 2. Comprobar que existe `data/final/masters_final/`. El motor lo usa solo.
 3. `python -m bankrec.run --phase final --no-score`, que debería tardar menos de 5 min.

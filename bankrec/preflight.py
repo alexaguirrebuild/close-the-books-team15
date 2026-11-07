@@ -9,6 +9,7 @@ REQUIRED_PACKAGES = ("pypdf", "openpyxl")
 HASH_SEED_VARIABLE = "PYTHONHASHSEED"
 HASH_SEED = "0"
 PRIOR_PHASES = {"live": ("train",), "final": ("train", "live")}
+MASTER_FILES = ("entities.csv", "bank_accounts.csv", "customers.csv", "suppliers.csv", "categories.csv", "payment_terms.csv", "fx_rates.csv")
 
 
 def check_dependencies() -> None:
@@ -46,3 +47,13 @@ def check_phase_inputs(phase: str, data: Path) -> None:
         problems.append("falta final/masters_final: sin él no están la filial nueva ni los cambios del semestre")
     if problems:
         raise SystemExit(f"La fase {phase} no está completa:\n  " + "\n  ".join(problems))
+    if phase == "final":
+        warn_incomplete_final_masters(data)
+
+
+def warn_incomplete_final_masters(data: Path) -> None:
+    """No para: se usa el maestro anterior y el fichero sigue siendo válido. Pero lo nuevo del semestre no estará, y hay que saberlo."""
+    folder = data / "final" / "masters_final"
+    missing = [name for name in MASTER_FILES if not (folder / name).is_file()]
+    if missing:
+        print(f"  AVISO: masters_final no trae {', '.join(missing)}. Se usa masters/, sin lo nuevo del semestre: ver docs/RUNBOOK_FINAL.md.", flush=True)
