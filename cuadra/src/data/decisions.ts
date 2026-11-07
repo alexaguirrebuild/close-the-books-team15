@@ -11,6 +11,12 @@ export type LogEntry =
 
 const CSV_COLUMNS = ['bank_txn_id', 'item_id', 'amount', 'category', 'exception']
 
+/** The server uppercases codes, so a teammate's lowercase file must not fail here. */
+const validException = (value: string): ExceptionCode | null => {
+  const code = value?.trim().toUpperCase()
+  return code && isException(code) ? code : null
+}
+
 type CsvRow = Record<(typeof CSV_COLUMNS)[number], string>
 
 function decisionsFromCsv(csv: string, source: 'bulk' | 'imported', batch: string, at: number): Decision[] {
@@ -19,31 +25,33 @@ function decisionsFromCsv(csv: string, source: 'bulk' | 'imported', batch: strin
   for (const row of parsed.data) {
     const txnId = row.bank_txn_id
     if (!txnId) continue
-    const exception = row.exception && isException(row.exception) ? (row.exception as ExceptionCode) : null
-    const existing = byTxn.get(txnId) ?? {
-      txnId,
-      allocations: [],
-      category: row.category || null,
-      exception,
-      source,
-      at,
-      batch,
-    }
+    const exception = validException(row.exception)
+    const existing = byTxn.get(txnId) ?? { txnId, allocations: [], category: null, exception: null, source, at, batch }
     byTxn.set(
       txnId,
       row.item_id
-        ? { ...existing, allocations: [...existing.allocations, { itemId: row.item_id, amount: Number(row.amount) }] }
-        : existing,
+        ? { ...existing, allocations: [...existing.allocations, { itemId: row.item_id, amount: row.amount ? Number(row.amount) : Number.NaN, exception }] }
+        : { ...existing, category: row.category?.trim().toUpperCase() || null, exception },
     )
   }
   return [...byTxn.values()]
+}
+
+/** Logs written before exceptions moved to the rows kept one for the whole line. */
+function withRowExceptions(decision: Decision): Decision {
+  if (!decision.allocations.length) return decision
+  return {
+    ...decision,
+    exception: null,
+    allocations: decision.allocations.map((a) => ({ ...a, exception: a.exception ?? decision.exception ?? null })),
+  }
 }
 
 /** The log is the source of truth across reloads; later entries win. */
 export function replayLog(entries: LogEntry[]): Decision[] {
   const decisions = new Map<string, Decision>()
   for (const entry of entries) {
-    if (entry.kind === 'set') decisions.set(entry.decision.txnId, entry.decision)
+    if (entry.kind === 'set') decisions.set(entry.decision.txnId, withRowExceptions(entry.decision))
     if (entry.kind === 'clear') decisions.delete(entry.txnId)
     if (entry.kind === 'bulk') {
       for (const decision of decisionsFromCsv(entry.csv, entry.source, entry.batch, entry.at)) {
@@ -63,13 +71,13 @@ function decisionToRows(decision: Decision): Record<string, unknown>[] {
   const base = {
     txn_id: decision.txnId,
     category: decision.category ?? '',
-    exception: decision.exception ?? '',
     source: decision.source,
     batch: decision.batch ?? '',
     ts: decision.at,
   }
-  if (!decision.allocations.length) return [{ ...base, item_id: '', amount: '' }]
-  return decision.allocations.map((a) => ({ ...base, item_id: a.itemId, amount: a.amount }))
+  if (!decision.allocations.length) return [{ ...base, item_id: '', amount: '', exception: decision.exception ?? '' }]
+  // An amount that was missing stays missing, for the export to flag, instead of becoming 0.00.
+  return decision.allocations.map((a) => ({ ...base, item_id: a.itemId, amount: Number.isFinite(a.amount) ? a.amount : '', exception: a.exception ?? '' }))
 }
 
 export async function loadDecisionsIntoDb(db: Db, decisions: Decision[]): Promise<void> {
@@ -91,7 +99,7 @@ export async function writeDecision(db: Db, rid: number, decision: Decision): Pr
     .map(
       (r) =>
         `(${rid}, ${lit(decision.txnId)}, ${lit((r.item_id as string) || null)}, ${sqlNum(typeof r.amount === 'number' ? r.amount : null)},
-          ${lit(decision.category)}, ${lit(decision.exception)}, ${lit(decision.source)}, ${lit(decision.batch ?? null)}, ${decision.at})`,
+          ${lit(decision.category)}, ${lit((r.exception as string) || null)}, ${lit(decision.source)}, ${lit(decision.batch ?? null)}, ${decision.at})`,
     )
     .join(',')
   await db.query(`DELETE FROM decision_rows WHERE rid = ${rid}; INSERT INTO decision_rows VALUES ${values}`)
@@ -110,7 +118,7 @@ export async function confirmBulk(db: Db, minConf: number): Promise<BulkResult> 
   await db.query(
     `CREATE OR REPLACE TABLE bulk_rows AS
      SELECT p.rid, p.txn_id, p.item_id,
-            coalesce(p.amount, i.open_amount) AS amount,
+            abs(coalesce(p.amount, i.open_amount)) AS amount,
             CASE WHEN p.item_id IS NULL THEN p.category END AS category,
             p.exception
      FROM q
@@ -129,6 +137,21 @@ export async function confirmBulk(db: Db, minConf: number): Promise<BulkResult> 
   return { batch, count: ridRows.length, csv, rids: ridRows.map((r) => numOr(r.rid, 0)) }
 }
 
+export type BulkSummary = { lines: number; rows: number; withException: number }
+
+/** What a batch would confirm, so the reviewer sees it before committing to it. */
+export async function bulkSummary(db: Db, minConf: number): Promise<BulkSummary> {
+  const [row] = await db.query(
+    `SELECT count(DISTINCT p.rid) AS lines, count(*) AS rows_n, count(DISTINCT p.rid) FILTER (WHERE p.exception IS NOT NULL) AS with_exception
+     FROM q
+     JOIN txn_q t ON t.rid = q.rid
+     JOIN prop p ON p.rid = q.rid
+     WHERE t.conf >= ${sqlNum(minConf)}
+       AND NOT EXISTS (SELECT 1 FROM decision_rows d WHERE d.rid = q.rid)`,
+  )
+  return { lines: numOr(row?.lines, 0), rows: numOr(row?.rows_n, 0), withException: numOr(row?.with_exception, 0) }
+}
+
 async function bulkRowsCsv(db: Db): Promise<string> {
   const bytes = await copyToBytes(
     db,
@@ -141,7 +164,7 @@ export async function undoBulk(db: Db, batch: string): Promise<void> {
   await db.query(`DELETE FROM decision_rows WHERE batch = ${lit(batch)}`)
 }
 
-export type ImportResult = { batch: string; applied: number; skipped: number; csv: string; unknown: number }
+export type ImportResult = { batch: string; applied: number; skipped: number; csv: string; unknown: number; rids: number[] }
 
 /** Merges the work of a teammate: movements already decided here keep their decision. */
 export async function importDecisions(db: Db, text: string): Promise<ImportResult> {
@@ -151,7 +174,7 @@ export async function importDecisions(db: Db, text: string): Promise<ImportResul
   await db.registerText(name, text)
   await db.query(
     `CREATE OR REPLACE TABLE import_rows AS
-     SELECT trim(bank_txn_id) AS txn_id, nz(item_id) AS item_id, num(amount) AS amount, nz(category) AS category, nz(exception) AS exception
+     SELECT trim(bank_txn_id) AS txn_id, nz(item_id) AS item_id, num(amount) AS amount, upper(nz(category)) AS category, upper(nz(exception)) AS exception
      FROM read_csv('${name}', all_varchar=true, header=true, auto_detect=true)`,
   )
   const [counts] = await db.query(
@@ -173,11 +196,12 @@ export async function importDecisions(db: Db, text: string): Promise<ImportResul
      SELECT rid, txn_id, item_id, amount, category, exception, 'imported', ${lit(batch)}, ${at} FROM bulk_rows`,
   )
   const csv = await bulkRowsCsv(db)
+  const ridRows = await db.query('SELECT DISTINCT rid FROM bulk_rows ORDER BY rid')
   await db.dropFile(name)
   const total = numOr(counts?.total, 0)
   const skipped = numOr(counts?.skipped, 0)
   const unknown = numOr(counts?.unknown, 0)
-  return { batch, applied: total - skipped - unknown, skipped, unknown, csv }
+  return { batch, applied: total - skipped - unknown, skipped, unknown, csv, rids: ridRows.map((r) => numOr(r.rid, 0)) }
 }
 
 export function exportReviewCsv(db: Db): Promise<Uint8Array> {

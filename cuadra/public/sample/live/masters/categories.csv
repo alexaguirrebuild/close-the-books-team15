@@ -1,7 +1,22 @@
-category,description
-BANK_FEES,Comisiones bancarias
-PAYROLL,Nóminas
-TAXES,Impuestos
-INTEREST,Intereses
-RENT,Alquileres
-INTERNAL_TRANSFER,Traspaso interno
+category,description,gl_account
+BANK_FEES,Comisiones y gastos bancarios,626
+INTEREST_INCOME,Intereses a favor,769
+INTEREST_EXPENSE,Intereses de deudas o descubiertos,662
+PAYROLL,Nóminas (remesa de transferencias),640
+SOCIAL_SECURITY,Seguridad social y cargas sociales,642
+TAX_PAYMENT,Impuestos,475
+TAX_REFUND,Devolución de impuestos,470
+LOAN_DRAWDOWN,Disposición de préstamo o póliza,520
+LOAN_REPAYMENT,Cuota de préstamo,170
+LEASING,Cuota de leasing o renting,621
+FX_DEAL,Compraventa de divisa,768
+CASH_POOL,Barrido de cash pooling,551
+INTERCOMPANY,Transferencia intragrupo,552
+INTERNAL_TRANSFER,Traspaso entre cuentas propias,572
+CUSTOMER_ADVANCE,Anticipo de cliente sin factura,438
+CUSTOMER_REFUND,Devolución de dinero a cliente,438
+SUPPLIER_REFUND,Reembolso de proveedor,407
+CARD_EXPENSES,Liquidación de tarjetas de empresa,410
+INSURANCE,Primas de seguros,625
+BANK_REVERSAL,Apunte erróneo del banco y su anulación,572
+UNIDENTIFIED,Cobro no identificado,555

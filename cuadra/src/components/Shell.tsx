@@ -1,66 +1,34 @@
-import { ArrowUpRight } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useStore, type Screen } from '../store'
+import { useStore } from '../store'
+import { AppRail } from './AppRail'
 import { HelpOverlay } from './HelpOverlay'
-import { Robot } from './Robot'
-
-const NAV: { screen: Screen; label: string; key: string }[] = [
-  { screen: 'panel', label: 'Panel', key: '1' },
-  { screen: 'queue', label: 'Cola', key: '2' },
-  { screen: 'bench', label: 'Mesa', key: '3' },
-]
+import { ScopeBar } from './ScopeBar'
 
 export function Shell({ children }: { children: ReactNode }) {
-  const screen = useStore((s) => s.screen)
-  const go = useStore((s) => s.go)
-  const meta = useStore((s) => s.meta)
   const notice = useStore((s) => s.notice)
   const helpOpen = useStore((s) => s.helpOpen)
-  const setHelp = useStore((s) => s.setHelp)
+  const undoLast = useStore((s) => s.undoLast)
+  const dismissNotice = useStore((s) => s.dismissNotice)
 
   return (
     <div className="shell">
-      <header className="topbar">
-        <div className="brand">
-          <Robot mood="happy" size={24} />
-          <span>Cuadra</span>
-        </div>
-        <nav className="nav" aria-label="Pantallas">
-          {NAV.map((item) => (
-            <button
-              key={item.screen}
-              className={screen === item.screen ? 'nav-item is-active' : 'nav-item'}
-              aria-current={screen === item.screen ? 'page' : undefined}
-              onClick={() => go(item.screen)}
-              title={`Alt+${item.key}`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="topbar-right">
-          <span className="dataset" title={meta?.name}>
-            {meta?.name}
-          </span>
-          <button className="nav-item" onClick={() => setHelp(true)} title="Atajos de teclado (?)">
-            Atajos
-          </button>
-          <button
-            className={screen === 'export' ? 'cta is-active' : 'cta'}
-            onClick={() => go('export')}
-            title="Alt+4"
-          >
-            Exportar
-            <span className="cta-box">
-              <ArrowUpRight size={12} strokeWidth={1.5} />
-            </span>
-          </button>
-        </div>
-      </header>
-      <main className="main">{children}</main>
+      <AppRail />
+      <div className="workspace">
+        <ScopeBar />
+        <main className="main">{children}</main>
+      </div>
       {notice && (
         <div className={`notice notice-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
-          {notice.text}
+          <span>{notice.text}</span>
+          {notice.undoable && (
+            <button className="notice-action" onClick={() => void undoLast()}>
+              Deshacer <kbd>Z</kbd>
+            </button>
+          )}
+          {notice.tone === 'error' && (
+            <button className="notice-action" aria-label="Cerrar el aviso" onClick={dismissNotice}><X size={14} /></button>
+          )}
         </div>
       )}
       {helpOpen && <HelpOverlay />}

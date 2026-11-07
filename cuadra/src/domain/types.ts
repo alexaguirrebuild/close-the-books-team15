@@ -40,6 +40,16 @@ export type Txn = {
   currency: string
   account: string
   description: string
+  entity: string
+  bank: string
+  counterparty: string
+  counterpartyAccount: string
+  endToEnd: string
+  remittance: string
+  ref1: string
+  ref2: string
+  origAmount: number | null
+  origCurrency: string
 }
 
 export type Item = {
@@ -52,11 +62,15 @@ export type Item = {
   openAmount: number
   currency: string
   dueDate: string
+  issueDate: string
+  /** False when the movement predates the item: nothing can settle it yet. */
   isOpen: boolean
   terms: string
+  po: string
 }
 
-export type Allocation = { itemId: string; amount: number }
+/** One row of the submission: the exception belongs to the row, not to the line. */
+export type Allocation = { itemId: string; amount: number; exception: ExceptionCode | null }
 
 export type DecisionSource = 'confirmed' | 'manual' | 'bulk' | 'imported'
 
@@ -64,6 +78,7 @@ export type Decision = {
   txnId: string
   allocations: Allocation[]
   category: string | null
+  /** Only for a line without items; item rows carry their own in allocations. */
   exception: ExceptionCode | null
   source: DecisionSource
   at: number
@@ -77,6 +92,9 @@ export type ProposalRow = {
   category: string | null
   confidence: number | null
   reason: string
+  source: string
+  adviceId: string | null
+  lineNo: string | null
 }
 
 export type FxRate = { date: string; base: string; quote: string; rate: number }

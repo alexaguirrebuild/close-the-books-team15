@@ -1,5 +1,5 @@
 import { computeScore, type ScoreResult, type ScoreRow } from '../domain/score'
-import { numOr, numOrNull, str, strOrNull, type Db } from './db'
+import { numOr, numOrNull, str, strOrNull, type Db, type Row } from './db'
 
 export type CoverageStats = {
   total: number
@@ -101,12 +101,13 @@ export async function loadDashboard(db: Db): Promise<DashboardStats> {
   }
 }
 
-const toScoreRow = (r: Record<string, unknown>): ScoreRow => ({
+const toScoreRow = (r: Row): ScoreRow => ({
   txn: str(r.txn),
   item: strOrNull(r.item),
   amount: numOrNull(r.amount),
   category: strOrNull(r.category),
   exception: strOrNull(r.exception),
+  segment: strOrNull(r.segment),
 })
 
 /** Scores the rows that would be exported, the same ones a submission would contain. */
@@ -114,6 +115,7 @@ export async function scoreAgainstGolden(db: Db): Promise<ScoreResult> {
   const predicted = await db.query(
     'SELECT txn_id AS txn, item_id AS item, amount_num AS amount, category, exception FROM export_rows',
   )
-  const golden = await db.query('SELECT txn, item, amount, category, exception FROM golden')
-  return computeScore(predicted.map(toScoreRow), golden.map(toScoreRow))
+  const golden = await db.query('SELECT txn, item, amount, category, exception, segment FROM golden')
+  const lines = await db.query('SELECT id FROM txn')
+  return computeScore(predicted.map(toScoreRow), golden.map(toScoreRow), lines.map((r) => str(r.id)))
 }

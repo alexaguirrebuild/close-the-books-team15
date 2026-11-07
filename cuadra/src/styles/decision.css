@@ -1,0 +1,313 @@
+/* Decision: the raised surface where the reviewer commits. */
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+}
+
+.decision-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 2px;
+  background: var(--sunken);
+  border-radius: var(--radius-control);
+}
+
+.decision-mode button {
+  height: 28px;
+  border-radius: 4px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: center;
+}
+
+.decision-mode button.is-active {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(22 24 29 / 12%);
+  color: var(--ink);
+}
+
+.decision-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.proposal-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.proposal-reason {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+/* Why: the pipeline's reasoning as a short trace, like a run's steps. */
+.trail {
+  display: flex;
+  flex-direction: column;
+}
+
+.trail-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  padding-bottom: 7px;
+}
+
+.trail-step::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: 0;
+  left: 7px;
+  width: 1px;
+  background: var(--line-strong);
+}
+
+.trail-step:last-child {
+  padding-bottom: 0;
+}
+
+.trail-step:last-child::before {
+  display: none;
+}
+
+.trail-icon {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--neutral-wash);
+  color: var(--ink-3);
+}
+
+.trail-step[data-state='ok'] .trail-icon {
+  background: var(--balanced-wash);
+  color: var(--balanced);
+}
+
+.trail-step[data-state='warn'] .trail-icon {
+  background: var(--review-wash);
+  color: var(--review);
+}
+
+.trail-step[data-state='bad'] .trail-icon {
+  background: var(--error-wash);
+  color: var(--error);
+}
+
+.trail-text {
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.trail-label {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+/* Allocation rows */
+.alloc {
+  display: flex;
+  flex-direction: column;
+}
+
+.alloc-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.alloc-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.alloc-printed {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alloc-open {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.amount-input input {
+  width: 104px;
+  height: 28px;
+  padding: 0 7px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.amount-ccy {
+  width: 26px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.alloc-exception {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.exception-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  background: var(--review-wash);
+  border-radius: 999px;
+  color: var(--review);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.exception-add {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.exception-add:hover {
+  color: var(--select);
+}
+
+.alloc-more {
+  padding: 8px 0 0;
+  font-size: var(--text-xs);
+}
+
+.assign {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assign-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: var(--review-wash);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+
+.suggestion-why {
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+}
+
+.fifo-hint {
+  padding: 8px 10px;
+  background: var(--select-wash);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+
+.decision-cta {
+  position: sticky;
+  bottom: -14px;
+  margin: auto -14px -14px;
+  padding: 10px 14px 14px;
+  background: linear-gradient(to bottom, transparent, var(--surface) 10px);
+}
+
+.decided-note {
+  padding: 6px 10px;
+  background: var(--sunken);
+  border-radius: var(--radius-control);
+  font-size: var(--text-xs);
+}
+
+.docs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-control);
+}
+
+.doc:hover {
+  background: var(--sunken);
+}
+
+.doc-snippet {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Against the golden: only on TRAIN and the sample. */
+.golden-diff ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.golden-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: var(--text-xs);
+}
+
+.golden-values {
+  color: var(--ink-2);
+}

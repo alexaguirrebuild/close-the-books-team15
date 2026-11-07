@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { rankCandidates, type RawCandidates } from './candidates'
+import { describeFit, groupCandidates, rankCandidates, type Candidate, type RawCandidates } from './candidates'
 import type { Item } from './types'
 
 const makeItem = (over: Partial<Item>): Item => ({
@@ -12,6 +12,8 @@ const makeItem = (over: Partial<Item>): Item => ({
   openAmount: 100,
   currency: 'EUR',
   dueDate: '2024-01-01',
+  issueDate: '',
+  po: '',
   isOpen: true,
   terms: '',
   ...over,
@@ -101,5 +103,61 @@ describe('rankCandidates', () => {
     const open = makeItem({ itemId: 'ARI-O', partyId: 'C2' })
     const result = rankCandidates(txn, raw({ exact: [closed, open] }), emptyUsed)
     expect(result[0].item.itemId).toBe('ARI-O')
+  })
+})
+
+describe('groupCandidates', () => {
+  const candidate = (itemId: string, reasons: Candidate['reasons']): Candidate => ({
+    item: makeItem({ itemId }),
+    reasons,
+    fragment: null,
+    fifo: false,
+    usedBy: null,
+  })
+
+  test('separates good matches, the rest of the party and unrelated look-alikes', () => {
+    const groups = groupCandidates([
+      candidate('printed', ['printed']),
+      candidate('proposed', ['proposal']),
+      candidate('exact', ['exact', 'party']),
+      candidate('same', ['party']),
+      candidate('lookalike', ['converted']),
+    ])
+    expect(groups.best.map((c) => c.item.itemId)).toEqual(['printed', 'proposed', 'exact'])
+    expect(groups.party.map((c) => c.item.itemId)).toEqual(['same'])
+    expect(groups.others.map((c) => c.item.itemId)).toEqual(['lookalike'])
+  })
+
+  test('counts a converted amount of the same party as a match', () => {
+    const groups = groupCandidates([candidate('fx', ['converted', 'party'])])
+    expect(groups.best.map((c) => c.item.itemId)).toEqual(['fx'])
+  })
+})
+
+describe('describeFit', () => {
+  test('says when the item settles what is left exactly', () => {
+    expect(describeFit(makeItem({ openAmount: 100 }), 100, txn, [])).toMatchObject({ fit: 'exact', gap: 0, equivalent: null })
+  })
+
+  test('says what the item would leave to apply', () => {
+    expect(describeFit(makeItem({ openAmount: 60 }), 100, txn, [])).toMatchObject({ fit: 'leaves', gap: 40 })
+  })
+
+  test('says how much the item goes over', () => {
+    expect(describeFit(makeItem({ openAmount: 130 }), 100, txn, [])).toMatchObject({ fit: 'over', gap: 30 })
+  })
+
+  test('gives the equivalent of an item in another currency', () => {
+    const rates = [{ date: '2024-01-01', base: 'EUR', quote: 'USD', rate: 2 }]
+    const fit = describeFit(makeItem({ currency: 'USD', openAmount: 200 }), 100, txn, rates)
+    expect(fit).toMatchObject({ fit: 'exact', equivalent: 100 })
+  })
+
+  test('nets a credit note against what is left', () => {
+    expect(describeFit(makeItem({ kind: 'CN', openAmount: 20 }), 80, txn, [])).toMatchObject({ fit: 'leaves', gap: 100 })
+  })
+
+  test('says nothing without a rate', () => {
+    expect(describeFit(makeItem({ currency: 'USD' }), 100, txn, []).fit).toBe('unknown')
   })
 })

@@ -1,9 +1,11 @@
 import { ArrowDownToLine, Check, TriangleAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { exportReviewCsv } from '../data/decisions'
-import { findTxn, queuePosition } from '../data/queue'
+import { downloadBytes } from '../data/download'
+import { DEFAULT_FILTERS, findTxn, queuePosition } from '../data/queue'
 import {
   buildExportRows,
+  canDownloadSubmission,
   previewExport,
   SUBMISSION_HEADER,
   validateExport,
@@ -11,19 +13,19 @@ import {
   type ExportSummary,
   type ValidationIssue,
 } from '../data/exportSubmission'
-import { formatCount, formatPercent } from '../domain/money'
+import { formatCount } from '../domain/money'
 import { useStore } from '../store'
 
-function download(bytes: Uint8Array, name: string) {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'text/csv' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = name
-  anchor.click()
-  URL.revokeObjectURL(url)
+async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
 const PREVIEW_ROWS = 10
+const BYTES_PER_MB = 1024 * 1024
+const ORIGIN_LABEL: Record<string, string> = { review: 'Revisado', proposal: 'Propuesta', auto: 'Automático' }
+
+const formatMegabytes = (bytes: number) => `${(bytes / BYTES_PER_MB).toFixed(1).replace('.', ',')} MB de 60`
 
 function errorsLabel(count: number): string {
   return count === 1 ? 'Corrige 1 error' : `Corrige ${formatCount(count)} errores`
@@ -36,14 +38,14 @@ export function ExportScreen() {
   const setOptions = useStore((s) => s.setExportOptions)
   const revision = useStore((s) => s.revision)
   const notify = useStore((s) => s.notify)
-  const importReview = useStore((s) => s.importReview)
   const openCase = useStore((s) => s.openCase)
+  const filters = useStore((s) => s.filters)
+  const setFilters = useStore((s) => s.setFilters)
   const [summary, setSummary] = useState<ExportSummary | null>(null)
   const [issues, setIssues] = useState<ValidationIssue[]>([])
   const [preview, setPreview] = useState<Record<string, string>[]>([])
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const runRef = useRef(0)
 
   const validate = useCallback(async () => {
@@ -74,18 +76,21 @@ export function ExportScreen() {
 
   const errors = issues.filter((i) => i.severity === 'error')
   const warnings = issues.filter((i) => i.severity === 'warning')
-  const coverage = summary && meta ? summary.txns / meta.txnCount : 0
-  const canDownload = Boolean(summary) && !errors.length && !busy && !failure
+  const offersFile = canDownloadSubmission(meta?.phase ?? null)
+  const canDownload = offersFile && Boolean(summary) && !errors.length && !busy && !failure
+  const fileBase = `submission_${meta?.phase ?? 'cuadra'}`
 
-  const save = async () => {
-    if (!db) return
+  const save = async (compressed: boolean) => {
+    if (!db || !offersFile) return
     try {
       await useStore.getState().flushWrites()
       const bytes = await writeSubmission(db)
       const firstLine = new TextDecoder().decode(bytes.slice(0, SUBMISSION_HEADER.length))
       if (firstLine !== SUBMISSION_HEADER) throw new Error('La cabecera generada no coincide con la oficial')
-      download(bytes, 'submission.csv')
-      notify('ok', `submission.csv descargado con ${formatCount(summary?.rows ?? 0)} filas.`)
+      const name = `${fileBase}.csv${compressed ? '.gz' : ''}`
+      if (compressed) downloadBytes(await gzip(bytes), name, 'application/gzip')
+      else downloadBytes(bytes, name)
+      notify('ok', `${name} descargado con ${formatCount(summary?.rows ?? 0)} filas.`)
     } catch (error) {
       notify('error', `No se pudo generar el CSV: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -98,20 +103,45 @@ export function ExportScreen() {
       notify('error', `${txnId} no existe en bank_transactions.csv.`)
       return
     }
-    openCase(rid, await queuePosition(db, rid))
+    // Outside the current view, opening it would lose the place: J would jump to the top of the list.
+    let position = await queuePosition(db, rid)
+    if (position === null) {
+      await setFilters({ ...DEFAULT_FILTERS, readyThreshold: filters.readyThreshold, view: 'all' })
+      position = await queuePosition(db, rid)
+    }
+    openCase(rid, position)
   }
 
-  return (
-    <div className="export">
-      <section className="export-side">
-        <h1 className="headline">Exportar el envío</h1>
-        <p className="muted">Cada movimiento sale con lo revisado, si lo hay. Si no, con su propuesta. Si tampoco, como UNIDENTIFIED.</p>
+  const ctaLabel = busy
+    ? 'Validando…'
+    : failure
+      ? 'No se pudo validar'
+      : errors.length
+        ? errorsLabel(errors.reduce((n, e) => n + e.count, 0))
+        : `Descargar ${fileBase}.csv.gz`
 
-        <fieldset className="options">
-          <legend className="label">Qué hacer con las propuestas sin revisar</legend>
+  return (
+    <div className="send">
+      <section className="send-side">
+        <h1 className="send-title">Validar</h1>
+        <p className="muted">Cada movimiento queda con lo revisado, si lo hay. Si no, con su propuesta. Si tampoco, como no identificado.</p>
+
+        {summary && (
+          <dl className="send-summary">
+            <div><dt>Revisados</dt><dd className="num from-review">{formatCount(summary.fromReview)}</dd></div>
+            <div><dt>Con propuesta sin revisar</dt><dd className="num">{formatCount(summary.fromProposals)}</dd></div>
+            <div className={summary.autoUnidentified ? 'is-attention' : ''}>
+              <dt>No identificados automáticos</dt><dd className="num">{formatCount(summary.autoUnidentified)}</dd>
+            </div>
+            <div><dt>Filas</dt><dd className="num">{formatCount(summary.rows)}</dd></div>
+            <div><dt>Tamaño sin comprimir</dt><dd className="num">{formatMegabytes(summary.bytes)}</dd></div>
+          </dl>
+        )}
+
+        <fieldset className="send-options">
           <label className="check">
             <input type="checkbox" checked={options.includeProposals} onChange={(e) => setOptions({ includeProposals: e.target.checked })} />
-            Incluirlas en el CSV
+            Incluir las propuestas sin revisar
           </label>
           <label className="inline-number">
             Solo con confianza desde
@@ -127,65 +157,33 @@ export function ExportScreen() {
           </label>
         </fieldset>
 
-        {summary && (
-          <dl className="summary">
-            <div><dt>Filas</dt><dd className="num">{formatCount(summary.rows)}</dd></div>
-            <div><dt>Revisados</dt><dd className="num">{formatCount(summary.fromReview)}</dd></div>
-            <div><dt>Con propuesta</dt><dd className="num">{formatCount(summary.fromProposals)}</dd></div>
-            <div><dt>UNIDENTIFIED automático</dt><dd className="num">{formatCount(summary.autoUnidentified)}</dd></div>
-            <div><dt>Cobertura</dt><dd className="num">{formatPercent(coverage)}</dd></div>
-          </dl>
+        {offersFile ? (
+          <>
+            <button className="btn btn-primary btn-large" disabled={!canDownload} onClick={() => void save(true)}>
+              {ctaLabel}
+              <ArrowDownToLine size={16} aria-hidden="true" />
+            </button>
+            <button className="link footnote" disabled={!canDownload} onClick={() => void save(false)}>
+              Descargarlo sin comprimir
+            </button>
+          </>
+        ) : (
+          <p className="review-only">
+            Aquí no se genera el fichero de envío: el de esta fase sale del motor del equipo. Sirve para revisar y comprobar el formato; lo decidido se pasa con «Descargar mi revisión».
+          </p>
         )}
 
-        <button className="cta cta-large cta-wide" disabled={!canDownload} onClick={() => void save()}>
-          {busy ? 'Validando…' : failure ? 'No se pudo validar' : errors.length ? errorsLabel(errors.reduce((n, e) => n + e.count, 0)) : 'Descargar submission.csv'}
-          <span className="cta-box"><ArrowDownToLine size={14} strokeWidth={1.5} /></span>
-        </button>
-
-        <div className="team">
-          <h2 className="label">Reparto en el equipo</h2>
-          <p className="muted">Cada persona descarga lo suyo y otra lo importa. Lo ya decidido aquí no se pisa.</p>
-          <div className="team-actions">
-            <button
-              className="btn"
-              onClick={() => {
-                if (!db) return
-                exportReviewCsv(db).then(
-                  (bytes) => download(bytes, 'revision.csv'),
-                  (error: unknown) => notify('error', `No se pudo descargar la revisión: ${String(error)}`),
-                )
-              }}
-            >
-              Descargar mi revisión
-            </button>
-            <button className="btn" onClick={() => fileRef.current?.click()}>Importar revisión</button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv"
-              hidden
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                event.target.value = ''
-                if (!file) return
-                file.text().then(importReview).then(
-                  (message) => notify('ok', message),
-                  (error: unknown) => notify('error', `No se pudo importar: ${String(error)}`),
-                )
-              }}
-            />
-          </div>
-        </div>
+        <TeamBlock />
       </section>
 
-      <section className="export-main">
+      <section className="send-main">
         {failure && <p className="problem">No se pudo validar: {failure}</p>}
-        <h2 className="label">Validación</h2>
+        <h2 className="section-title">Comprobaciones del formato oficial</h2>
         {summary && !issues.length && !busy && !failure && (
-          <p className="valid"><Check size={16} /> Sin errores ni avisos. El CSV está listo.</p>
+          <p className="valid"><Check size={16} aria-hidden="true" /> Todo correcto. El fichero está listo.</p>
         )}
         {summary && !errors.length && warnings.length > 0 && !failure && (
-          <p className="valid"><Check size={16} /> Sin errores. Los avisos no impiden descargar.</p>
+          <p className="valid"><Check size={16} aria-hidden="true" /> Sin errores. Los avisos no impiden descargar.</p>
         )}
         <div className="issues">
           {[...errors, ...warnings].map((issue) => (
@@ -195,7 +193,7 @@ export function ExportScreen() {
                 <span className="issue-title">{issue.title}</span>
                 <span className="num">{formatCount(issue.count)}</span>
               </summary>
-              <table className="table table-compact">
+              <table className="table">
                 <thead>
                   <tr><th className="right">Fila</th><th>Movimiento</th><th>Detalle</th><th /></tr>
                 </thead>
@@ -203,8 +201,8 @@ export function ExportScreen() {
                   {issue.samples.map((sample) => (
                     <tr key={`${sample.line}-${sample.txn}-${sample.detail}`}>
                       <td className="right num">{sample.line || 'Sin fila'}</td>
-                      <td className="mono-small">{sample.txn}</td>
-                      <td className="mono-small">{sample.detail}</td>
+                      <td className="id">{sample.txn}</td>
+                      <td className="id">{sample.detail}</td>
                       <td className="right"><button className="link" onClick={() => void goToTxn(sample.txn)}>Abrir</button></td>
                     </tr>
                   ))}
@@ -217,9 +215,9 @@ export function ExportScreen() {
           ))}
         </div>
 
-        <h2 className="label label-spaced">Primeras filas</h2>
+        <h2 className="section-title send-preview-title">Primeras filas del fichero</h2>
         <div className="table-scroll-x">
-          <table className="table table-compact">
+          <table className="table">
             <thead>
               <tr>
                 <th className="right">Fila</th>
@@ -230,11 +228,11 @@ export function ExportScreen() {
               {preview.map((row) => (
                 <tr key={row.line}>
                   <td className="right num">{row.line}</td>
-                  <td className="mono-small">{row.txn_id}</td>
-                  <td className="mono-small">{row.item_id}</td>
+                  <td className="id">{row.txn_id}</td>
+                  <td className="id">{row.item_id}</td>
                   <td className="right num">{row.amount}</td>
-                  <td className="mono-small">{row.category}</td>
-                  <td className="mono-small">{row.exception}</td>
+                  <td className="id">{row.category}</td>
+                  <td className="id">{row.exception}</td>
                   <td className="muted">{ORIGIN_LABEL[row.origin] ?? row.origin}</td>
                 </tr>
               ))}
@@ -246,4 +244,46 @@ export function ExportScreen() {
   )
 }
 
-const ORIGIN_LABEL: Record<string, string> = { review: 'Revisado', proposal: 'Propuesta', auto: 'Automático' }
+function TeamBlock() {
+  const db = useStore((s) => s.db)
+  const notify = useStore((s) => s.notify)
+  const importReview = useStore((s) => s.importReview)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="send-team">
+      <h2 className="section-title">Revisar en equipo</h2>
+      <p className="footnote">Cada persona descarga su revisión y otra la importa. Lo ya decidido aquí no se pisa.</p>
+      <div className="case-empty-actions send-team-actions">
+        <button
+          className="btn"
+          onClick={() => {
+            if (!db) return
+            exportReviewCsv(db).then(
+              (bytes) => downloadBytes(bytes, 'revision.csv'),
+              (error: unknown) => notify('error', `No se pudo descargar la revisión: ${String(error)}`),
+            )
+          }}
+        >
+          Descargar mi revisión
+        </button>
+        <button className="btn" onClick={() => fileRef.current?.click()}>Importar revisión</button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (!file) return
+            file.text().then(importReview).then(
+              (message) => notify('ok', message),
+              (error: unknown) => notify('error', `No se pudo importar: ${String(error)}`),
+            )
+          }}
+        />
+      </div>
+    </div>
+  )
+}

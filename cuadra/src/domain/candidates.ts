@@ -1,4 +1,5 @@
-import type { Item } from './types'
+import { convert, tolerance } from './money'
+import type { FxRate, Item } from './types'
 
 export type CandidateReason = 'proposal' | 'printed' | 'exact' | 'converted' | 'party' | 'search'
 
@@ -66,6 +67,8 @@ function collect(
   return merged
 }
 
+const invoiceDate = (item: Item) => item.issueDate || item.dueDate
+
 /** FIFO rule: same party and same amount with no other clue settles the oldest open item. */
 function markFifo(candidates: Candidate[]): Candidate[] {
   const hasPrinted = candidates.some((c) => c.reasons.includes('printed'))
@@ -77,7 +80,7 @@ function markFifo(candidates: Candidate[]): Candidate[] {
     const key = `${candidate.item.partyId}|${candidate.item.currency}|${candidate.item.openAmount.toFixed(2)}`
     sizes.set(key, (sizes.get(key) ?? 0) + 1)
     const current = oldestByGroup.get(key)
-    if (!current || candidate.item.dueDate < current.item.dueDate) {
+    if (!current || invoiceDate(candidate.item) < invoiceDate(current.item)) {
       oldestByGroup.set(key, candidate)
     }
   }
@@ -106,6 +109,41 @@ export function rankCandidates(
 ): Candidate[] {
   const candidates = markFifo([...collect(txn.currency, raw, used).values()])
   return [...candidates].sort(
-    (a, b) => score(b) - score(a) || a.item.dueDate.localeCompare(b.item.dueDate),
+    (a, b) => score(b) - score(a) || invoiceDate(a.item).localeCompare(invoiceDate(b.item)),
   )
+}
+
+export type CandidateGroups = { best: Candidate[]; party: Candidate[]; others: Candidate[] }
+
+const isGoodMatch = ({ reasons }: Candidate) =>
+  reasons.some((reason) => ['proposal', 'printed', 'exact', 'search'].includes(reason)) ||
+  (reasons.includes('converted') && reasons.includes('party'))
+
+/** The reviewer sees likely matches first; amounts of unrelated parties are almost always noise. */
+export function groupCandidates(candidates: Candidate[]): CandidateGroups {
+  const best = candidates.filter(isGoodMatch)
+  const rest = candidates.filter((candidate) => !isGoodMatch(candidate))
+  return {
+    best,
+    party: rest.filter(({ reasons }) => reasons.includes('party')),
+    others: rest.filter(({ reasons }) => !reasons.includes('party')),
+  }
+}
+
+export type Fit = { fit: 'exact' | 'leaves' | 'over' | 'unknown'; gap: number; equivalent: number | null }
+
+/** What this item would do to the part of the movement still unapplied. */
+export function describeFit(
+  item: Item,
+  remaining: number,
+  txn: { currency: string; date: string },
+  rates: FxRate[],
+): Fit {
+  const size = Math.abs(item.openAmount)
+  const value = convert(size, item.currency, txn.currency, txn.date, rates)
+  if (value === null) return { fit: 'unknown', gap: 0, equivalent: null }
+  const equivalent = item.currency === txn.currency ? null : value
+  const gap = item.kind === 'CN' ? remaining + value : remaining - value
+  if (Math.abs(gap) <= tolerance(remaining)) return { fit: 'exact', gap: 0, equivalent }
+  return gap > 0 ? { fit: 'leaves', gap, equivalent } : { fit: 'over', gap: -gap, equivalent }
 }

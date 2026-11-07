@@ -1,19 +1,29 @@
-import { ArrowUpRight, Check } from 'lucide-react'
+import { Check, Circle, FolderOpen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Robot } from '../components/Robot'
+import type { PhaseLayout, PhaseName } from '../data/dataRoot'
 import { readFolderHandle } from '../data/log'
 import { buildPlan, planProblems, withMapping, type Plan, type SourceFile } from '../data/preflight'
 import { ROLE_LABEL, ROLE_SCHEMA, SCHEMAS, type FileRole } from '../data/schema'
-import { canPickDirectory, fetchSample, pickDirectory, reopenDirectory, sourcesFromInput } from '../data/sources'
+import { canPickDirectory, fetchSample, pickDirectory, reopenDirectory, scanFromInput, type FolderScan } from '../data/sources'
 import { formatCount } from '../domain/money'
 import { useStore } from '../store'
 
-const SLOTS: FileRole[] = ['bank', 'ar', 'ap', 'cn', 'open', 'proposals', 'golden', 'categories', 'customers', 'suppliers', 'fx', 'terms', 'pdfText']
-const REQUIRED: FileRole[] = ['bank']
+const NEEDED: FileRole[] = ['bank', 'ar', 'ap', 'cn', 'open']
+const USEFUL: FileRole[] = ['proposals', 'golden', 'categories', 'customers', 'suppliers', 'fx', 'terms', 'pdfText']
+const PHASE_LABEL: Record<PhaseName, string> = { sample: 'Sample', train: 'TRAIN', live: 'LIVE', final: 'FINAL' }
+const DEFAULT_PHASES: PhaseName[] = ['live', 'final', 'sample', 'train']
+
+const defaultLayout = (layouts: PhaseLayout[]) =>
+  DEFAULT_PHASES.flatMap((phase) => layouts.filter((layout) => layout.phase === phase))[0] ?? null
 
 export function LoadScreen() {
+  const [scan, setScan] = useState<FolderScan | null>(null)
+  const [layout, setLayout] = useState<PhaseLayout | null>(null)
+  const [sources, setSources] = useState<SourceFile[]>([])
   const [plan, setPlan] = useState<Plan | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reading, setReading] = useState(false)
   const [lastFolder, setLastFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const progress = useStore((s) => s.progress)
@@ -24,16 +34,35 @@ export function LoadScreen() {
     readFolderHandle().then(setLastFolder, () => setLastFolder(null))
   }, [])
 
-  const accept = useCallback(async (name: string, sources: SourceFile[]) => {
+  const openPhase = useCallback(async (folder: FolderScan, next: PhaseLayout | null, phaseHint: string | null = null) => {
+    setReading(true)
     setError(null)
-    setPlan(await buildPlan(name, sources))
+    try {
+      setLayout(next)
+      const found = await folder.load(next)
+      const phase = next?.phase ?? phaseHint
+      setSources(found)
+      setPlan(await buildPlan(phase ? `${folder.name}/${phase}` : folder.name, found, { phase }))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setReading(false)
+    }
   }, [])
 
+  const accept = useCallback(
+    async (folder: FolderScan, phaseHint: string | null = null) => {
+      setScan(folder)
+      await openPhase(folder, defaultLayout(folder.layouts), phaseHint)
+    },
+    [openPhase],
+  )
+
   const run = useCallback(
-    async (open: () => Promise<{ name: string; sources: SourceFile[] } | null>) => {
+    async (open: () => Promise<FolderScan | null>, phaseHint: string | null = null) => {
       try {
         const picked = await open()
-        if (picked) await accept(picked.name, picked.sources)
+        if (picked) await accept(picked, phaseHint)
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause))
       }
@@ -46,16 +75,23 @@ export function LoadScreen() {
     else inputRef.current?.click()
   }
 
+  const changeProposal = async (path: string) => {
+    if (!plan) return
+    setPlan(await buildPlan(plan.name, sources, { phase: plan.phase, proposalPath: path }))
+  }
+
   const problems = plan ? planProblems(plan) : []
-  const ready = Boolean(plan) && problems.length === 0 && !progress
+  const ready = Boolean(plan) && problems.length === 0 && !progress && !reading
+  const missingMasters = plan && !plan.files.categories && !plan.files.fx
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const sample = params.get('demo')
     if (!sample) return
     void (async () => {
-      const picked = await fetchSample(sample)
-      const built = await buildPlan(picked.name, picked.sources)
+      const folder = await fetchSample(sample)
+      const found = await folder.load(null)
+      const built = await buildPlan(folder.name, found, { phase: sample })
       setPlan(built)
       if (params.has('autoload')) await loadDataset(built)
     })()
@@ -74,16 +110,17 @@ export function LoadScreen() {
 
   return (
     <div className="load">
-      <div className="load-bg" aria-hidden="true" />
-      <section className="load-hero">
-        <h1 className="display">Cuadra cada movimiento.</h1>
-        <div className="folder-control">
-          <div className="folder-path">{plan ? plan.name : 'Carpeta con los CSV descargados'}</div>
-          <button className="cta cta-large" onClick={choose}>
-            Elegir carpeta
-            <span className="cta-box">
-              <ArrowUpRight size={14} strokeWidth={1.5} />
-            </span>
+      <section className="load-main">
+        <div className="load-brand"><Robot mood={plan ? (problems.length ? 'worried' : 'happy') : 'neutral'} size={40} /><span>Cuadra</span></div>
+        <h1 className="load-title">Cuadra cada movimiento del banco con sus partidas.</h1>
+        <p className="load-lede">
+          Revisa las propuestas del pipeline por teclado, corrige lo dudoso y comprueba el formato oficial. Todo se queda en este navegador.
+        </p>
+
+        <div className="load-pick">
+          <button className={plan ? 'btn btn-large' : 'btn btn-primary btn-large'} onClick={choose}>
+            <span className="load-pick-label"><FolderOpen size={16} aria-hidden="true" /> {plan ? plan.name : 'Elegir la carpeta de datos'}</span>
+            {plan && <span className="muted">Cambiar</span>}
           </button>
           <input
             ref={inputRef}
@@ -92,95 +129,106 @@ export function LoadScreen() {
             multiple
             {...({ webkitdirectory: '' } as object)}
             onChange={(event) => {
-              if (event.target.files?.length) {
-                const picked = sourcesFromInput(event.target.files)
-                void accept(picked.name, picked.sources)
-              }
+              if (event.target.files?.length) void accept(scanFromInput(event.target.files))
             }}
           />
-        </div>
-        <p className="lede">
-          Revisa las propuestas del pipeline por teclado, corrige lo dudoso y exporta un CSV de envío validado. Todo se
-          queda en este navegador.
-        </p>
-        <div className="load-links">
-          {lastFolder && (
-            <button className="link" onClick={() => void run(() => reopenDirectory(lastFolder))}>
-              Reabrir {lastFolder.name}
-            </button>
-          )}
-          <button className="link" onClick={() => void run(() => fetchSample('train'))}>
-            Probar con datos inventados, con golden
-          </button>
-          <button className="link" onClick={() => void run(() => fetchSample('live'))}>
-            Probar con datos inventados, sin golden
-          </button>
+          {!plan && <p className="footnote">La carpeta que contiene <code>live/</code>, <code>train/</code> y <code>masters/</code>. Usa Chrome o Edge para poder reabrirla.</p>}
         </div>
 
-        {(error || loadError) && (
-          <p className="problem" role="alert">
-            No se pudo leer la carpeta: {error ?? loadError}
-          </p>
+        {lastFolder && !plan && (
+          <button className="btn" onClick={() => void run(() => reopenDirectory(lastFolder))}>Reabrir {lastFolder.name}</button>
         )}
 
-        {plan && (
-          <div className="load-actions">
-            {problems.map((problem) => (
-              <p key={problem.message} className="problem">
-                {problem.message}
-              </p>
-            ))}
-            {progress ? (
-              <div className="progress" role="status">
-                <Robot mood="working" size={32} />
-                <div className="progress-text">
-                  <span>{progress.step}</span>
-                  <div className="meter" aria-hidden="true">
-                    <div style={{ width: `${(progress.done / progress.total) * 100}%` }} />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <button className="cta cta-large" disabled={!ready} onClick={() => plan && void loadDataset(plan)}>
-                Cargar datos
-                <span className="cta-box">
-                  <kbd className="kbd-invert">Enter</kbd>
-                </span>
-              </button>
-            )}
+        {scan && scan.layouts.length > 0 && (
+          <div className="load-field">
+            <span className="section-title">Fase</span>
+            <div className="phase-picker" role="group" aria-label="Fase">
+              {scan.layouts.map((option) => (
+                <button
+                  key={option.phase}
+                  className={layout?.phase === option.phase ? 'btn is-active' : 'btn'}
+                  aria-pressed={layout?.phase === option.phase}
+                  onClick={() => void openPhase(scan, option)}
+                >
+                  {PHASE_LABEL[option.phase]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {plan && plan.proposalOptions.length > 1 && (
+          <label className="load-field">
+            <span className="section-title">Propuestas</span>
+            <select value={plan.files.proposals?.path ?? ''} onChange={(event) => void changeProposal(event.target.value)}>
+              {plan.proposalOptions.map((path) => <option key={path} value={path}>{path}</option>)}
+            </select>
+            {plan.enrichments.length > 0 && <span className="footnote">La confianza y el origen salen de {plan.enrichments.length} etapas de matching.</span>}
+          </label>
+        )}
+
+        {(error || loadError) && <p className="problem" role="alert">No se pudo leer la carpeta: {error ?? loadError}</p>}
+        {missingMasters && (
+          <p className="problem">No encuentro los maestros: sin ellos no hay categorías ni tipos de cambio. Elige la carpeta raíz, la que contiene esta fase y <code>masters/</code>.</p>
+        )}
+        {problems.map((problem) => <p key={problem.message} className="problem">{problem.message}</p>)}
+
+        {plan && (progress ? (
+          <div className="progress" role="status">
+            <Robot mood="working" size={28} />
+            <div className="progress-text">
+              <span>{progress.step}</span>
+              <div className="meter" aria-hidden="true"><div style={{ transform: `scaleX(${progress.done / progress.total})` }} /></div>
+            </div>
+          </div>
+        ) : (
+          <button className="btn btn-primary btn-large load-go" disabled={!ready} onClick={() => plan && void loadDataset(plan)}>
+            {reading ? 'Leyendo la carpeta…' : 'Cargar datos'}
+            <kbd>Enter</kbd>
+          </button>
+        ))}
+
+        {!plan && (
+          <div className="load-samples">
+            <span className="footnote">¿Sin datos a mano? Prueba con datos inventados:</span>
+            <button className="link footnote" onClick={() => void run(() => fetchSample('train'), 'train')}>con golden</button>
+            <button className="link footnote" onClick={() => void run(() => fetchSample('live'), 'live')}>sin golden</button>
           </div>
         )}
       </section>
 
-      <section className="file-grid" aria-label="Ficheros detectados">
-        {SLOTS.map((role) => {
-          const file = plan?.files[role]
-          const missing = !file && REQUIRED.includes(role)
-          return (
-            <div key={role} className={`file-cell${file ? ' is-found' : ''}${missing && plan ? ' is-missing' : ''}`}>
-              <span className="file-name">{ROLE_LABEL[role].replace(/([_/])/g, '$1\u200b')}</span>
-              {file ? (
-                <span className="file-meta">
-                  <Check size={12} aria-label="Encontrado" /> {formatSize(file.file.size)}
-                </span>
-              ) : (
-                <span className="file-meta">{plan ? 'no está' : ''}</span>
-              )}
-              {file && !file.complete && plan && (
-                <MappingEditor plan={plan} role={role} onChange={setPlan} />
-              )}
-            </div>
-          )
-        })}
-        <div className={`file-cell${plan?.pdfs.length ? ' is-found' : ''}`}>
-          <span className="file-name">pdfs/</span>
-          <span className="file-meta">{plan ? `${formatCount(plan.pdfs.length)} PDF` : ''}</span>
-        </div>
-        <div className="file-cell file-cell-robot">
-          <Robot mood={plan ? (problems.length ? 'worried' : 'happy') : 'neutral'} size={56} />
-        </div>
-      </section>
+      {plan && (
+        <section className="load-files" aria-label="Ficheros detectados">
+          <h2 className="section-title">Lo que se ha encontrado</h2>
+          <FileList plan={plan} roles={NEEDED} onChange={setPlan} />
+          <h2 className="section-title load-files-second">Lo que ayuda a decidir</h2>
+          <FileList plan={plan} roles={USEFUL} onChange={setPlan} />
+          <div className="file-row is-found">
+            <Check size={14} aria-hidden="true" />
+            <span>Documentos PDF</span>
+            <span className="muted num">{formatCount(plan.pdfs.length)}</span>
+          </div>
+        </section>
+      )}
     </div>
+  )
+}
+
+function FileList({ plan, roles, onChange }: { plan: Plan; roles: FileRole[]; onChange: (plan: Plan) => void }) {
+  return (
+    <ul className="file-list">
+      {roles.map((role) => {
+        const file = plan.files[role]
+        return (
+          <li key={role} className={file ? 'file-row is-found' : 'file-row'}>
+            {file ? <Check size={14} aria-label="Encontrado" /> : <Circle size={14} aria-label="No está" />}
+            <span>{ROLE_LABEL[role]}</span>
+            <span className="muted num">{file ? formatSize(file.file.size) : 'No está'}</span>
+            {file && !file.complete && <MappingEditor plan={plan} role={role} onChange={onChange} />}
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
@@ -204,11 +252,7 @@ function MappingEditor({ plan, role, onChange }: MappingEditorProps) {
           <span>{field}</span>
           <select value="" onChange={(event) => onChange(withMapping(plan, role, field, event.target.value))}>
             <option value="">Elige columna</option>
-            {file.headers.map((header) => (
-              <option key={header} value={header}>
-                {header}
-              </option>
-            ))}
+            {file.headers.map((header) => <option key={header} value={header}>{header}</option>)}
           </select>
         </label>
       ))}

@@ -48,6 +48,10 @@ const OPEN_AMOUNT = ['open_amount', 'amount_open', 'outstanding', 'outstanding_a
 const PARTY = ['party_id', 'customer_id', 'supplier_id', 'vendor_id', 'counterparty_id', 'third_party_id', 'tercero_id', 'party', 'customer', 'supplier', 'vendor', 'tercero', 'counterparty']
 const PARTY_NAME = ['party_name', 'customer_name', 'supplier_name', 'vendor_name', 'counterparty_name', 'tercero_nombre', 'name', 'nombre']
 const CURRENCY = ['currency', 'ccy', 'currency_code', 'divisa', 'moneda']
+const PRINTED = ['printed_number', 'printed_no', 'printed_id', 'number', 'invoice_number', 'supplier_invoice_number', 'document_number', 'doc_number', 'credit_note_number', 'numero', 'numero_impreso']
+const DUE_DATE = ['due_date', 'vencimiento', 'maturity_date', 'duedate', 'fecha_vencimiento']
+const ISSUE_DATE = ['issue_date', 'invoice_date', 'document_date', 'date']
+const TERMS = ['payment_terms', 'payment_term', 'terms', 'terms_id', 'payment_term_id', 'condiciones_pago']
 
 export const SCHEMAS: Record<SchemaKey, Schema> = {
   bank: {
@@ -57,21 +61,33 @@ export const SCHEMAS: Record<SchemaKey, Schema> = {
       amount: ['amount', 'signed_amount', 'importe', 'txn_amount'],
       currency: CURRENCY,
       account: ['account', 'account_id', 'bank_account', 'iban', 'cuenta', 'account_number'],
-      description: ['description', 'concept', 'concepto', 'bank_concept', 'concepto_bancario', 'narrative', 'memo', 'remittance_info', 'remittance', 'details', 'text', 'reference'],
+      description: ['description', 'concept', 'concepto', 'bank_concept', 'concepto_bancario', 'narrative', 'memo', 'text', 'details', 'reference', 'remittance_info', 'remittance'],
+      entity: ['entity', 'company', 'sociedad'],
+      bank: ['bank', 'banco'],
+      counterparty: ['counterparty_name', 'counterparty', 'ordenante'],
+      counterpartyAccount: ['counterparty_account', 'counterparty_iban'],
+      endToEnd: ['end_to_end_id', 'endtoendid'],
+      remittance: ['remittance_info', 'remittance'],
+      ref1: ['ref1'],
+      ref2: ['ref2'],
+      origAmount: ['orig_amount', 'instructed_amount'],
+      origCurrency: ['orig_currency', 'instructed_currency'],
     },
     required: ['id', 'date', 'amount', 'currency', 'account', 'description'],
   },
   invoice: {
     fields: {
       id: ['item_id', 'id'],
-      printed: ['printed_number', 'printed_no', 'printed_id', 'number', 'invoice_number', 'document_number', 'doc_number', 'credit_note_number', 'numero', 'numero_impreso'],
+      printed: PRINTED,
       party: PARTY,
       partyName: PARTY_NAME,
       amount: ITEM_AMOUNT,
       openAmount: OPEN_AMOUNT,
       currency: CURRENCY,
-      dueDate: ['due_date', 'vencimiento', 'maturity_date', 'duedate', 'fecha_vencimiento', 'date', 'issue_date', 'invoice_date'],
-      terms: ['payment_terms', 'payment_term', 'terms', 'terms_id', 'payment_term_id', 'condiciones_pago'],
+      dueDate: DUE_DATE,
+      issueDate: ISSUE_DATE,
+      terms: TERMS,
+      po: ['customer_po', 'our_po', 'po', 'po_number', 'pedido'],
     },
     required: ['id', 'amount', 'currency'],
   },
@@ -79,6 +95,12 @@ export const SCHEMAS: Record<SchemaKey, Schema> = {
     fields: {
       id: ['item_id', 'id'],
       openAmount: [...OPEN_AMOUNT, 'amount'],
+      printed: PRINTED,
+      party: PARTY,
+      amount: ITEM_AMOUNT,
+      currency: CURRENCY,
+      dueDate: DUE_DATE,
+      issueDate: ISSUE_DATE,
     },
     required: ['id'],
   },
@@ -91,6 +113,9 @@ export const SCHEMAS: Record<SchemaKey, Schema> = {
       category: ['category', 'categoria'],
       confidence: ['confidence', 'confianza', 'score', 'conf'],
       reason: ['reason', 'motivo', 'why', 'explanation', 'rationale'],
+      source: ['source', 'fuente', 'stage'],
+      adviceId: ['advice_id'],
+      lineNo: ['line_no'],
     },
     required: ['txn'],
   },
@@ -101,6 +126,8 @@ export const SCHEMAS: Record<SchemaKey, Schema> = {
       amount: ['amount'],
       category: ['category'],
       exception: ['exception'],
+      segment: ['segment'],
+      difficulty: ['difficulty'],
     },
     required: ['txn'],
   },
@@ -115,6 +142,10 @@ export const SCHEMAS: Record<SchemaKey, Schema> = {
     fields: {
       id: PARTY,
       name: PARTY_NAME,
+      tradeName: ['trade_name'],
+      iban: ['iban'],
+      entity: ['entity'],
+      terms: TERMS,
     },
     required: ['id'],
   },
@@ -123,14 +154,16 @@ export const SCHEMAS: Record<SchemaKey, Schema> = {
       date: ['date', 'rate_date', 'fecha'],
       base: ['base', 'base_currency', 'from', 'from_currency', 'currency_from', 'source_currency', 'currency'],
       quote: ['quote', 'quote_currency', 'to', 'to_currency', 'currency_to', 'target_currency'],
-      rate: ['rate', 'fx_rate', 'exchange_rate', 'tipo', 'value'],
+      rate: ['rate', 'fx_rate', 'exchange_rate', 'tipo', 'value', 'units_per_eur'],
     },
-    required: ['date', 'base', 'quote', 'rate'],
+    // Without a quote column, rate means units of that currency per euro.
+    required: ['date', 'base', 'rate'],
   },
   terms: {
     fields: {
       id: ['payment_terms', 'payment_term', 'terms', 'terms_id', 'payment_term_id', 'code', 'id'],
-      discount: ['discount_pct', 'discount_percent', 'early_discount_pct', 'discount', 'descuento'],
+      discount: ['discount_pct', 'discount_percent', 'early_discount_pct', 'early_payment_discount_pct', 'discount', 'descuento'],
+      discountDays: ['discount_days', 'early_payment_days'],
     },
     required: ['id'],
   },
@@ -150,8 +183,8 @@ export const ROLE_LABEL: Record<FileRole, string> = {
   ap: 'ap_invoices.csv',
   cn: 'credit_notes.csv',
   open: 'open_items_at_start.csv',
-  proposals: 'propuestas.csv',
-  golden: 'golden.csv',
+  proposals: 'Propuestas del pipeline',
+  golden: 'golden_allocations.csv',
   categories: 'masters/categories.csv',
   customers: 'masters/customers.csv',
   suppliers: 'masters/suppliers.csv',
@@ -160,25 +193,34 @@ export const ROLE_LABEL: Record<FileRole, string> = {
   pdfText: 'pdfs_text.csv',
 }
 
+const CSV = String.raw`\.csv(\.gz)?$`
+const pattern = (start: string) => new RegExp(`^${start}.*${CSV}`)
+
 const FILE_PATTERNS: [RegExp, FileRole][] = [
-  [/^bank_transactions.*\.csv$/, 'bank'],
-  [/^ar_invoices.*\.csv$/, 'ar'],
-  [/^ap_invoices.*\.csv$/, 'ap'],
-  [/^credit_notes.*\.csv$/, 'cn'],
-  [/^open_items_at_start.*\.csv$/, 'open'],
-  [/^(propuestas|proposals).*\.csv$/, 'proposals'],
-  [/^.*(golden|ground_truth|gold).*\.csv$/, 'golden'],
-  [/^categories.*\.csv$/, 'categories'],
-  [/^customers.*\.csv$/, 'customers'],
-  [/^suppliers.*\.csv$/, 'suppliers'],
-  [/^fx_rates.*\.csv$/, 'fx'],
-  [/^payment_terms.*\.csv$/, 'terms'],
-  [/^pdfs_text.*\.csv$/, 'pdfText'],
+  [pattern('bank_transactions'), 'bank'],
+  [pattern('ar_invoices'), 'ar'],
+  [pattern('ap_invoices'), 'ap'],
+  [pattern('credit_notes'), 'cn'],
+  [pattern('open_items_at_start'), 'open'],
+  [pattern('(propuestas|proposals)'), 'proposals'],
+  [pattern('.*(golden|ground_truth|gold)'), 'golden'],
+  [pattern('categories'), 'categories'],
+  [pattern('customers'), 'customers'],
+  [pattern('suppliers'), 'suppliers'],
+  [pattern('fx_rates'), 'fx'],
+  [pattern('payment_terms'), 'terms'],
+  [pattern('pdfs_text'), 'pdfText'],
 ]
+
+const UNDER_OUTPUT = /(^|\/)out\//
+
+export const isCsvName = (name: string): boolean => new RegExp(CSV, 'i').test(name)
 
 export function classifyFile(path: string): FileRole | null {
   const name = (path.split('/').at(-1) ?? '').toLowerCase()
-  return FILE_PATTERNS.find(([pattern]) => pattern.test(name))?.[1] ?? null
+  const role = FILE_PATTERNS.find(([regex]) => regex.test(name))?.[1]
+  if (role) return role
+  return UNDER_OUTPUT.test(path) && isCsvName(name) ? 'proposals' : null
 }
 
 export type ColumnMapping = Record<string, string | undefined>
