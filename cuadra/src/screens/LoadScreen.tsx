@@ -1,7 +1,7 @@
 import { Check, Circle, FolderOpen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Robot } from '../components/Robot'
-import { phaseOfEngineFile, type PhaseLayout, type PhaseName } from '../data/dataRoot'
+import { engineFileProblem, PHASE_LABEL, type PhaseLayout, type PhaseName } from '../data/dataRoot'
 import { readFolderHandle } from '../data/log'
 import { buildPlan, fileSource, planProblems, withMapping, type Plan, type SourceFile } from '../data/preflight'
 import { ROLE_LABEL, ROLE_SCHEMA, SCHEMAS, type FileRole } from '../data/schema'
@@ -11,7 +11,6 @@ import { useStore } from '../store'
 
 const NEEDED: FileRole[] = ['bank', 'ar', 'ap', 'cn', 'open']
 const USEFUL: FileRole[] = ['proposals', 'golden', 'categories', 'customers', 'suppliers', 'fx', 'terms', 'pdfText']
-const PHASE_LABEL: Record<PhaseName, string> = { sample: 'Sample', train: 'TRAIN', live: 'LIVE', final: 'FINAL' }
 const DEFAULT_PHASES: PhaseName[] = ['live', 'final', 'sample', 'train']
 
 const defaultLayout = (layouts: PhaseLayout[]) =>
@@ -84,9 +83,9 @@ export function LoadScreen() {
   /** The engine may have written elsewhere: its folder cannot be walked when the data is behind symlinks. */
   const pickEngineFile = async (file: File) => {
     if (!plan) return
-    const named = phaseOfEngineFile(file.name)
-    if (plan.phase && named && named !== plan.phase) {
-      setError(`${file.name} es de otra fase (${PHASE_LABEL[named]}). Elige el de esta fase o cambia de fase.`)
+    const problem = engineFileProblem(file.name, plan.phase)
+    if (problem) {
+      setError(problem)
       return
     }
     const path = `out/${file.name}`

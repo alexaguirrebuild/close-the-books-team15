@@ -69,8 +69,8 @@ describe('buildEvidence', () => {
     expect(step('origin', { proposal })?.text).toBe('Partida abierta con ese número')
   })
 
-  test('says when the pipeline proposes nothing', () => {
-    expect(step('origin', {})).toMatchObject({ state: 'warn', text: 'El pipeline no propone nada' })
+  test('says when there is no proposal, whoever wrote the file', () => {
+    expect(step('origin', {})).toMatchObject({ state: 'warn', text: 'No hay propuesta' })
   })
 
   test('leaves out documents when there are none', () => {

@@ -166,6 +166,16 @@ describe('engine output', () => {
     expect(plan.enrichments.map((f) => f.path)).toEqual(['out/live/matches/m2_remittance.csv.gz'])
   })
 
+  test('keeps the stages for a file that names its rule and brings a confidence: the engine gives none', async () => {
+    const withConfidence = 'bank_txn_id,item_id,amount,category,exception,rule,confidence\nT1,,,BANK_FEES,,kw:FEE,0.9\n'
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/live/propuestas.csv.gz', withConfidence),
+      output('out/live/matches/m2_remittance.csv.gz', OFFICIAL),
+    ])
+    expect(plan.enrichments.map((f) => f.path)).toEqual(['out/live/matches/m2_remittance.csv.gz'])
+  })
+
   test('keeps the rule and the evidence of each row, and knows there is no confidence', async () => {
     const explain = `bank_txn_id,item_id,amount,category,exception,rule,evidence\nT1,${A1},100.00,,,ref,refs F-1`
     const { db, meta } = await setup({ 'propuestas.csv': null, 'out/explain_live.csv': explain })

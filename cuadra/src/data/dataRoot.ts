@@ -6,6 +6,7 @@ import type { SourceFile } from './preflight'
  */
 export const PHASES = ['sample', 'train', 'live', 'final'] as const
 export type PhaseName = (typeof PHASES)[number]
+export const PHASE_LABEL: Record<PhaseName, string> = { sample: 'Sample', train: 'TRAIN', live: 'LIVE', final: 'FINAL' }
 
 export type PhaseLayout = {
   phase: PhaseName
@@ -49,6 +50,13 @@ const ENGINE_FILE_NAME = /^(?:sub|explain)_(sample|train|holdout|live|final)(?=[
 export function phaseOfEngineFile(name: string): PhaseName | null {
   const named = ENGINE_FILE_NAME.exec(name)?.[1].toLowerCase()
   return named === 'holdout' ? 'train' : (PHASES.find((phase) => phase === named) ?? null)
+}
+
+/** Why an engine file cannot be chosen for this phase, or null if it can. With no phase chosen, only its name can tell. */
+export function engineFileProblem(name: string, phase: string | null): string | null {
+  const named = phaseOfEngineFile(name)
+  if (!phase) return named ? null : `${name} no dice de qué fase es. Elige el explain_<fase>.csv.gz que escribe el motor.`
+  return named && named !== phase ? `${name} es de otra fase (${PHASE_LABEL[named]}). Elige el de esta fase o cambia de fase.` : null
 }
 
 export function filesOfLayout(layout: PhaseLayout, sources: SourceFile[]): SourceFile[] {

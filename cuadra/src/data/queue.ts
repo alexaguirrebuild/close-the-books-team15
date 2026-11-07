@@ -26,8 +26,8 @@ export const VIEW_LABEL: Record<QueueView, string> = {
 export const VIEW_HINT: Record<QueueView, string> = {
   priority: 'Primero lo que más puede subir la puntuación.',
   ready: 'Propuestas con confianza alta, para confirmar en lote.',
-  exceptions: 'El pipeline propone una excepción: compruébala.',
-  no_proposal: 'El pipeline no propone nada: hay que decidir a mano.',
+  exceptions: 'La propuesta trae una excepción: compruébala.',
+  no_proposal: 'No hay propuesta: hay que decidir a mano.',
   done: 'Lo ya decidido, por si hay que corregirlo.',
   errors: 'La propuesta no coincide con el golden.',
   all: 'Todos los movimientos de la fase.',

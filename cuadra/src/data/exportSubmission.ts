@@ -13,6 +13,12 @@ export type ExportOptions = { includeProposals: boolean; minConfidence: number }
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = { includeProposals: true, minConfidence: 0 }
 
+/** The minimum confidence for a percentage typed by hand, limited to 0-100; null if the field holds no usable number. */
+export function minConfidenceFromPercent(raw: string): number | null {
+  const percent = raw.trim() ? Number(raw) : Number.NaN
+  return Number.isFinite(percent) ? Math.min(Math.max(percent, 0), 100) / 100 : null
+}
+
 export type ExportSummary = {
   rows: number
   txns: number

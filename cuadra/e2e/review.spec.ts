@@ -643,7 +643,8 @@ test.describe('real data', () => {
     execFileSync('cp', ['-cR', phaseDir, join(folder, 'root', PHASE)])
     execFileSync('cp', ['-cR', join(docs, 'masters'), join(folder, 'root', 'masters')])
     if (existsSync(join(out, PHASE))) execFileSync('cp', ['-cR', join(out, PHASE), join(folder, 'root', 'out', PHASE)])
-    for (const name of readdirSync(out).filter((file) => new RegExp(`^(sub|explain)_${PHASE}\\.`).test(file))) {
+    const runPrefixes = [`sub_${PHASE}.`, `explain_${PHASE}.`]
+    for (const name of readdirSync(out).filter((file) => runPrefixes.some((prefix) => file.startsWith(prefix)))) {
       execFileSync('cp', ['-c', join(out, name), join(folder, 'root', 'out', name)])
     }
     const started = Date.now()

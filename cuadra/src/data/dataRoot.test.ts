@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { detectLayouts, filesOfLayout, phaseOfEngineFile, shouldEnter, type PhaseLayout } from './dataRoot'
+import { detectLayouts, engineFileProblem, filesOfLayout, phaseOfEngineFile, shouldEnter, type PhaseLayout } from './dataRoot'
 
 const live: PhaseLayout = { phase: 'live', phaseDir: 'live', mastersDir: 'bankrec-docs-and-masters/masters', outDir: 'out/live' }
 
@@ -121,6 +121,20 @@ describe('phaseOfEngineFile', () => {
   test('says nothing about any other name', () => {
     expect(phaseOfEngineFile('mi_revision.csv')).toBeNull()
     expect(phaseOfEngineFile('sub_lively.csv')).toBeNull()
+  })
+})
+
+describe('engineFileProblem', () => {
+  test('with a phase chosen, refuses only a file that names another one', () => {
+    expect(engineFileProblem('explain_live.csv', 'train')).toBe('explain_live.csv es de otra fase (LIVE). Elige el de esta fase o cambia de fase.')
+    expect(engineFileProblem('explain_train.csv', 'train')).toBeNull()
+    expect(engineFileProblem('explain_holdout.csv', 'train')).toBeNull()
+    expect(engineFileProblem('mi_revision.csv', 'train')).toBeNull()
+  })
+
+  test('with no phase chosen, the name has to say which one it is', () => {
+    expect(engineFileProblem('mi_revision.csv', null)).toBe('mi_revision.csv no dice de qué fase es. Elige el explain_<fase>.csv.gz que escribe el motor.')
+    expect(engineFileProblem('explain_live.csv.gz', null)).toBeNull()
   })
 })
 

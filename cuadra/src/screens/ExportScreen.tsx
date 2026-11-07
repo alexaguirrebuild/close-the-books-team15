@@ -6,6 +6,7 @@ import { DEFAULT_FILTERS, findTxn, queuePosition } from '../data/queue'
 import {
   buildExportRows,
   canDownloadSubmission,
+  minConfidenceFromPercent,
   previewExport,
   SUBMISSION_HEADER,
   validateExport,
@@ -152,7 +153,10 @@ export function ExportScreen() {
                 max={100}
                 disabled={!options.includeProposals}
                 value={Math.round(options.minConfidence * 100)}
-                onChange={(e) => setOptions({ minConfidence: Number(e.target.value) / 100 })}
+                onChange={(e) => {
+                  const minConfidence = minConfidenceFromPercent(e.target.value)
+                  if (minConfidence !== null) setOptions({ minConfidence })
+                }}
               />
               %
             </label>

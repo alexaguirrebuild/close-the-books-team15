@@ -35,7 +35,7 @@ function party({ partyName, counterparty }: EvidenceInput): EvidenceStep {
 
 function origin({ proposal }: EvidenceInput): EvidenceStep {
   const base = { id: 'origin', label: 'De dónde sale' }
-  if (!proposal.length) return { ...base, state: 'warn', text: 'El pipeline no propone nada' }
+  if (!proposal.length) return { ...base, state: 'warn', text: 'No hay propuesta' }
   const withSource = proposal.find((row) => row.adviceId || row.source || row.reason) ?? proposal[0]
   if (withSource.reason) {
     const name = ruleName(withSource.source)

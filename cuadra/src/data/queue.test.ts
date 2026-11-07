@@ -31,4 +31,9 @@ describe('viewHint', () => {
   test('leaves the other views as they are', () => {
     expect(viewHint('done', false)).toBe(VIEW_HINT.done)
   })
+
+  test('describes the proposal without saying where it came from', () => {
+    expect(viewHint('exceptions', true)).toBe('La propuesta trae una excepción: compruébala.')
+    expect(viewHint('no_proposal', true)).toBe('No hay propuesta: hay que decidir a mano.')
+  })
 })

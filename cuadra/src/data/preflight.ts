@@ -130,8 +130,9 @@ export async function buildPlan(name: string, sources: SourceFile[], options: Pl
 
   const primary = await pickProposal(proposals, options.proposalPath)
   if (primary) files.proposals = await planFile('proposals', primary)
-  // The engine says where each row came from: the stages and their confidence belong to another pipeline.
-  const fromEngine = ENGINE_RULE_COLUMN.test(files.proposals?.mapping.source ?? '')
+  // The engine says where each row came from and gives no confidence: the stages and theirs belong to another pipeline.
+  const mapping = files.proposals?.mapping
+  const fromEngine = ENGINE_RULE_COLUMN.test(mapping?.source ?? '') && !mapping?.confidence
   const stages = fromEngine ? [] : proposals.filter((source) => isStage(source.path) && source.path !== primary?.path)
   const enrichments = await Promise.all(stages.map((source) => planFile('proposals', source)))
 
