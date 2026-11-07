@@ -1,0 +1,48 @@
+"""Lo que se comprueba antes de generar un fichero: en FINAL no hay segunda oportunidad."""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+REQUIRED_PACKAGES = ("pypdf", "openpyxl")
+HASH_SEED_VARIABLE = "PYTHONHASHSEED"
+HASH_SEED = "0"
+PRIOR_PHASES = {"live": ("train",), "final": ("train", "live")}
+
+
+def check_dependencies() -> None:
+    """Sin estas librerías el motor no falla: pierde los avisos en PDF y XLSX y baja la nota sin decir nada."""
+    missing = []
+    for package in REQUIRED_PACKAGES:
+        try:
+            __import__(package)
+        except ImportError:
+            missing.append(package)
+    if missing:
+        raise SystemExit(
+            f"Faltan dependencias obligatorias: {', '.join(missing)}. Lanza el motor con `uv run python -m bankrec.run ...`."
+        )
+
+
+def ensure_deterministic(argv: list[str]) -> None:
+    """El orden de los sets depende de esta semilla y Python solo la lee al arrancar, así que hay que relanzar."""
+    if os.environ.get(HASH_SEED_VARIABLE) == HASH_SEED:
+        return
+    os.environ[HASH_SEED_VARIABLE] = HASH_SEED
+    os.execv(sys.executable, [sys.executable, "-m", "bankrec.run", *argv])
+
+
+def check_phase_inputs(phase: str, data: Path) -> None:
+    """Sin partidas de apertura o sin fases anteriores el motor no falla: los cobros de partidas antiguas salen UNIDENTIFIED."""
+    if phase not in PRIOR_PHASES:
+        return
+    problems = []
+    opening = data / phase / "open_items_at_start.csv.gz"
+    if not opening.is_file():
+        problems.append(f"falta {opening}")
+    problems.extend(f"falta la fase anterior {prior}: {data / prior}" for prior in PRIOR_PHASES[phase] if not (data / prior / "ar_invoices.csv.gz").is_file())
+    if phase == "final" and not (data / "final" / "masters_final").is_dir():
+        problems.append("falta final/masters_final: sin él no están la filial nueva ni los cambios del semestre")
+    if problems:
+        raise SystemExit(f"La fase {phase} no está completa:\n  " + "\n  ".join(problems))

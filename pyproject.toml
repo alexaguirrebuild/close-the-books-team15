@@ -1,0 +1,19 @@
+[project]
+name = "bankrec"
+version = "0.1.0"
+description = "Equipo 15 · Close the Books: conciliación bancaria explicable para Grupo Valtermia"
+requires-python = ">=3.11"
+# Sin pypdf y openpyxl se pierden los avisos en PDF y XLSX: en sample, de 83,77 a 79,92. Por eso son obligatorias.
+dependencies = ["pypdf>=5.0", "openpyxl>=3.1"]
+
+[project.optional-dependencies]
+extra = ["rapidfuzz>=3.9", "pypdf>=5.0", "openpyxl>=3.1", "requests>=2.32", "polars>=1.20"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
