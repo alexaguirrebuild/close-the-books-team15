@@ -72,3 +72,67 @@ def _path_sin_gitleaks(tmp_path: Path) -> str:
         if ruta.startswith("/"):
             (binarios / nombre).symlink_to(ruta)
     return str(binarios)
+
+
+def motor_vacio(**campos):
+    from bankrec.engine import Engine
+
+    motor = Engine.__new__(Engine)
+    for nombre, valor in campos.items():
+        setattr(motor, nombre, valor)
+    return motor
+
+
+class TestDesempatesDeterministas:
+    def test_mismo_numero_y_fecha_gana_el_identificador_menor(self, monkeypatch):
+        ids = ["H", "C", "A", "F", "B", "G", "E", "D"]
+        partidas = {i: SimpleNamespace(id=i, kind="ARI", entity="E", party="C", open=10, issue=dt.date(2025, 1, 1)) for i in ids}
+        motor = motor_vacio(ph=SimpleNamespace(by_num={"N1": set(ids)}), items=partidas)
+        monkeypatch.setattr("bankrec.engine.num_variants", lambda numero: [numero])
+
+        assert motor.item_by_number("N1").id == "A"
+
+
+class TestChequeSobreFacturaCerrada:
+    def test_elige_la_abierta_aunque_la_cerrada_comparta_sufijo(self):
+        filas = []
+        motor = motor_vacio(
+            used_batches=set(),
+            cheque_items={},
+            cheque_deps={"RCH1": [{"amount": "10.00", "stub_reference": "123456", "drawer": "X", "cheque_number": "9"}]},
+            ph=SimpleNamespace(by_suffix={"123456": {"ARI-1", "ARI-2"}}, by_num={}),
+            items={
+                "ARI-1": SimpleNamespace(id="ARI-1", side="AR", open=0, total=1000),
+                "ARI-2": SimpleNamespace(id="ARI-2", side="AR", open=1000, total=1000),
+            },
+            entity_ok=lambda *_: True,
+            find_by_party_amount=lambda *_, **__: None,
+            emit=lambda t, it, amt, exc, rule, ev="": filas.append((it.id, amt)),
+        )
+
+        assert motor.m_cheque(SimpleNamespace(amount=1000, up="RCH1", account="A")) is True
+        assert filas == [("ARI-2", 1000)]
+
+
+class TestAbonoYaAplicadoEnParte:
+    def test_la_factura_recibe_lo_cobrado_mas_el_saldo_del_abono(self):
+        factura = SimpleNamespace(id="ARI-1", ccy="EUR", open=10000, total=10000, terms=None)
+        abono = SimpleNamespace(id="ARC-1", ccy="EUR", open=2000, total=5000, terms=None)
+        filas = []
+
+        def emit(t, it, amt, exc, rule, ev=""):
+            filas.append((it.id, amt, exc))
+            it.open -= amt
+
+        motor = motor_vacio(
+            items={"ARI-1": factura, "ARC-1": abono},
+            ph=SimpleNamespace(fx=SimpleNamespace(conv=lambda c, *_: c)),
+            sign=lambda it, t: 1 if it is factura else -1,
+            to_bank=lambda importe, it, t: importe,
+            explain_short=lambda *_: None,
+            emit=emit,
+        )
+
+        motor.settle(SimpleNamespace(amount=5000, ccy="EUR", date=None), ["ARI-1", "ARC-1"], "regla")
+
+        assert filas == [("ARC-1", 2000, ""), ("ARI-1", 7000, "PARTIAL")]

@@ -28,7 +28,7 @@ cache/
 /bankrec-docs-and-masters/sample/
 
 # Motor bankrec (rama motor-bankrec)
-data/
+/data/
 out/
 *.csv.gz
 !.env.example
