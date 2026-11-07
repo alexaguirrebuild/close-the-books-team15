@@ -34,7 +34,9 @@
 
 ### Preparación (unos 15 min)
 - `git clone` de Paella_Hackathon, luego `git worktree add ../Paella-cobros-cortos -b cobros-cortos origin/Dev` y `git config core.hooksPath .githooks`. Ese hook exige **gitleaks** instalado.
-- Instalar `uv sync` (con pypdf y openpyxl) y descargar `data/live` y `train-lite`. Pedir a Pablo `m2_remittance.csv.gz` de train y sample y copiarlos en `out/<fase>/matches/`: sin ellos la nota no es comparable con 89,26.
+- Instalar `uv sync` (con pypdf y openpyxl).
+- **Datos (el PC no los tiene):** desde la raíz del clon, `uv run python scripts/download.py docs train-lite live`. Es la descarga oficial de la página Datos: lee `config.json`, comprueba el sha256 y no pide token. Son ~530 MB que se descomprimen en ~1,8 GB dentro de `data/` (masters, sample, train con golden, live con `open_items_at_start`). **No se suben a git.** Comprobación: existen `data/train/golden_allocations.csv.gz` y `data/live/open_items_at_start.csv.gz`; sin este último, el holdout no reconstruye los saldos.
+- Pedir a Pablo `m2_remittance.csv.gz` de train y sample y copiarlos en `out/<fase>/matches/`: sin ellos la nota no es comparable con 89,26.
 - Fijar `PYTHONHASHSEED=0` y `BANKREC_PLUGINS=devoluciones,m2_avisos,remittance,pdfclauses,learned,cobros_cortos`.
 - Antes de tocar nada, medir el holdout de Dev limpio y confirmar 89,26 en tu máquina.
 
