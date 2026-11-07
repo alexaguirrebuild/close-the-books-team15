@@ -670,3 +670,118 @@ class TestReciboConReferenciaCortada:
         eng = motor_adeudos_sufijo([citada], [recibo("1102503648")])
         assert eng.m_dd_batch(abono_remesa()) is True
         assert [r.item for r in eng.rows] == [citada.id]
+
+
+def motor_cheques(items, depositos, nombres=None):
+    from collections import defaultdict
+    eng = Engine.__new__(Engine)
+    eng.items = {i.id: i for i in items}
+    by_suffix, by_num, by_party = defaultdict(set), defaultdict(set), defaultdict(list)
+    for i in items:
+        by_suffix[re.sub(r"\D", "", i.number)[-6:].rjust(6, "0")].add(i.id)
+        by_party[i.party].append(i.id)
+    eng.ph = SimpleNamespace(by_suffix=by_suffix, by_num=by_num, by_party=by_party, children={}, party_by_iban={})
+    eng.cheque_deps = depositos
+    eng.rows, eng.settled_by, eng.iban_learned, eng.used_batches, eng.cheque_items = [], defaultdict(list), {}, set(), {}
+    nombres = nombres or {}
+    eng.resolve_names = lambda raw: list(nombres.get(raw, []))
+    eng.resolve_name = lambda raw: (nombres.get(raw) or [None])[0]
+    proveedores._wrap_cheque(eng)
+    return eng
+
+
+def cheque(numero, importe, ref, librador="Jardins Delta EURL", dep="RCH25033102694", total="300.00"):
+    return {"deposit_id": dep, "account_id": "FR01-LORV-EUR", "deposit_total": total, "cheque_number": numero,
+            "drawer": librador, "amount": importe, "stub_reference": ref}
+
+
+def remesa_cheques(importe=30000, dep="RCH25033102694"):
+    return SimpleNamespace(id="T7", amount=importe, account="FR01-LORV-EUR", entity="ES01", date=DAY, cp_iban="",
+                           up=f"REMISE DE CHEQUES {dep} 2 CHQ")
+
+
+def fra(item_id, numero, cents, party="C1", abierto=None):
+    return Item(id=item_id, kind="ARI", side="AR", entity="ES01", number=numero, party=party, ccy="EUR", total=cents,
+                open=cents if abierto is None else abierto, issue=dt.date(2025, 2, 1))
+
+
+class TestChequesSinAmbiguedad:
+    """m_cheque recorría un set y se quedaba con la primera factura que encajaba por sufijo: con dos candidatas, el
+    resultado dependía de PYTHONHASHSEED y podía ser la de otro cliente. POLICIES §5.3 + regla del equipo: candidata
+    única, o la del librador si hay varias; si no, ese cheque no se asigna (y los demás del depósito sí)."""
+
+    def test_una_candidata_igual_que_antes(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000)
+        b = fra("ARI-2025-0000002", "FA240233180", 20000)
+        eng = motor_cheques([a, b], {"RCH25033102694": [cheque("1", "100.00", "FA240233179"),
+                                                         cheque("2", "200.00", "FA240233180")]})
+        assert eng.m_cheque(remesa_cheques()) is True
+        assert sorted((r.item, r.amount) for r in eng.rows) == [(a.id, 10000), (b.id, 20000)]
+
+    def test_dos_candidatas_gana_la_del_librador(self):
+        mia = fra("ARI-2025-0000001", "FA240233179", 10000, party="C1")
+        ajena = fra("ARI-2025-0000009", "FB990233179", 10000, party="C2")
+        eng = motor_cheques([mia, ajena], {"RCH25033102694": [cheque("1", "100.00", "FA240233179", total="100.00")]},
+                            nombres={"Jardins Delta EURL": ["C1"]})
+        assert eng.m_cheque(remesa_cheques(10000)) is True
+        assert [r.item for r in eng.rows] == [mia.id]
+
+    def test_homonimos_con_factura_identica_no_se_asigna_ese_cheque(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000, party="C1")
+        b = fra("ARI-2025-0000009", "FA240233179", 10000, party="C2")
+        otra = fra("ARI-2025-0000003", "FA240233555", 20000, party="C1")
+        eng = motor_cheques([a, b, otra], {"RCH25033102694": [cheque("1", "100.00", "FA240233179"),
+                                                               cheque("2", "200.00", "FA240233555")]},
+                            nombres={"Jardins Delta EURL": ["C1", "C2"]})
+        assert eng.m_cheque(remesa_cheques()) is True
+        assert [r.item for r in eng.rows] == [otra.id]
+
+    def test_reproducible_con_cualquier_semilla(self):
+        sonda = r'''
+import sys, re, datetime as dt
+sys.path.insert(0, sys.argv[1]); sys.path.insert(0, sys.argv[1] + "/tests")
+import test_proveedores as T
+items = [T.fra(f"ARI-2025-{k:07d}", f"FX{k}0233179", 10000, party="C1") for k in range(20)]
+eng = T.motor_cheques(items, {"RCH25033102694": [T.cheque("1", "100.00", "0233179", total="100.00")]},
+                      nombres={"Jardins Delta EURL": ["C1"]})
+eng.m_cheque(T.remesa_cheques(10000))
+print([r.item for r in eng.rows])
+'''
+        outs = set()
+        for seed in range(1, 7):
+            r = subprocess.run([sys.executable, "-c", sonda, str(ROOT)], env=dict(os.environ, PYTHONHASHSEED=str(seed)),
+                               capture_output=True, text=True, check=True)
+            outs.add(r.stdout.strip())
+        assert outs == {"[]"}  # 20 candidatas del mismo cliente e importe: ambigua, no se asigna, siempre igual
+
+    def test_total_de_deposito_roto_no_cae(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000)
+        eng = motor_cheques([a], {"RCH1": [cheque("1", "100.00", "FA240233179", dep="RCH1", total="N/A")],
+                                  "RCH2": [cheque("2", "100.00", "FA240233179", dep="RCH2", total="100.00")]})
+        t = SimpleNamespace(id="T7", amount=10000, account="FR01-LORV-EUR", entity="ES01", date=DAY, cp_iban="",
+                            up="REMISE DE CHEQUES SANS NUMERO")
+        assert eng.m_cheque(t) is True
+        assert [r.item for r in eng.rows] == [a.id]
+
+    def test_sin_referencia_usa_librador_e_importe(self):
+        a = fra("ARI-2025-0000001", "FA240233179", 10000)
+        eng = motor_cheques([a], {"RCH25033102694": [cheque("1", "100.00", "", total="100.00")]},
+                            nombres={"Jardins Delta EURL": ["C1"]})
+        eng.find_by_party_amount = lambda raw, amt, t, kinds: a if raw == "Jardins Delta EURL" and amt == 10000 else None
+        assert eng.m_cheque(remesa_cheques(10000)) is True
+        assert [r.item for r in eng.rows] == [a.id]
+
+
+class TestIntegridadDelPlugin:
+    """Guardas del propio fichero: un carácter de control en una expresión regular (p. ej. «\b» convertido en
+    retroceso al copiar) la deja casi inservible sin que ningún otro test lo note."""
+
+    def test_sin_caracteres_de_control_en_el_codigo(self):
+        src = (ROOT / "bankrec" / "proveedores.py").read_bytes()
+        assert not [c for c in src if c < 32 and c not in (9, 10, 13)]
+
+    def test_ids_de_remesa_se_leen_como_en_el_motor(self):
+        assert proveedores.DD_BATCH_ID.findall("ABONO REMESA SEPA CORE 03250516656 | PRESENTADA 250516 29") == ["03250516656"]
+        assert proveedores.DD_BATCH_ID.findall("X 1234567890123 Y") == []
+        assert proveedores.CHEQUE_DEPOSIT_ID.findall("REMISE DE CHEQUES RCH25033102694 4 CHQ") == ["RCH25033102694"]
+        assert proveedores.CHEQUE_DEPOSIT_ID.findall("DEPOSIT LBX20250331 | ABCLBX20250331") == ["LBX20250331"]

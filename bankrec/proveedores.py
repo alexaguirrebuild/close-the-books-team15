@@ -369,11 +369,67 @@ def _safety_net(engine) -> None:
             setattr(engine, name, guard(name, getattr(engine, name)))
 
 
+CHEQUE_DEPOSIT_ID = re.compile(r"RCH\d+|\b[A-Z]{2,4}\d{8,}\b")  # la misma forma que lee Engine.m_cheque
+
+
+def _cheque_item(engine, r, t, amt):
+    """Partida de un cheque por su talón (sufijo de 6 dígitos o número completo), POLICIES §5.3. Varias candidatas:
+    la del cliente del librador si es única; si no, ninguna. Sin talón utilizable, librador + importe (como el motor)."""
+    stub = re.sub(r"\D", "", r.get("stub_reference") or "")
+    if len(stub) >= 5:
+        ids = engine.ph.by_suffix.get(stub[-6:].rjust(6, "0"), set()) | engine.ph.by_num.get(stub, set())
+        cands = [engine.items[i] for i in sorted(ids)
+                 if engine.items[i].side == "AR" and engine.items[i].open > 0 and engine.entity_ok(engine.items[i], t)
+                 and (abs(engine.items[i].open - amt) <= 2 or abs(engine.items[i].total - amt) <= 2)]
+        if len(cands) > 1:
+            drawer = set(engine.resolve_names(r.get("drawer") or ""))
+            cands = [c for c in cands if c.party in drawer]
+        if len(cands) == 1:
+            return cands[0]
+        if cands:  # ambigua incluso con el librador: no se responde
+            return None
+    return engine.find_by_party_amount(r.get("drawer") or "", amt, t, kinds={"ARI"})
+
+
+def _wrap_cheque(engine) -> None:
+    """Engine.m_cheque con la misma lógica, pero reproducible y sin ambigüedad: recorría un set y se quedaba con la
+    primera factura que encajaba (dependía de PYTHONHASHSEED; con dos candidatas podía ser la de otro cliente).
+    Además, un total de depósito ilegible ya no rompe la búsqueda por total."""
+
+    def m_cheque(t):
+        if t.amount <= 0:
+            return False
+        dep = next((d for d in CHEQUE_DEPOSIT_ID.findall(t.up or "") if d in engine.cheque_deps), None)
+        if not dep:
+            for did in sorted(engine.cheque_deps):
+                rs = engine.cheque_deps[did]
+                total = _cents_or_none(rs[0].get("deposit_total")) if rs else None
+                if did not in engine.used_batches and rs and rs[0].get("account_id") == t.account and                         total is not None and abs(total - t.amount) <= 2:
+                    dep = did
+                    break
+        if not dep:
+            return False
+        engine.used_batches.add(dep)
+        for r in engine.cheque_deps[dep]:
+            amt = _cents_or_none(r.get("amount"))
+            if amt is None:
+                continue
+            it = _cheque_item(engine, r, t, amt)
+            if it:
+                exc = "PARTIAL" if it.open - amt > 2 else ""
+                engine.emit(t, it, min(amt, it.open) if exc == "" else amt, exc, "cheque_deposit", f"remesa {dep}")
+                engine.cheque_items[r.get("cheque_number")] = it  # por si llega devuelto (plugin devoluciones)
+        return True
+
+    engine.m_cheque = m_cheque
+
+
 def prepare(engine) -> None:
     _drop_broken_rows(engine)
     engine.run_doc_item = types.MethodType(run_doc_item, engine)
     _wrap_payment_run(engine)
     _wrap_dd_batch(engine)
+    _wrap_cheque(engine)
     _safety_net(engine)
 
 
