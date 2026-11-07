@@ -26,3 +26,9 @@ cache/
 .DS_Store
 .claude-flow/
 /bankrec-docs-and-masters/sample/
+
+# Motor bankrec (rama motor-bankrec)
+data/
+out/
+*.csv.gz
+!.env.example
