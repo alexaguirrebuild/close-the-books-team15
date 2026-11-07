@@ -15,7 +15,7 @@ from itertools import combinations
 from . import duplicados
 from .sumas import exact_subsets
 from .data import SEPA, Phase, Txn, ascii_upper, day, name_key, norm_text, num_variants
-from .data import cents as to_cents
+from .data import cents
 
 PAYMENT_FACTORY = {"ES00": {"ES01", "ES02", "PT01"}}
 WITHHOLDING = {"MX": (0.0125, 0.015, 0.10), "BR": (0.0125, 0.015, 0.10), "MA": (0.0125, 0.015, 0.10)}
@@ -100,8 +100,24 @@ def plain_number(number):
 UNKNOWN_DATE_DAYS = 10 ** 6  # un lote sin fecha es el último candidato, pero no para la fase
 
 
+def to_cents(value) -> int:
+    """Importe de un fichero auxiliar: vacío o mal formado cuenta como cero. La ingesta ya informa de ello como BAD_VALUE."""
+    try:
+        return cents(value)
+    except ValueError:
+        return 0
+
+
+def _aux_day(text: str):
+    """Fecha de un fichero auxiliar; None si está vacía o mal formada."""
+    try:
+        return day(text)
+    except ValueError:
+        return None
+
+
 def _days_apart(text: str, date) -> int:
-    parsed = day(text)
+    parsed = _aux_day(text)
     return abs((parsed - date).days) if parsed else UNKNOWN_DATE_DAYS
 
 
@@ -540,9 +556,9 @@ class Engine:
                 dues = []
                 for r in g:
                     it = self.run_doc_item(r, t)
-                    dues.append(it.due if it and it.due else dt.date.fromisoformat(r["execution_date"]))
+                    dues.append(it.due if it and it.due else _aux_day(r["execution_date"]))
                 amt = sum(to_cents(r["document_amount"]) for r in g)
-                out[e] = (max(dues), g, amt)
+                out[e] = (max((due for due in dues if due), default=t.date), g, amt)
             cache[rid] = out
         return cache[rid]
 
@@ -649,7 +665,7 @@ class Engine:
                 key = (rid, g[0]["execution_date"], len(g))
                 if key in self.used_batches:
                     continue
-                st = sum({r["end_to_end_id"]: float(r["transfer_amount"] or 0) for r in g}.values())
+                st = sum({r["end_to_end_id"]: to_cents(r["transfer_amount"]) / 100 for r in g}.values())
                 if abs(int(round(st * 100)) - amt) <= 2:
                     self.used_batches.add(key)
                     self.emit_run_rows(t, g, "payment_run", f"remesa {rid}")
@@ -658,13 +674,13 @@ class Engine:
         if e2es:
             def score(e):
                 r0 = self.e2e_rows[e][0]
-                d = abs((dt.date.fromisoformat(r0["execution_date"]) - t.date).days)
+                d = _days_apart(r0["execution_date"], t.date)
                 nm = name_key(r0["beneficiary"]).split()
                 hit = sum(1 for w in nm[:2] if w in t.up)
                 return (-hit, d)
             e = min(e2es, key=score)
             r0 = self.e2e_rows[e][0]
-            if abs((dt.date.fromisoformat(r0["execution_date"]) - t.date).days) <= 5:
+            if _days_apart(r0["execution_date"], t.date) <= 5:
                 self.used_batches.add((e, amt))
                 self.emit_run_rows(t, self._transfer_for(self.e2e_rows[e], t), "payment_run_amount", f"transfer {e}")
                 return True

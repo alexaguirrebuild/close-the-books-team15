@@ -1,5 +1,6 @@
 """Guardas del motor: lo que en FINAL costaría puntos sin que nadie lo notara."""
 import builtins
+import datetime as dt
 from collections import defaultdict
 import gzip
 import json
@@ -14,7 +15,7 @@ import pytest
 
 from bankrec import devoluciones, m2_avisos, pdfclauses, preflight, remittance
 from bankrec.data import Item
-from bankrec.engine import Engine, Row, load_plugins
+from bankrec.engine import Engine, Row, _days_apart, load_plugins, to_cents
 from bankrec.run import assemble, report_broken_advices, report_plugin_errors
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -494,3 +495,17 @@ class TestConversionesConCamposVacios:
         eng = SimpleNamespace(ph=SimpleNamespace(dir=tmp_path), items={}, resolve_name=lambda raw: None)
         remittance.prepare(eng)
         assert [archivo for archivo, _ in eng.ra_errors] == ["a.txt"]
+
+
+class TestDatosMalosEnFicherosAuxiliares:
+    def test_un_importe_no_numerico_vale_cero(self):
+        assert to_cents("12,50") == 0 and to_cents(" ") == 0
+
+    def test_un_importe_normal_no_cambia(self):
+        assert to_cents("12.50") == 1250 and to_cents("") == 0
+
+    def test_una_fecha_vacia_queda_la_ultima_candidata(self):
+        fecha = dt.date(2025, 1, 10)
+        assert _days_apart("2025-01-12", fecha) == 2
+        assert _days_apart("", fecha) > 1000
+        assert _days_apart("no es fecha", fecha) > 1000

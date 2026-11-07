@@ -32,7 +32,7 @@ FAILURE_HINTS = {
     INGEST: "Mira out/{phase}/ingest_report.json y cache/warehouse/{phase}.failed.duckdb. Qué hacer con cada código: docs/RUNBOOK_FINAL.md.",
     LINK: "Sin este paso el motor no arranca en LIVE ni en FINAL. Mira out/{phase}/match.log.",
     RUN: "El motor se ha parado. El mensaje de arriba dice por qué; preflight avisa de lo que falte en data/.",
-    VALIDATE: "Mira out/{phase}/validate__sub_{phase}.json. Si el único error es INGEST_HAD_ERRORS y el formato oficial está OK, decidís vosotros.",
+    VALIDATE: "Mira out/{phase}/validate__sub_{phase}.json.",
 }
 
 
@@ -146,7 +146,24 @@ def next_step(phase: str) -> str:
         "Fichero listo y validado: out/sub_final.csv.gz. Este comando no ha subido nada.\n"
         "Antes de enviar, sigue las comprobaciones de docs/RUNBOOK_FINAL.md.\n"
         "El envío se hace una sola vez, con el OK expreso del usuario, y lo lanza él:\n"
-        "  ! python scripts/submit.py FINAL out/sub_final.csv.gz"
+        "  ! uv run python scripts/submit.py FINAL out/sub_final.csv.gz"
+    )
+
+
+def only_ingest_errors(phase: str) -> bool:
+    """¿El fichero es válido salvo porque la ingesta registró errores? Enviarlo así lo decide una persona (RUNBOOK)."""
+    try:
+        report = json.loads((ROOT / "out" / phase / f"validate__sub_{phase}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(report, dict) and report.get("official_format_ok") is True and set(report.get("error_counts") or {}) == {"INGEST_HAD_ERRORS"}
+
+
+def ingest_errors_step(phase: str) -> str:
+    return (
+        f"NO validado: out/sub_{phase}.csv.gz solo falla porque la ingesta tuvo errores. Este comando no ha subido nada.\n"
+        f"Enviarlo así es una decisión del usuario: revisa docs/RUNBOOK_FINAL.md y out/{phase}/ingest_report.json.\n"
+        f"Si decide enviarlo, lo lanza él:\n  ! uv run python scripts/submit.py {phase.upper()} out/sub_{phase}.csv.gz --accept-ingest-errors"
     )
 
 
@@ -172,6 +189,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     print_times(times)
     if code != 0:
         failed = times[-1][0]
+        if failed == VALIDATE and only_ingest_errors(args.phase):
+            print()
+            print("\n".join(new_entities_report(args.phase)))
+            print(f"\n{ingest_errors_step(args.phase)}", flush=True)
+            return code
         print(f"\nPARADO en «{failed}». No hay fichero listo para enviar.\n{FAILURE_HINTS[failed].format(phase=args.phase)}", flush=True)
         return code
     print()

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .db import IngestContext
 from .roots import is_excluded, iter_phase_files
+from .tables import MASTER_FILES
 
 MAX_SAMPLES = 5
 INDEXED_ONLY_FOLDER = "pdfs"  # These PDFs are indexed on purpose and read on demand.
@@ -114,10 +115,19 @@ def _is_indexed_pdf(path: Path, phase_dir: Path) -> bool:
     return path.suffix.lower() == ".pdf" and path.relative_to(phase_dir).parts[0] == INDEXED_ONLY_FOLDER
 
 
+def _looks_like_master(relative: Path) -> bool:
+    """Un maestro conocido en otra carpeta o forma (customers.csv.gz, customers_2026.csv) dejaría el anterior sin que nadie lo note."""
+    if len(relative.parts) > 1:
+        return True
+    stem = relative.name.split(".")[0]
+    known = {name.removesuffix(".csv") for name in MASTER_FILES.values()}
+    return stem in known or any(stem.startswith(f"{name}_") for name in known)
+
+
 def could_hold_data(path: Path, phase_dir: Path, masters_override: Path | None) -> bool:
     """¿Un fichero sin leer puede ser un dato perdido? Un README o un maestro de más no lo es, y no debe bloquear FINAL."""
     if masters_override is not None and path.is_relative_to(masters_override):
-        return False
+        return _looks_like_master(path.relative_to(masters_override))
     parts = path.relative_to(phase_dir).parts
     if SYSTEM_FOLDER in parts:
         return False

@@ -169,12 +169,17 @@ def test_si_falla_pedir_la_url_no_se_reintenta_porque_gasta_hueco(submit, envio,
 FORMATO_OK = {"official_format_ok": True, "error_counts": {"INGEST_HAD_ERRORS": 1}}
 
 
-def informe_validacion(submit, raiz, fichero, **cambios):
-    """El informe que deja `bankcheck validate`; por defecto, el único error es el de ingesta y es de este fichero."""
+def informe_validacion(submit, raiz, fichero, texto=None, **cambios):
+    """El validador rechaza y, al ejecutarse, escribe su informe: por defecto, de este fichero y solo con el error de ingesta."""
     informe = {**FORMATO_OK, "file_sha256": hashlib.sha256(fichero.read_bytes()).hexdigest(), **cambios}
     ruta = raiz / "out" / "final" / "validate__sub.json"
-    ruta.parent.mkdir(parents=True, exist_ok=True)
-    ruta.write_text(json.dumps(informe), encoding="utf-8")
+
+    def validador(*a, **k):
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(json.dumps(informe) if texto is None else texto, encoding="utf-8")
+        return SimpleNamespace(returncode=1)
+
+    submit.subprocess.run = validador
     return ruta
 
 
@@ -233,16 +238,31 @@ class TestEnviarConErroresDeIngesta:
             submit.strict_validate("FINAL", rechazado, True)
 
     def test_con_la_opcion_y_un_informe_corrupto_no_envia(self, submit, rechazado, tmp_path):
-        ruta = informe_validacion(submit, tmp_path, rechazado)
-        ruta.write_text("{ no es json", encoding="utf-8")
+        informe_validacion(submit, tmp_path, rechazado, texto="{ no es json")
         with pytest.raises(SystemExit, match="No se envía"):
             submit.strict_validate("FINAL", rechazado, True)
 
     def test_con_la_opcion_y_un_informe_que_no_es_un_objeto_no_envia(self, submit, rechazado, tmp_path):
-        ruta = informe_validacion(submit, tmp_path, rechazado)
-        ruta.write_text("[1, 2]", encoding="utf-8")
+        informe_validacion(submit, tmp_path, rechazado, texto="[1, 2]")
         with pytest.raises(SystemExit, match="No se envía"):
             submit.strict_validate("FINAL", rechazado, True)
+
+    @pytest.mark.parametrize("codigo", [1, 2, 127, -9])
+    def test_un_informe_anterior_no_vale_si_el_validador_no_llego_a_escribir_otro(self, submit, rechazado, tmp_path, monkeypatch, codigo):
+        ruta = informe_validacion(submit, tmp_path, rechazado)
+        submit.subprocess.run(None)
+        monkeypatch.setattr(submit.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=codigo))
+        assert ruta.exists()
+        with pytest.raises(SystemExit, match="No se envía"):
+            submit.strict_validate("FINAL", rechazado, True)
+
+    def test_sin_la_opcion_no_toca_el_informe(self, submit, rechazado, tmp_path):
+        ruta = informe_validacion(submit, tmp_path, rechazado)
+        submit.subprocess.run(None)
+        submit.subprocess.run = lambda *a, **k: SimpleNamespace(returncode=1)
+        with pytest.raises(SystemExit):
+            submit.strict_validate("FINAL", rechazado)
+        assert ruta.exists()
 
     def test_si_el_validador_aprueba_no_cuenta_como_aceptado(self, submit, rechazado, monkeypatch):
         monkeypatch.setattr(submit.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0))
@@ -278,3 +298,42 @@ def test_un_envio_normal_no_lleva_esa_marca(submit, envio, tmp_path, monkeypatch
     monkeypatch.setattr(submit, "call", respuestas((201, UPLOAD), (200, {"status": "scored", "score": 90.0})))
     submit.main("LIVE", str(envio))
     assert "accepted_ingest_errors" not in registro(tmp_path)[-1]
+
+
+class TestBytesEnviados:
+    def preparado(self, submit, monkeypatch, durante_la_confirmacion=lambda: None):
+        call = respuestas((201, UPLOAD), (200, {"status": "scored", "score": 90.0}))
+        monkeypatch.setattr(submit, "call", call)
+        subidos = []
+        monkeypatch.setattr(submit, "s3_upload", lambda url, fields, nombre, datos: subidos.append(datos) or 204)
+
+        def confirma(_):
+            durante_la_confirmacion()
+            return "si"
+
+        monkeypatch.setattr("builtins.input", confirma)
+        return call, subidos
+
+    def test_sube_exactamente_lo_validado(self, submit, envio, monkeypatch):
+        _, subidos = self.preparado(submit, monkeypatch)
+        submit.main("LIVE", str(envio))
+        assert subidos == [b"datos"]
+
+    def test_si_el_fichero_cambia_mientras_se_confirma_no_gasta_hueco(self, submit, envio, monkeypatch):
+        call, subidos = self.preparado(submit, monkeypatch, lambda: envio.write_bytes(b"otro fichero"))
+        with pytest.raises(SystemExit, match="ha cambiado"):
+            submit.main("LIVE", str(envio))
+        assert call.llamadas == [] and subidos == []
+
+    def test_si_el_fichero_desaparece_mientras_se_confirma_no_gasta_hueco(self, submit, envio, monkeypatch):
+        call, _ = self.preparado(submit, monkeypatch, envio.unlink)
+        with pytest.raises(SystemExit, match="ha cambiado"):
+            submit.main("LIVE", str(envio))
+        assert call.llamadas == []
+
+    def test_si_cambia_durante_la_validacion_tampoco(self, submit, envio, monkeypatch):
+        call, _ = self.preparado(submit, monkeypatch)
+        monkeypatch.setattr(submit, "strict_validate", lambda *_: envio.write_bytes(b"otro fichero") and None)
+        with pytest.raises(SystemExit, match="ha cambiado"):
+            submit.main("LIVE", str(envio))
+        assert call.llamadas == []

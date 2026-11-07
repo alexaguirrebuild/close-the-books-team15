@@ -53,7 +53,7 @@ Aparta el fichero anterior como `out/sub_final.anterior.csv.gz` y borra la cach�
 **4. Enviar.** Solo el usuario, en su terminal:
 
 ```bash
-! python scripts/submit.py FINAL out/sub_final.csv.gz
+! uv run python scripts/submit.py FINAL out/sub_final.csv.gz
 ```
 
 Valida otra vez, enseña el fichero con su SHA-256 y pide escribir `FINAL`. Un fichero rechazado no gasta el envío; uno válido, sí, aunque sea el equivocado. **Pedir la URL de subida ya consume un hueco**, así que no se envía por probar.
@@ -75,10 +75,12 @@ Con `--allow-ingest-errors`, la validación final dice NO VÁLIDO por `INGEST_HA
 Para enviar en ese caso, la persona que decide añade `--accept-ingest-errors`:
 
 ```bash
-! python scripts/submit.py FINAL out/sub_final.csv.gz --accept-ingest-errors
+! uv run python scripts/submit.py FINAL out/sub_final.csv.gz --accept-ingest-errors
 ```
 
-`submit.py` lee `out/final/validate__sub_final.json` y solo sigue si `official_format_ok` es `true`, `INGEST_HAD_ERRORS` es el **único** error y `file_sha256` coincide con el fichero que se envía. Avisa en pantalla, sigue pidiendo escribir `FINAL` y lo deja anotado en `out/envios.jsonl` con `accepted_ingest_errors`. Si `bankcheck validate` no se pudo ejecutar o el informe no existe, no envía.
+`submit.py` lee `out/final/validate__sub_final.json` y solo sigue si `official_format_ok` es `true`, `INGEST_HAD_ERRORS` es el **único** error y `file_sha256` coincide con el fichero que se envía. Avisa en pantalla, sigue pidiendo escribir `FINAL` y lo deja anotado en `out/envios.jsonl` con `accepted_ingest_errors`. Si `bankcheck validate` no llega a escribir un informe nuevo, no envía. En este camino `final_run.py` termina con código distinto de 0 y «NO validado»: la casilla de «Fichero listo y validado» no se cumple, pero sí debe mirarse el informe de sociedades nuevas que imprime.
+
+En cualquier envío, si el fichero cambia desde que se validó, `submit.py` para antes de pedir la URL y no gasta hueco.
 
 **No bloquean la publicación, pero hay que mirarlos:**
 

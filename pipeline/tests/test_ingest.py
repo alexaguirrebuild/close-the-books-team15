@@ -531,6 +531,10 @@ class TestWhatCanBlockFinal:
     def test_could_hold_data(self, name: str) -> None:
         assert could_hold_data(self.PHASE / name, self.PHASE, self.OVERRIDE) is True
 
+    @pytest.mark.parametrize("name", ["masters_final/masters_final/customers.csv", "masters_final/final/otro.csv", "masters_final/customers.csv.gz", "masters_final/customers_20260630.csv"])
+    def test_a_known_master_in_another_form_must_not_be_lost_in_silence(self, name: str) -> None:
+        assert could_hold_data(self.PHASE / name, self.PHASE, self.OVERRIDE) is True
+
     def test_without_masters_final_a_csv_there_would_still_be_data(self) -> None:
         assert could_hold_data(self.OVERRIDE / "otro.csv", self.PHASE, None) is True
 

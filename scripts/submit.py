@@ -137,6 +137,8 @@ def strict_validate(phase: str, path: Path, accept_ingest_errors: bool = False) 
 
     Devuelve True si el validador rechaza el fichero solo por errores de ingesta y quien envía ha aceptado ese riesgo."""
     command = ["uv", "run", "--project", str(ROOT / "pipeline"), "bankcheck", "validate", "--phase", phase.lower(), str(path.resolve())]
+    if accept_ingest_errors:
+        validation_report_path(phase, path).unlink(missing_ok=True)  # solo vale el informe de esta ejecución
     if subprocess.run(command, cwd=ROOT).returncode == 0:
         return False
     if not accept_ingest_errors:
@@ -156,10 +158,21 @@ def describe(path: Path) -> str:
     return f"Fichero: {path.resolve()}\n  {stat.st_size / 1e6:.1f} MB · modificado a las {modified} · SHA-256 {hashlib.sha256(data).hexdigest()}"
 
 
-def upload_problem(up: dict, path: Path) -> str | None:
+def bytes_if_unchanged(path: Path, validated_sha256: str) -> bytes:
+    """Lo que se va a subir, solo si es lo que se validó: otro proceso puede reescribir el fichero mientras se confirma."""
+    try:
+        payload = path.read_bytes()
+    except OSError:
+        payload = b""
+    if hashlib.sha256(payload).hexdigest() != validated_sha256:
+        sys.exit(f"{path} ha cambiado desde que se validó. No se envía y no se ha gastado ningún hueco. Vuelve a lanzar el envío.")
+    return payload
+
+
+def upload_problem(up: dict, path: Path, payload: bytes) -> str | None:
     """Sube el fichero y devuelve qué ha fallado. Sin excepciones: el hueco ya está gastado y hay que dejar registro."""
     try:
-        st = s3_upload(up["upload"]["url"], up["upload"]["fields"], path.name, path.read_bytes())
+        st = s3_upload(up["upload"]["url"], up["upload"]["fields"], path.name, payload)
     except OSError as error:
         return str(error)
     return None if st in (200, 201, 204) else f"estado {st}"
@@ -218,16 +231,18 @@ def main(phase: str, path_s: str, accept_ingest_errors: bool = False) -> None:
         sys.exit("Fase: LIVE o FINAL")
     require_https(API)
     tok = token()
+    validated_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     local_validate(phase, path)
     accepted_ingest_errors = bool(strict_validate(phase, path, accept_ingest_errors))
     print(describe(path))
     ok = input(f"Vas a gastar un envío {phase} con {path.name}. Escribe {'FINAL' if phase == 'FINAL' else 'si'}: ")
     if ok.strip() != ("FINAL" if phase == "FINAL" else "si"):
         sys.exit("Cancelado.")
+    payload = bytes_if_unchanged(path, validated_sha256)
     up = request_upload(phase, path, tok)
     sub_id = up["sub_id"]
     print(f"Hueco gastado. sub_id={sub_id}", flush=True)
-    problem = upload_problem(up, path)
+    problem = upload_problem(up, path, payload)
     sub = {"status": "upload_failed", "detail": problem} if problem else wait_for_score(sub_id, tok)
     print(json.dumps(sub, indent=2, ensure_ascii=False))
     record_submission(phase, path, sub_id, sub, accepted_ingest_errors)

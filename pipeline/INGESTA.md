@@ -192,12 +192,12 @@ Hecho con la CLI real sobre una copia de `sample`. Ningún caso da traza de erro
 | `index.csv` sin columna `file` | 1 | No | `FILE_UNREADABLE` |
 | Fila de `index.csv` sin nombre de fichero | 1 | No | `BAD_VALUE`; esa fila se descarta |
 | Fecha imposible en `index.csv` | 1 | No | `BAD_VALUE`; la fecha queda vacía |
-| Columna nueva en un maestro | 1 | No | `BAD_HEADER`; la tabla queda vacía |
+| Columna nueva en un maestro | 0 | Sí | `EXTRA_COLUMNS` como aviso: se ignora |
 | `ar_invoices.csv` sin comprimir | 1 | No | `MISSING_FILE`, `FILE_NOT_READ` |
 | `bank_transactions.csv` sin comprimir | 2 | No | «No encuentro la fase»; sin informe |
 | `ar_invoices.csv.gz` truncado | 1 | No | `FILE_UNREADABLE`; la tabla queda vacía |
 | `bank_transactions.csv.gz` truncado | 1 | No | `FILE_UNREADABLE`, `XVAL_DIFF` |
-| `LEEME.txt`, `.zip` o `__MACOSX/` en la fase | 1 | No | `FILE_NOT_READ` |
+| `LEEME.txt`, `.zip` o `__MACOSX/` en la fase | 0 | Sí | `FILE_NOT_READ` como aviso. Con `.csv`, `.gz`, extracto o aviso sin leer, es error |
 | Extracto en formato desconocido | 1 | No | `STATEMENT_UNKNOWN_FORMAT` |
 | Extracto XML truncado, o fecha imposible en un extracto | 1 | No | `STATEMENT_PARSE_ERROR` |
 | Extracto N43 cortado | 1 | No | `XVAL_DIFF`, `RAW_ONLY_LINE`, `MISSING_IN_RAW` |
@@ -218,7 +218,7 @@ No se puede comprobar hasta las 18:00.
 | `open_items_at_start.csv.gz` | Obligatorio; si falta: `MISSING_FILE` |
 | ZA01 con ZAR, numeración `KWI…`, renombrada el 2026-04-01 | ZAR ya está en N43 y en tipos de cambio. Su banco ya aparece como MT940 en LIVE |
 | Cuenta de cobros de IT01 cambia el 2026-02-01 | Ambas son válidas |
-| Una columna o plantilla nueva | `BAD_HEADER` o `REMITTANCE_PARSE_ERROR` |
+| Falta una columna, o una plantilla nueva | `BAD_HEADER` o `REMITTANCE_PARSE_ERROR` |
 | Un formato de extracto nuevo | `STATEMENT_UNKNOWN_FORMAT` |
 
 ## 7. Procedimiento de las 18:00
@@ -232,8 +232,8 @@ Si la ingesta da errores, mira `out/final/ingest_report.json` y `cache/warehouse
 | Código | Qué se pierde | ¿`--allow-errors`? |
 |---|---|---|
 | `REMITTANCE_*` en pocos ficheros | Esos avisos | **Sí, es razonable** |
-| `BAD_HEADER` o `FILE_UNREADABLE` en una tabla de raíz o un maestro | **La tabla entera queda vacía** | **No.** Volver a descargar o adaptar `tables.py` |
-| `FILE_NOT_READ` | Nada todavía | Mejor no: mira el fichero y quítalo si es ruido, o adapta el cargador si son datos |
+| `BAD_HEADER` (falta una columna o está repetida) o `FILE_UNREADABLE` en una tabla de raíz o un maestro | **La tabla entera queda vacía** | **No.** Volver a descargar o adaptar `tables.py` |
+| `FILE_NOT_READ` como error (`.csv`, `.gz`, extracto o aviso sin leer) | Nada todavía | Mejor no: mira el fichero y quítalo si es ruido, o adapta el cargador si son datos |
 | `STATEMENT_*`, `XVAL_DIFF`, `RAW_ONLY_LINE`, `MISSING_IN_RAW` | El contraste con el extracto de esa cuenta; los `bank_txn_id` salen de la vista normalizada | Solo tras mirar qué cuenta afecta |
 | `BAD_VALUE`, `CSV_ROW_REJECTED` | Esas filas o valores | Según cuántos sean |
 
