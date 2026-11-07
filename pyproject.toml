@@ -1,0 +1,17 @@
+[project]
+name = "bankrec"
+version = "0.1.0"
+description = "Equipo 15 · Close the Books: conciliación bancaria explicable para Grupo Valtermia"
+requires-python = ">=3.11"
+# El motor corre con la librería estándar (sin instalar nada): así funciona en cualquier portátil
+# y con el WiFi de la sala. Lo de abajo es opcional (PDFs, xlsx, fuzzy, envío).
+dependencies = []
+
+[project.optional-dependencies]
+extra = ["rapidfuzz>=3.9", "pypdf>=5.0", "openpyxl>=3.1", "requests>=2.32", "polars>=1.20"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
