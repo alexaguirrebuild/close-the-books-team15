@@ -72,6 +72,14 @@ El comando para y deja `out/final/ingest_report.json` y `cache/warehouse/final.f
 
 Con `--allow-ingest-errors`, la validación final dice NO VÁLIDO por `INGEST_HAD_ERRORS`, aunque el formato esté bien. Si es el único error y `official_format_ok` es `true` en `out/final/validate__sub_final.json`, enviar es una decisión del usuario.
 
+Para enviar en ese caso, la persona que decide añade `--accept-ingest-errors`:
+
+```bash
+! python scripts/submit.py FINAL out/sub_final.csv.gz --accept-ingest-errors
+```
+
+`submit.py` lee `out/final/validate__sub_final.json` y solo sigue si `official_format_ok` es `true`, `INGEST_HAD_ERRORS` es el **único** error y `file_sha256` coincide con el fichero que se envía. Avisa en pantalla, sigue pidiendo escribir `FINAL` y lo deja anotado en `out/envios.jsonl` con `accepted_ingest_errors`. Si `bankcheck validate` no se pudo ejecutar o el informe no existe, no envía.
+
 ## Si FINAL no trae un maestro
 
 `final/masters_final/` manda fichero a fichero. Lo que no traiga se toma de `masters/` y se avisa: `preflight` en el motor y `MASTER_NOT_UPDATED` en la ingesta. No para, pero hay que mirarlo:

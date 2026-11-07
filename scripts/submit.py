@@ -2,6 +2,7 @@
 
     python scripts/submit.py LIVE out/sub_live.csv.gz            # pide confirmación
     python scripts/submit.py FINAL out/sub_final.csv.gz          # pide escribir FINAL: solo hay UN envío
+    python scripts/submit.py FINAL out/sub_final.csv.gz --accept-ingest-errors   # ver docs/RUNBOOK_FINAL.md
 
 Antes de subir valida el fichero en local con el evaluador oficial (ids de la fase, duplicados, formato).
 Pedir la URL de subida ya gasta un hueco (20/día por fase, 1 cada 180 s): no se envía por probar.
@@ -9,6 +10,7 @@ El token sale de la variable de entorno HK_TOKEN o del fichero .env (que no se s
 """
 from __future__ import annotations
 
+import argparse
 import gzip
 import hashlib
 import io
@@ -29,6 +31,7 @@ FINAL_STATES = {"scored", "received", "invalid", "error"}
 POLL_SECONDS = 5  # como mucho cada 5 s: toda la sala comparte IP
 POLL_DEADLINE_SECONDS = 600
 SERVER_ERROR = 500
+INGEST_ERROR_CODE = "INGEST_HAD_ERRORS"
 
 
 def require_https(url: str) -> None:
@@ -100,11 +103,49 @@ def s3_upload(url, fields, name, payload):
         return r.status
 
 
-def strict_validate(phase: str, path: Path) -> None:
-    """Además del evaluador oficial: cobertura total, partidas que existen, 2 decimales. Ver pipeline/README.md."""
+def validation_report_path(phase: str, path: Path) -> Path:
+    """El informe que escribe `bankcheck validate`: uno por fichero (pipeline/bankcheck/submission/writer.py)."""
+    name = path.name.removesuffix(".gz").removesuffix(".csv")
+    return ROOT / "out" / phase.lower() / f"validate__{name}.json"
+
+
+def read_validation_report(phase: str, path: Path) -> dict:
+    report_file = validation_report_path(phase, path)
+    try:
+        report = json.loads(report_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        sys.exit(f"No se puede leer {report_file}: {error}. No se envía.")
+    if not isinstance(report, dict):
+        sys.exit(f"{report_file} no es un informe válido. No se envía.")
+    return report
+
+
+def accepted_ingest_problem(report: dict, path: Path) -> str | None:
+    """Por qué el informe no permite enviar con errores de ingesta, o None si ese es su único problema."""
+    if report.get("official_format_ok") is not True:
+        return "el evaluador oficial no da el formato por bueno"
+    codes = set(report.get("error_counts") or {})
+    if codes != {INGEST_ERROR_CODE}:
+        return f"el único error debe ser {INGEST_ERROR_CODE}, y hay: {sorted(codes)}"
+    if report.get("file_sha256") != hashlib.sha256(path.read_bytes()).hexdigest():
+        return "el informe es de otro fichero"
+    return None
+
+
+def strict_validate(phase: str, path: Path, accept_ingest_errors: bool = False) -> bool:
+    """Además del evaluador oficial: cobertura total, partidas que existen, 2 decimales. Ver pipeline/README.md.
+
+    Devuelve True si el validador rechaza el fichero solo por errores de ingesta y quien envía ha aceptado ese riesgo."""
     command = ["uv", "run", "--project", str(ROOT / "pipeline"), "bankcheck", "validate", "--phase", phase.lower(), str(path.resolve())]
-    if subprocess.run(command, cwd=ROOT).returncode != 0:
+    if subprocess.run(command, cwd=ROOT).returncode == 0:
+        return False
+    if not accept_ingest_errors:
         sys.exit("El validador estricto rechaza el fichero. No se envía.")
+    problem = accepted_ingest_problem(read_validation_report(phase, path), path)
+    if problem:
+        sys.exit(f"El validador estricto rechaza el fichero: {problem}. No se envía.")
+    print("AVISO: se va a enviar con errores de ingesta. Revisa docs/RUNBOOK_FINAL.md antes de confirmar.", flush=True)
+    return True
 
 
 def describe(path: Path) -> str:
@@ -148,12 +189,15 @@ def wait_for_score(sub_id: str, tok: str) -> dict:
         time.sleep(POLL_SECONDS)
 
 
-def record_submission(phase: str, path: Path, sub_id: str, sub: dict) -> None:
+def record_submission(phase: str, path: Path, sub_id: str, sub: dict, accepted_ingest_errors: bool = False) -> None:
     log = ROOT / "out" / "envios.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
+    entry = {"t": time.strftime("%H:%M:%S"), "phase": phase, "file": path.name, "sub_id": sub_id,
+             "status": sub.get("status"), "score": sub.get("score")}
+    if accepted_ingest_errors:
+        entry["accepted_ingest_errors"] = True
     with log.open("a", encoding="utf-8") as f:
-        f.write(json.dumps({"t": time.strftime("%H:%M:%S"), "phase": phase, "file": path.name, "sub_id": sub_id,
-                            "status": sub.get("status"), "score": sub.get("score")}) + "\n")
+        f.write(json.dumps(entry) + "\n")
 
 
 def request_upload(phase: str, path: Path, tok: str) -> dict:
@@ -167,7 +211,7 @@ def request_upload(phase: str, path: Path, tok: str) -> dict:
     return up
 
 
-def main(phase: str, path_s: str) -> None:
+def main(phase: str, path_s: str, accept_ingest_errors: bool = False) -> None:
     phase = phase.upper()
     path = Path(path_s)
     if phase not in ("LIVE", "FINAL"):
@@ -175,7 +219,7 @@ def main(phase: str, path_s: str) -> None:
     require_https(API)
     tok = token()
     local_validate(phase, path)
-    strict_validate(phase, path)
+    accepted_ingest_errors = bool(strict_validate(phase, path, accept_ingest_errors))
     print(describe(path))
     ok = input(f"Vas a gastar un envío {phase} con {path.name}. Escribe {'FINAL' if phase == 'FINAL' else 'si'}: ")
     if ok.strip() != ("FINAL" if phase == "FINAL" else "si"):
@@ -186,14 +230,22 @@ def main(phase: str, path_s: str) -> None:
     problem = upload_problem(up, path)
     sub = {"status": "upload_failed", "detail": problem} if problem else wait_for_score(sub_id, tok)
     print(json.dumps(sub, indent=2, ensure_ascii=False))
-    record_submission(phase, path, sub_id, sub)
+    record_submission(phase, path, sub_id, sub, accepted_ingest_errors)
     if problem:
         sys.exit(f"La subida falló ({problem}). sub_id={sub_id}. Mira su estado en la plataforma antes de repetir.")
     if sub.get("status") not in FINAL_STATES:
         sys.exit(f"Sin estado final tras {POLL_DEADLINE_SECONDS} s. sub_id={sub_id}. Míralo en la plataforma: no reenvíes a ciegas.")
 
 
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("phase", help="LIVE o FINAL")
+    parser.add_argument("path", help="fichero a enviar")
+    parser.add_argument("--accept-ingest-errors", action="store_true",
+                        help="enviar si el único error de la validación es INGEST_HAD_ERRORS y el formato oficial es válido")
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        sys.exit(__doc__)
-    main(sys.argv[1], sys.argv[2])
+    args = parse_args(sys.argv[1:])
+    main(args.phase, args.path, args.accept_ingest_errors)
