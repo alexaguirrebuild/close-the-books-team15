@@ -12,6 +12,7 @@ Quien recibe este repo (Claude, Codex, Antigravity o una persona) lee esto antes
 | sample (jun-2025) | 81,46 | sin saldos abiertos: plazos y parciales salen peor que en real |
 | TRAIN holdout lento (`--phase train --since 2025-01-01`) | **69,36** | F1 0,786 (precisión 0,91, recall 0,69) · acierto por movimiento 0,73 · macro-F1 excepciones **0,41** · 103 min |
 | TRAIN holdout rápido (`--phase holdout`) | **71,74** | ene-jun 2025 con saldos exactos a 1-ene, igual que arranca LIVE · F1 0,806 · acierto 0,75 · excepciones 0,44 · 16 min. **Es la referencia para iterar** |
+| holdout tras b3bc63f (7-nov, 08:40) | **82,33** | antes 80,93 · F1 0,860 · acierto 0,867 · excepciones 0,667 · sample 83,77. Siguiente: precisión de UNIDENTIFIED (0,26; 11.764 FP en movimientos sin partida), SHORT_BANK_CHARGES (prec 0,25) y DUPLICATE_PAYMENT (prec 0,54) |
 | LIVE | sin enviar | `out/sub_live.csv.gz` valida en local: 590.949 filas, 203.083/203.083 movimientos · 7 min 49 s |
 
 ## Dónde se pierden los puntos (holdout lento)
