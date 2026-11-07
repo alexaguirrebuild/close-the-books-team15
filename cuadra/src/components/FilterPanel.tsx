@@ -8,6 +8,7 @@ const SORTS: { value: QueueSort; label: string }[] = [
   { value: 'confidence_low', label: 'Menor confianza' },
   { value: 'confidence_high', label: 'Mayor confianza' },
 ]
+const NEEDS_CONFIDENCE: QueueSort[] = ['confidence_low', 'confidence_high']
 
 type FilterPanelProps = { onClose: () => void }
 
@@ -75,7 +76,7 @@ export function FilterPanel({ onClose }: FilterPanelProps) {
       <label>
         Ordenar por
         <select value={filters.sort} onChange={(e) => apply({ sort: e.target.value as QueueSort }, e.target)}>
-          {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          {SORTS.filter((s) => meta?.hasConfidence || !NEEDS_CONFIDENCE.includes(s.value)).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </label>
     </div>

@@ -54,6 +54,21 @@ describe('buildEvidence', () => {
     expect(step('origin', { proposal: [{ ...row, reason: 'Mismo tercero' }] })?.text).toBe('Mismo tercero')
   })
 
+  test('shows the rule of the engine with its evidence', () => {
+    const proposal = [{ ...row, source: 'dd_batch', reason: 'remesa 03250701018' }]
+    expect(step('origin', { proposal })?.text).toBe('Remesa de recibos: remesa 03250701018')
+  })
+
+  test('names the rule when the engine gives no evidence', () => {
+    const proposal = [{ ...row, source: 'kw:COMISION|GASTOS', reason: '' }]
+    expect(step('origin', { proposal })?.text).toBe('Palabra clave en el concepto')
+  })
+
+  test('keeps only the reason when the rule has no name in words', () => {
+    const proposal = [{ ...row, source: 'm1_reference', reason: 'Partida abierta con ese número' }]
+    expect(step('origin', { proposal })?.text).toBe('Partida abierta con ese número')
+  })
+
   test('says when the pipeline proposes nothing', () => {
     expect(step('origin', {})).toMatchObject({ state: 'warn', text: 'El pipeline no propone nada' })
   })

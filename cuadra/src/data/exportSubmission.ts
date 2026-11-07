@@ -11,6 +11,8 @@ export const canDownloadSubmission = (phase: string | null): boolean => phase ==
 
 export type ExportOptions = { includeProposals: boolean; minConfidence: number }
 
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = { includeProposals: true, minConfidence: 0 }
+
 export type ExportSummary = {
   rows: number
   txns: number

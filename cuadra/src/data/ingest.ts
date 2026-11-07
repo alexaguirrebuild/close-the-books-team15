@@ -16,6 +16,7 @@ export type DatasetMeta = {
   proposalTxnCount: number
   hasGolden: boolean
   hasProposals: boolean
+  hasConfidence: boolean
   hasOpenItems: boolean
   phase: string | null
   categories: string[]
@@ -491,6 +492,7 @@ export async function ingest(
     proposalTxnCount: await scalar(db, 'SELECT count(*) FROM prop_sum'),
     hasGolden: Boolean(plan.files.golden),
     hasProposals: Boolean(plan.files.proposals),
+    hasConfidence: (await scalar(db, 'SELECT count(conf) FROM prop')) > 0,
     hasOpenItems: Boolean(plan.files.open),
     phase: plan.phase,
     categories,

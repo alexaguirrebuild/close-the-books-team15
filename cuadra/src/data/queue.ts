@@ -35,6 +35,19 @@ export const VIEW_HINT: Record<QueueView, string> = {
 
 export const VIEW_ORDER_IN_TABS: QueueView[] = ['priority', 'ready', 'exceptions', 'no_proposal', 'errors', 'done', 'all']
 
+type ViewSupport = { hasGolden: boolean; hasConfidence: boolean }
+
+/** Errors need a golden, and a list ready to confirm needs something that says how sure a proposal is. */
+export function availableViews(support: ViewSupport | null): QueueView[] {
+  return VIEW_ORDER_IN_TABS.filter((view) => (view !== 'errors' || support?.hasGolden) && (view !== 'ready' || support?.hasConfidence))
+}
+
+const PRIORITY_HINT_WITHOUT_CONFIDENCE = 'El motor no da confianza: primero las líneas con más partidas y excepciones raras.'
+
+export function viewHint(view: QueueView, hasConfidence: boolean): string {
+  return view === 'priority' && !hasConfidence ? PRIORITY_HINT_WITHOUT_CONFIDENCE : VIEW_HINT[view]
+}
+
 export const DEFAULT_READY_THRESHOLD = 0.95
 
 export type QueueFilters = {

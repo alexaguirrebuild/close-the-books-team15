@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { CASE_TYPE_LABEL, queuePage, VIEW_HINT, VIEW_LABEL, VIEW_ORDER_IN_TABS, type QueueFilters, type QueueRow } from '../data/queue'
+import { availableViews, CASE_TYPE_LABEL, queuePage, VIEW_LABEL, viewHint, type QueueFilters, type QueueRow, type QueueView } from '../data/queue'
 import { formatCount, formatMoney, formatPercent } from '../domain/money'
 import { EXCEPTION_LABELS, isException } from '../domain/types'
 import { useStore } from '../store'
@@ -49,7 +49,7 @@ export function QueuePanel() {
     <section className="queue" aria-label="Movimientos">
       <div className="queue-top">
         <QueueViews />
-        <p className="view-hint">{VIEW_HINT[filters.view]}</p>
+        <ViewHint view={filters.view} />
         <QueueSearch />
         <FilterChips />
         {filters.view === 'ready' && <BulkRow />}
@@ -81,7 +81,7 @@ function QueueViews() {
   const counts = useStore((s) => s.counts)
   const meta = useStore((s) => s.meta)
   const setFilters = useStore((s) => s.setFilters)
-  const views = VIEW_ORDER_IN_TABS.filter((view) => view !== 'errors' || meta?.hasGolden)
+  const views = availableViews(meta)
 
   return (
     <div className="views" role="tablist" aria-label="Vistas">
@@ -99,6 +99,11 @@ function QueueViews() {
       ))}
     </div>
   )
+}
+
+function ViewHint({ view }: { view: QueueView }) {
+  const hasConfidence = useStore((s) => Boolean(s.meta?.hasConfidence))
+  return <p className="view-hint">{viewHint(view, hasConfidence)}</p>
 }
 
 function QueueSearch() {

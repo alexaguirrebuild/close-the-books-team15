@@ -1,9 +1,9 @@
 import { Check, Circle, FolderOpen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Robot } from '../components/Robot'
-import type { PhaseLayout, PhaseName } from '../data/dataRoot'
+import { phaseOfEngineFile, type PhaseLayout, type PhaseName } from '../data/dataRoot'
 import { readFolderHandle } from '../data/log'
-import { buildPlan, planProblems, withMapping, type Plan, type SourceFile } from '../data/preflight'
+import { buildPlan, fileSource, planProblems, withMapping, type Plan, type SourceFile } from '../data/preflight'
 import { ROLE_LABEL, ROLE_SCHEMA, SCHEMAS, type FileRole } from '../data/schema'
 import { canPickDirectory, fetchSample, pickDirectory, reopenDirectory, scanFromInput, type FolderScan } from '../data/sources'
 import { formatCount } from '../domain/money'
@@ -77,7 +77,32 @@ export function LoadScreen() {
 
   const changeProposal = async (path: string) => {
     if (!plan) return
+    setError(null)
     setPlan(await buildPlan(plan.name, sources, { phase: plan.phase, proposalPath: path }))
+  }
+
+  /** The engine may have written elsewhere: its folder cannot be walked when the data is behind symlinks. */
+  const pickEngineFile = async (file: File) => {
+    if (!plan) return
+    const named = phaseOfEngineFile(file.name)
+    if (plan.phase && named && named !== plan.phase) {
+      setError(`${file.name} es de otra fase (${PHASE_LABEL[named]}). Elige el de esta fase o cambia de fase.`)
+      return
+    }
+    const path = `out/${file.name}`
+    const next = [...sources.filter((source) => source.path !== path), fileSource(path, file)]
+    try {
+      const built = await buildPlan(plan.name, next, { phase: plan.phase, proposalPath: path })
+      if (built.files.proposals?.path !== path) {
+        setError(`${file.name} no es un fichero de propuestas. Elige el explain_<fase>.csv.gz que escribe el motor.`)
+        return
+      }
+      setSources(next)
+      setPlan(built)
+      setError(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
   }
 
   const problems = plan ? planProblems(plan) : []
@@ -92,6 +117,7 @@ export function LoadScreen() {
       const folder = await fetchSample(sample)
       const found = await folder.load(null)
       const built = await buildPlan(folder.name, found, { phase: sample })
+      setSources(found)
       setPlan(built)
       if (params.has('autoload')) await loadDataset(built)
     })()
@@ -132,7 +158,7 @@ export function LoadScreen() {
               if (event.target.files?.length) void accept(scanFromInput(event.target.files))
             }}
           />
-          {!plan && <p className="footnote">La carpeta que contiene <code>live/</code>, <code>train/</code> y <code>masters/</code>. Usa Chrome o Edge para poder reabrirla.</p>}
+          {!plan && <p className="footnote">La carpeta que contiene <code>live/</code>, <code>train/</code> y <code>masters/</code>, o la raíz del repositorio con <code>data/</code>. Usa Chrome o Edge para poder reabrirla.</p>}
         </div>
 
         {lastFolder && !plan && (
@@ -167,7 +193,9 @@ export function LoadScreen() {
           </label>
         )}
 
-        {(error || loadError) && <p className="problem" role="alert">No se pudo leer la carpeta: {error ?? loadError}</p>}
+        {plan && <EngineFilePicker onPick={(file) => void pickEngineFile(file)} />}
+
+        {(error || loadError) && <p className="problem" role="alert">No se pudieron leer los datos: {error ?? loadError}</p>}
         {missingMasters && (
           <p className="problem">No encuentro los maestros: sin ellos no hay categorías ni tipos de cambio. Elige la carpeta raíz, la que contiene esta fase y <code>masters/</code>.</p>
         )}
@@ -211,6 +239,28 @@ export function LoadScreen() {
         </section>
       )}
     </div>
+  )
+}
+
+function EngineFilePicker({ onPick }: { onPick: (file: File) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  return (
+    <p className="footnote">
+      ¿El motor escribió en otra carpeta?{' '}
+      <button className="link footnote" onClick={() => inputRef.current?.click()}>Elegir su fichero explain</button>
+      <input
+        ref={inputRef}
+        type="file"
+        hidden
+        accept=".csv,.gz"
+        aria-label="Fichero del motor"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) onPick(file)
+        }}
+      />
+    </p>
   )
 }
 

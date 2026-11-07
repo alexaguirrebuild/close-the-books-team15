@@ -108,6 +108,57 @@ afterAll(() => {
   }
 })
 
+describe('engine output', () => {
+  const OFFICIAL = 'bank_txn_id,item_id,amount,category,exception\nT1,,,BANK_FEES,\n'
+  const EXPLAINED = 'bank_txn_id,item_id,amount,category,exception,rule,evidence\nT1,,,BANK_FEES,,kw:FEE,\n'
+  const output = (path: string, text: string, lastModified = 0) =>
+    fileSource(path, new File([gzipSync(text)], path.split('/').at(-1) ?? path, { lastModified }))
+
+  test('prefers what the engine explains, even over a newer file', async () => {
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/sub_live.csv.gz', OFFICIAL, 5),
+      output('out/live/submission_m2.csv.gz', OFFICIAL, 9),
+      output('out/explain_live.csv.gz', EXPLAINED, 1),
+    ])
+    expect(plan.files.proposals?.path).toBe('out/explain_live.csv.gz')
+    expect(plan.files.proposals?.mapping).toMatchObject({ source: 'rule', reason: 'evidence' })
+  })
+
+  test('does not mix old stages into a file that already says where each row came from', async () => {
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/explain_live.csv.gz', EXPLAINED),
+      output('out/live/matches/m2_remittance.csv.gz', OFFICIAL),
+    ])
+    expect(plan.enrichments).toEqual([])
+    expect(plan.proposalOptions).toHaveLength(2)
+  })
+
+  test('keeps the stages for a pipeline file that names its source but brings no confidence', async () => {
+    const named = 'bank_txn_id,item_id,amount,category,exception,source\nT1,,,BANK_FEES,,m1_reference\n'
+    const plan = await buildPlan('demo', [
+      ...sources({ 'propuestas.csv': null }),
+      output('out/live/propuestas.csv.gz', named),
+      output('out/live/matches/m2_remittance.csv.gz', OFFICIAL),
+    ])
+    expect(plan.enrichments.map((f) => f.path)).toEqual(['out/live/matches/m2_remittance.csv.gz'])
+  })
+
+  test('keeps the rule and the evidence of each row, and knows there is no confidence', async () => {
+    const explain = `bank_txn_id,item_id,amount,category,exception,rule,evidence\nT1,${A1},100.00,,,ref,refs F-1`
+    const { db, meta } = await setup({ 'propuestas.csv': null, 'out/explain_live.csv': explain })
+    const data = await loadCase(db, meta, 1)
+    expect(meta.hasConfidence).toBe(false)
+    expect(data.proposal[0]).toMatchObject({ source: 'ref', reason: 'refs F-1', confidence: null })
+  })
+
+  test('knows when the proposals carry confidence', async () => {
+    const { meta } = await setup()
+    expect(meta.hasConfidence).toBe(true)
+  })
+})
+
 describe('preflight', () => {
   const gz = (text: string) => new File([gzipSync(text)], 'x.csv.gz')
 

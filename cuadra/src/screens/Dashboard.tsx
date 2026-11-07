@@ -260,7 +260,7 @@ function ConfidenceBlock({ stats }: { stats: DashboardStats }) {
           )}
         </>
       ) : (
-        <p className="muted">Estas propuestas no traen confianza. Las etapas de matching la añaden.</p>
+        <p className="muted">Estas propuestas no traen confianza. Cada caso muestra la regla que las decidió.</p>
       )}
     </section>
   )
