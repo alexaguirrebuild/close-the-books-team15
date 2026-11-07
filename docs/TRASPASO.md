@@ -5,7 +5,7 @@ Quien recibe este repo (Claude, Codex, Antigravity o una persona) lee esto antes
 - **Último que escribió:** Claude (PC de Pablo), sábado 7-nov, 13:40.
 - **Rama de integración:** `origin/Dev`. Toda rama nueva sale de ahí. `team15-dev` no comparte historia con `Dev` y no sirve de base.
 - **Referencia para superar:** holdout **89,91**, en `Dev`.
-- **Última nota oficial:** LIVE **88,63** con `648cc9c`. Los envíos los decide una persona.
+- **Última nota oficial:** LIVE **88,63** con `648cc9c`. **No se sube nada a LIVE hasta llegar a 95 en holdout** (decisión de Pablo, 13:45). Los envíos los decide una persona.
 - **Horario:** las reglas nuevas acaban a las 16:30; ensayo a las 17:00; código congelado a las 17:30; FINAL de 18:00 a 19:30.
 
 ## Quién lleva qué
@@ -45,6 +45,23 @@ uv run python -m bankrec.run --phase holdout
 - **Plugin:** un módulo en `bankrec/` con `prepare(engine)` y `match(engine, t)`. `bankrec/devoluciones.py` sirve de modelo. `match` se ejecuta después de las remesas y las categorías claras, y antes de `m_refs` y `m_party_amount`.
 - **Para cambiar algo anterior o interno:** envuelve en `prepare` el método que toque (`engine.m_cheque`, `engine.m_payment_run`, `engine.explain_short`…), sin editar `engine.py`. Lo hace `_wrap_resolve` en `bankrec/pdfclauses.py`.
 - **Activarlo:** tu PR no lo activa. Quien la fusiona añade el plugin a la lista de `engine.py` y vuelve a comprobar el holdout. En la PR pon la nota de antes y de después.
+
+## Qué falta para 95
+
+Cascada en holdout, con el golden solo para evaluar: cada fila supone perfecta esa parte y todas las anteriores. Son techos, no previsiones, y dependen del orden.
+
+| Parte | Sube | Acumulado | Dónde mirar |
+|---|---|---|---|
+| Etiquetas e importes en filas ya bien asignadas | +1,01 | 90,92 | `explain_short`, `settle`. Confusiones: PARTIAL y vacía (1.071), SHORT_DISCOUNT como PARTIAL (263), vacía como DUPLICATE_PAYMENT (171) |
+| Quitar filas falsas | +0,46 | 91,38 | Precisión de `ref_cited`, `ref_completed` y `party_due_subset` (acierta el 81 %) |
+| Número citado entero | +0,11 | 91,49 | Poco que rascar |
+| Cita parcial (20.567 filas) | +1,54 | 93,03 | `_settle_cited`, `_complete_cited`: `ar_short_dispute` 8.280, `ar_1toN_credit_note` 5.138, `ar_1toN_text` 2.672, `ar_ref_noise` 2.116 |
+| Sin cita, hasta 14 filas (34.807 filas) | +5,22 | 98,25 | `m_party_amount`, `scan_names`: `ar_ref_noise` 17.812, `ar_1toN_credit_note` 4.174, `ar_n_to_m` 2.366 |
+| Sin cita, remesa grande (34.364 filas) | +1,75 | 100,00 | En cobros no hay evidencia. Sí en `ap_confirming` (4.597) y `ap_fx` (1.549), que van por remesas, y en `ar_1toN_remittance` (1.440), que tiene aviso |
+
+La clasificación por cita es aproximada: 7.663 filas no tienen número localizado y cuentan como sin cita.
+
+**Para llegar a 95 hace falta recuperar cerca de la mitad de los cobros sin cita, con evidencia exacta.** Primero hay que medir cuántos tienen cliente identificado y una suma exacta única, también tras los ajustes que marca POLICIES (descuento, retención, abono, parcial).
 
 ## Dónde se pierden los puntos (LIVE 88,63)
 
