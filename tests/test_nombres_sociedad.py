@@ -153,3 +153,11 @@ class TestLosDosJuntos:
 
         assert eng.scan_names(line("TT IN MARY YOUNG SERVICE")) == ["CCN1"]
         assert eng.scan_names(line("FP AQUATICS HARRIS 20 SERVICE", amount=7000)) == ["C1"]
+
+    def test_el_orden_de_carga_inverso_tampoco(self):
+        eng = engine({**LONG_ELSEWHERE, "C1": "Aquatics Harris 2000"}, [*ITEMS_BOTH, invoice("A3", "C1", "CN01", cents=7000)])
+        nombres_cortados.prepare(eng)
+        nombres_sociedad.prepare(eng)
+
+        assert eng.scan_names(line("TT IN MARY YOUNG SERVICE")) == ["CCN1"]
+        assert eng.scan_names(line("FP AQUATICS HARRIS 20 SERVICE", amount=7000)) == ["C1"]
