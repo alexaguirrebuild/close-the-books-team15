@@ -298,10 +298,22 @@ def read_pdf(path):
     for i, t in enumerate(toks):
         if re.match(r"^(paid|pagado|pay[eé]|bezahlt)$", t.strip(), re.I):
             start = i + 1
+            break
     recs, cur = [], None
+    in_table = True
     for t in toks[start:]:
         s = t.strip()
         if not s or s.startswith("Documento sint") or "Synthetic" in s:
+            continue
+        if re.match(r"^(payment advice|aviso de pago|avis de paiement|zahlungsavis)$", s, re.I):
+            if cur:
+                recs.append(cur)
+                cur = None
+            in_table = False
+            continue
+        if not in_table:
+            if re.match(r"^(paid|pagado|pay[eé]|bezahlt)$", s, re.I):
+                in_table = True
             continue
         first = s.split()[0]
         is_doc = (DOC_RE.match(first) and not DATE_RE.match(first) and not AMT_RE.match(first)) or \

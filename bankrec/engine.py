@@ -72,7 +72,7 @@ RUN_ID = re.compile(r"\b[A-Z]{2}\d{10,}\b")
 EXPLAINED_SHORTFALLS = ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "LATE")
 OPTIONAL_PLUGINS = {"learned"}  # Solo estos pueden faltar: sin un plugin obligatorio se pierden puntos sin aviso.
 # `abonos` no se activa: en holdout no sube la nota (90,65 sin él, 90,64 con él) y añade riesgo en sobrepagos (PR #12).
-DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,proveedores,mismo_importe,nombres_cortados,cobros_cortos"
+DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,proveedores,mismo_importe,nombres_cortados,cobros_cortos,citas_parciales"
 # (primero, después): el segundo transforma en prepare() lo que deja el primero; al revés no lo vería, y sin ningún aviso.
 PLUGIN_ORDER = (("m2_avisos", "mismo_importe"),)
 

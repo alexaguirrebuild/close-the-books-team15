@@ -102,3 +102,24 @@ class TestSobrepagoNoFuerza:
         cobros_cortos.prepare(eng)
         assert eng.settle(movement(-25549), ["P"], "ref")
         assert [r.exception for r in eng.rows] == [""]
+
+
+class TestSobrepagoPorContraparte:
+    """Cuando la referencia no permite casar por m_refs, _party_amount acepta el sobrepago si hay una única factura que encaja."""
+
+    def test_una_factura_con_exceso_exacto_por_contraparte_se_liquida_como_sobrepago(self):
+        eng = engine([invoice(cents=15549)])
+        eng.ph.by_party = {"C1": ["A"]}
+        eng.ph.children = {}
+        cobros_cortos.prepare(eng)
+        assert eng._party_amount(movement(25549), "C1", "iban") is True
+        assert [(r.item, r.amount, r.exception) for r in eng.rows] == [("A", 15549, "OVERPAYMENT")]
+
+    def test_dos_facturas_candidatas_al_sobrepago_no_se_fuerzan(self):
+        eng = engine([invoice("A", cents=15549), invoice("B", cents=20549)])
+        eng.ph.by_party = {"C1": ["A", "B"]}
+        eng.ph.children = {}
+        cobros_cortos.prepare(eng)
+        assert eng._party_amount(movement(25549), "C1", "iban") is False
+        assert eng.rows == []
+

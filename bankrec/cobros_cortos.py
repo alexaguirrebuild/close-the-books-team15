@@ -109,8 +109,31 @@ def _wrap_settle(engine) -> None:
     engine.settle = settle
 
 
+def _wrap_party_amount(engine) -> None:
+    inner = engine._party_amount
+
+    def _party_amount(t, party, how):
+        if inner(t, party, how):
+            return True
+
+        def rule_overpay_party():
+            if t.amount <= 0 or not party or not party.startswith("C"):
+                return False
+            its = engine.open_items_of(party, t, engine._party_kinds(party, t))
+            cash = abs(t.amount)
+            hits = [i for i in its if engine.sign(i, t) > 0 and i.ccy == t.ccy and overpaid(cash, i.open)]
+            if len(hits) != 1:
+                return False
+            return engine.settle(t, [hits[0].id], f"party_overpay_{how}", f"contraparte {party}", party=party)
+
+        return guarded(engine, "_party_amount", rule_overpay_party, lambda: False)
+
+    engine._party_amount = _party_amount
+
+
 def prepare(engine) -> None:
     _wrap_settle(engine)
+    _wrap_party_amount(engine)
 
 
 def _match(engine, t) -> bool:
@@ -119,3 +142,4 @@ def _match(engine, t) -> bool:
 
 def match(engine, t) -> bool:
     return guarded(engine, "match", lambda: _match(engine, t), lambda: False)
+
