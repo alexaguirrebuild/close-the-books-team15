@@ -93,7 +93,7 @@ def iter_phase_files(phase_dir: Path) -> Iterator[Path]:
 def _candidates(data_root: Path | None, env: Mapping[str, str], cwd: Path, home: Path) -> list[Path]:
     if data_root is not None:
         return [Path(data_root)]
-    from_env = [Path(env[ROOT_ENV_VAR])] if env.get(ROOT_ENV_VAR) else []
+    from_env = [Path(env[k]) for k in (ROOT_ENV_VAR, "BANKREC_DATA") if env.get(k)]
     return [*from_env, cwd / "data", cwd, cwd.parent, home / "Downloads"]
 
 
@@ -108,7 +108,7 @@ def _first_existing(*folders: Path) -> Path | None:
     return next((folder for folder in folders if folder.is_dir()), None)
 
 
-def _layout_at(candidate: Path, phase: str) -> Layout | None:
+def _layout_at(candidate: Path, phase: str, env: Mapping[str, str] | None = None) -> Layout | None:
     base = candidate.absolute()
     phase_dir = _phase_dir(base, phase)
     masters = _first_existing(base / "masters", base / DOCS_DIRNAME / "masters")
@@ -117,6 +117,7 @@ def _layout_at(candidate: Path, phase: str) -> Layout | None:
     project = base.parent if base.name == DATA_DIRNAME else base  # El motor guarda las fases en data/ y out/ fuera.
     starter = _first_existing(base / "starter", base / DOCS_DIRNAME / "starter", project / DOCS_DIRNAME / "starter") or base / "starter"
     override = phase_dir / "masters_final"
+    out_base = Path(env["BANKREC_OUT"]) if env and env.get("BANKREC_OUT") else project / "out"
     return Layout(
         root=base,
         phase=phase,
@@ -125,7 +126,7 @@ def _layout_at(candidate: Path, phase: str) -> Layout | None:
         masters_override_dir=override if override.is_dir() else None,
         starter_dir=starter,
         warehouse_path=project / "cache" / "warehouse" / f"{phase}.duckdb",
-        report_dir=project / "out" / phase,
+        report_dir=out_base / phase,
     )
 
 
@@ -138,14 +139,15 @@ def resolve_layout(
 ) -> Layout:
     if phase not in PHASES:
         raise ValueError(f"fase desconocida: {phase}. Usa una de {', '.join(PHASES)}")
+    eff_env = os.environ if env is None else env
     candidates = _candidates(
         data_root,
-        os.environ if env is None else env,
+        eff_env,
         Path.cwd() if cwd is None else cwd,
         Path.home() if home is None else home,
     )
     for base in candidates:
-        layout = _layout_at(base, phase)
+        layout = _layout_at(base, phase, eff_env)
         if layout is not None:
             return layout
     searched = "\n  ".join(str(base) for base in candidates)

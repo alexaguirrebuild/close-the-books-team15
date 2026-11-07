@@ -231,8 +231,10 @@ class Engine:
         else:
             it.open -= amount
         self.settled_by[it.id].append((t.id, amount))
-        if t.cp_iban and it.party:
-            self.iban_learned[t.cp_iban] = it.party
+        if t.cp_iban and it.party and not rule.startswith(("payment_run", "dd_", "cheque", "card")):
+            party_by_iban = getattr(getattr(self, "ph", None), "party_by_iban", {})
+            if t.cp_iban not in party_by_iban:
+                self.iban_learned[t.cp_iban] = it.party
 
     def emit_cat(self, t, cat, exc="", rule="", ev=""):
         self.rows.append(Row(t.id, "", None, cat, exc, rule, ev))
