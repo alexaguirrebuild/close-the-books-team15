@@ -70,7 +70,7 @@ RUN_ID = re.compile(r"\b[A-Z]{2}\d{10,}\b")
 # LATE: descuento pasado de plazo. Es fórmula exacta y POLICIES §3 lo trata como PARTIAL, que es lo que hace settle().
 EXPLAINED_SHORTFALLS = ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "LATE")
 OPTIONAL_PLUGINS = {"learned"}  # Solo estos pueden faltar: sin un plugin obligatorio se pierden puntos sin aviso.
-DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,mismo_importe"
+DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,abonos,proveedores,mismo_importe,nombres_cortados,cobros_cortos"
 # (primero, después): el segundo transforma en prepare() lo que deja el primero; al revés no lo vería, y sin ningún aviso.
 PLUGIN_ORDER = (("m2_avisos", "mismo_importe"),)
 
