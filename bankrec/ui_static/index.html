@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesa de conciliación</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="loading on" id="loading"><div><div class="spin"></div><div id="loadingMsg">Cargando la fase…</div></div></div>
+
+<header class="top">
+  <div class="brand">
+    <div class="mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5h12M2 8h8M2 11.5h5"/><path d="m10 11.3 1.6 1.6L14.5 10"/></svg></div>
+    <div><b>Conciliación bancaria · Grupo Valtermia</b><small id="sub">Mesa de revisión de tesorería</small></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="seg entsel" id="entities" role="group" aria-label="Sociedad"></div>
+  <select id="phase" aria-label="Fase" title="Fase"></select>
+  <button class="btn" id="exportBtn" title="Descarga la entrega con las correcciones de tesorería">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 2v8m0 0 3-3m-3 3L5 7M3 12.5h10"/></svg>Entrega revisada</button>
+  <button class="btn ghost" id="themeBtn" title="Tema claro / oscuro" aria-label="Cambiar tema">◐</button>
+  <button class="btn ghost" id="helpBtn" title="Atajos de teclado">?</button>
+</header>
+
+<section class="kpis" id="kpis"></section>
+<nav class="excs" id="excs" aria-label="Excepciones"></nav>
+
+<main>
+  <section class="pane" aria-label="Movimientos">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="filters">
+      <label class="search"><span class="sr">Buscar</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+        <input id="q" placeholder="ID, factura, contraparte, IBAN, importe…" autocomplete="off"><kbd>F</kbd></label>
+      <select id="rule" aria-label="Regla"><option value="">Todas las reglas</option></select>
+      <select id="conf" aria-label="Confianza"><option value="">Toda confianza</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Revisión humana</option></select>
+      <select id="sort" aria-label="Orden"><option value="date">Fecha ↑</option><option value="-date">Fecha ↓</option><option value="amount">Importe ↓</option><option value="conf">Menor confianza</option></select>
+    </div>
+    <div id="list" style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div class="thead"><span>Fecha</span><span>Soc.</span><span>Contraparte · texto banco</span><span style="text-align:right">Importe</span><span style="text-align:right">Propuesta</span></div>
+      <div class="list" id="scroller" tabindex="0" role="listbox" aria-label="Movimientos bancarios"><div class="spacer" id="spacer"></div></div>
+    </div>
+    <div class="lfoot"><span id="lcount">—</span><span id="lsum"></span></div>
+  </section>
+  <section class="pane" id="detail" aria-label="Ficha de auditoría" aria-live="polite"></section>
+</main>
+
+<div class="ov" id="editOv"><div class="drawer" role="dialog" aria-modal="true" aria-labelledby="editTitle" id="drawer"></div></div>
+<div class="ov" id="docOv"><div class="full" id="docFull"></div></div>
+<div class="ov" id="helpOv"><div class="help" role="dialog" aria-labelledby="helpT">
+  <h2 id="helpT">Atajos de teclado</h2>
+  <div class="keys">
+    <kbd>J</kbd><span>Siguiente movimiento</span><kbd>K</kbd><span>Movimiento anterior</span>
+    <kbd>A</kbd><span>Confirmar el cruce propuesto (y pasar al siguiente)</span>
+    <kbd>E</kbd><span>Editar excepción, categoría o partidas</span>
+    <kbd>F</kbd><span>Buscar (también <kbd>/</kbd>)</span>
+    <kbd>D</kbd><span>Abrir el documento a pantalla completa</span>
+    <kbd>1–0</kbd><span>Filtrar por cada una de las 10 excepciones</span>
+    <kbd>Esc</kbd><span>Cerrar / quitar el foco</span>
+  </div>
+  <p class="muted" style="margin:14px 0 0">Las correcciones se guardan en <span class="mono">out/overrides_&lt;fase&gt;.json</span> y la entrega revisada en <span class="mono">out/sub_&lt;fase&gt;_revisado.csv.gz</span>. La del motor no se toca.</p>
+</div></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
