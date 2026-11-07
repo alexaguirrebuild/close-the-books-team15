@@ -358,6 +358,7 @@ def prepare(engine):
             engine.ra_errors = getattr(engine, "ra_errors", []) + [(r["file"], repr(e))]
             continue
         if not adv["lines"]:
+            engine.ra_empty = getattr(engine, "ra_empty", []) + [r["file"]]
             continue
         adv["file"] = r["file"]
         adv["entity"] = r["entity"]
@@ -498,7 +499,7 @@ def _lookup(engine, line, t, party):
             fam = _family(engine, party)
             ids = [i for i in ids if i.party in fam] or ids
         if ids:
-            ids.sort(key=lambda i: (-(i.open > 0), i.issue))
+            ids.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min, i.id))
             it = ids[0]
     return it
 

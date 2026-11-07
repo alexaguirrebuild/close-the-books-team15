@@ -53,13 +53,7 @@ Las reglas de trabajo están en `AGENTS.md` (la leen Claude, Codex y Antigravity
 
 ### Sobre `cuadra/`
 
-Es útil para revisar fallos a mano y para la demo del vídeo, pero **no para generar el envío**. Su README ya dice que sus supuestos no están comprobados, y tres de ellos chocan con `FORMAT.md` y `POLICIES.md`:
-
-1. Pone `amount` en las filas sin partida. FORMAT dice que va vacío.
-2. Conserva el signo de la partida. FORMAT dice positivo.
-3. En un pago corto pone lo pagado. POLICIES §2 dice que, si el motivo es aceptado (descuento, comisiones, retención), va el saldo entero y la excepción explica la diferencia. Solo `PARTIAL` lleva lo pagado.
-
-Además, su puntuación local calcula el macro-F1 de excepciones por movimiento, y el oficial lo calcula por fila (FORMAT, «Scoring»).
+Es para revisar fallos a mano y para la demo del vídeo, **no para generar el envío**: en LIVE y FINAL no produce ningún fichero, y la nota sale del motor. Lee la salida del motor, y su test con datos reales comprueba que nota y segmentos coinciden con el evaluador oficial. Más detalle en `cuadra/README.md`.
 
 ### Por confirmar entre todos
 
@@ -128,13 +122,7 @@ Working rules are in `AGENTS.md` (read by Claude, Codex and Antigravity; written
 
 ### About `cuadra/`
 
-It is useful for reviewing errors by hand and for the demo video, but **not for producing the submission**. Its README already says its assumptions are unverified, and three of them clash with `FORMAT.md` and `POLICIES.md`:
-
-1. It fills `amount` on rows with no item. FORMAT says it must be empty.
-2. It keeps the item's sign. FORMAT says positive.
-3. On a short payment it writes what was paid. POLICIES §2 says that for an accepted reason (discount, charges, withholding) the full open amount goes in and the exception explains the gap. Only `PARTIAL` carries the amount paid.
-
-Its local scorer also computes exception macro-F1 per bank line, while the official one does it per row (FORMAT, "Scoring").
+It is for reviewing failures by hand and for the video demo, **not for generating the submission**: in LIVE and FINAL it produces no file, and the score comes from the engine. It reads the engine output, and its real-data test checks that score and segments match the official scorer. More in `cuadra/README.md`.
 
 ### To agree on
 

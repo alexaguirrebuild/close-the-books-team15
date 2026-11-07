@@ -1,6 +1,6 @@
 """Score a TRAIN (or sample) submission locally with the official scorer.
 
-    python starter/score_train.py submission_train.csv.gz [--data ..] [--sample]
+    python vendor/score_train.py submission_train.csv.gz [--data data] [--sample]
 """
 import argparse
 import csv
@@ -21,7 +21,7 @@ EXC = ["PARTIAL", "OVERPAYMENT", "SHORT_DISCOUNT", "SHORT_BANK_CHARGES", "SHORT_
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("submission")
-    ap.add_argument("--data", default=os.path.join(HERE, ".."))
+    ap.add_argument("--data", default=os.path.join(HERE, "..", "data"))
     ap.add_argument("--sample", action="store_true", help="score against sample/ instead of train/")
     a = ap.parse_args()
     folder = os.path.join(a.data, "sample" if a.sample else "train")

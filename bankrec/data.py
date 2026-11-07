@@ -167,12 +167,13 @@ class Phase:
         if name == "final" and final_m.exists():
             mdir = final_m
         self.mdir = mdir
-        self.customers = {r["customer_id"]: r for r in rows(mdir / "customers.csv")}
-        self.suppliers = {r["supplier_id"]: r for r in rows(mdir / "suppliers.csv")}
-        self.accounts = {r["account_id"]: r for r in rows(mdir / "bank_accounts.csv")}
-        self.categories = [r["category"] for r in rows(mdir / "categories.csv")]
-        self.terms = {r["code"]: r for r in rows(mdir / "payment_terms.csv")}
-        self.fx = FX(mdir / "fx_rates.csv")
+        self.entity_country = {r["entity"]: r.get("country") for r in rows(self._master("entities.csv"))}
+        self.customers = {r["customer_id"]: r for r in rows(self._master("customers.csv"))}
+        self.suppliers = {r["supplier_id"]: r for r in rows(self._master("suppliers.csv"))}
+        self.accounts = {r["account_id"]: r for r in rows(self._master("bank_accounts.csv"))}
+        self.categories = [r["category"] for r in rows(self._master("categories.csv"))]
+        self.terms = {r["code"]: r for r in rows(self._master("payment_terms.csv"))}
+        self.fx = FX(self._master("fx_rates.csv"))
         self.items: dict[str, Item] = {}
         self._load_items()
         self.txns = [Txn(r) for r in rows(self.dir / "bank_transactions.csv.gz")]
@@ -186,6 +187,11 @@ class Phase:
         self._index()
 
     # ---------- carga ----------
+    def _master(self, file_name: str) -> Path:
+        """masters_final manda fichero a fichero. Lo que no traiga sale de masters/, como en la ingesta; preflight lo avisa."""
+        chosen = self.mdir / file_name
+        return chosen if chosen.is_file() else DATA / "masters" / file_name
+
     def _prev_csvs(self, sub, months=2):
         """Remesas de la fase anterior de los últimos `months` meses: el confirming de junio se carga en julio,
         y las devoluciones de principios de mes citan remesas del mes anterior."""
@@ -302,6 +308,18 @@ class Phase:
         self.txns = [t for t in self.txns if t.date >= cut]
 
     # ---------- índices ----------
+    def _keep_previous_ibans(self):
+        """POLICIES §5.11: quien cambia de cuenta puede seguir pagando desde la vieja, y masters_final solo trae la nueva."""
+        previous = DATA / "masters"
+        if self.mdir == previous:
+            return
+        for file_name, id_column in (("customers.csv", "customer_id"), ("suppliers.csv", "supplier_id")):
+            path = previous / file_name
+            if path.is_file():
+                for r in rows(path):
+                    if r.get("iban"):
+                        self.party_by_iban.setdefault(r["iban"].replace(" ", ""), r[id_column])
+
     def _index(self):
         self.by_num = defaultdict(set)
         self.by_suffix = defaultdict(set)
@@ -343,6 +361,7 @@ class Phase:
                 k = name_key(it.party_name)
                 if k:
                     self.party_names.setdefault(it.party, set()).add(k)
+        self._keep_previous_ibans()
         for r in self.dd:
             if r.get("debtor_iban"):
                 self.party_by_iban.setdefault(r["debtor_iban"].replace(" ", ""), None)

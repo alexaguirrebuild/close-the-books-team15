@@ -22,8 +22,8 @@
 
 ## Bucle de mejora (repetir)
 
-1. `python -m bankrec.run --phase train --since 2025-01-01` (o `--phase sample` si TRAIN no está) → mirar la tabla de segmentos con más fallos.
-2. Escoger **un** segmento. `python -m bankrec.diff --segment <seg> -n 5` → ver el patrón.
+1. `python -m bankrec.run --phase holdout` (o `--phase sample` si TRAIN no está) → mirar la tabla de segmentos con más fallos.
+2. Escoger **un** segmento. `python -m bankrec.diff --phase holdout --segment <seg> -n 5` (o `--phase sample`, la misma fase del paso 1) → ver el patrón.
 3. Arreglarlo citando POLICIES. Volver a medir. Si sube y no rompe nada, commit con «segmento X: antes → después».
 
 ## Reparto (propuesto, se ajusta en la puerta)
@@ -39,6 +39,8 @@
 - Cada envío se apunta solo en `out/envios.jsonl`.
 
 ## Checklist FINAL (18:00–18:45)
+
+**El procedimiento vigente está en [`RUNBOOK_FINAL.md`](RUNBOOK_FINAL.md)** (`scripts/download.py final` y `scripts/final_run.py`). Esta lista queda como resumen.
 
 1. `python scripts/download.py final` → sha256 OK. Si la red de la sala va lenta, se descarga en el PC de casa.
 2. Comprobar que existe `data/final/masters_final/`. El motor lo usa solo.

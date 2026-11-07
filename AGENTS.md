@@ -14,7 +14,7 @@ python -m bankrec.run --phase train --since 2025-01-01    # holdout de TRAIN, im
 python -m bankrec.run --phase live --no-score             # genera out/sub_live.csv.gz (NO envía)
 python -m bankrec.diff --phase sample --segment ar_partial -n 5   # QA: fallos de un segmento, nuestra respuesta frente a la buena
 ```
-- Sin dependencias: el motor corre con la librería estándar de Python 3.11 o superior. Opcional: `pypdf` y `openpyxl` para los PDF y los xlsx.
+- Dependencias obligatorias: `pypdf` y `openpyxl`. Sin ellas se pierden los avisos en PDF y XLSX (en `sample`, de 83,77 a 79,92), así que `bankrec.run` se niega a arrancar. Con `uv run python -m bankrec.run ...` se instalan solas.
 - Los datos van en `data/<fase>/` y `data/masters/`. **Nunca se suben a git.** Se descargan con `python scripts/download.py live train-lite`.
 - El evaluador oficial está en `vendor/bankrec_score.py`. No se toca: es el mismo código que corre el servidor.
 
@@ -34,5 +34,6 @@ python -m bankrec.diff --phase sample --segment ar_partial -n 5   # QA: fallos d
 - No se ataca la plataforma: nada de escaneos, fuerza bruta ni intentos de saltarse límites. Solo los flujos oficiales de descarga y envío.
 - Sin golden de LIVE ni de FINAL por ninguna vía.
 - El token del equipo vive solo en `.env` (`HK_TOKEN`). Nunca en código, commits, prompts a otros servicios, capturas ni el vídeo.
+- Antes del primer commit: `git config core.hooksPath .githooks` y `gitleaks` instalado. Es obligatorio: sin él, el gancho no deja hacer commit.
 - Las consultas de estado de un envío van como mucho cada 5 s: toda la sala comparte IP.
 - Límites: 20 envíos LIVE al día, uno cada 180 s, y **un único envío FINAL**. Los envíos los decide una persona, no un agente.

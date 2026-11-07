@@ -5,11 +5,15 @@ POLICIES.md manda: los nombres de reglas citan su apartado.
 """
 from __future__ import annotations
 
+import importlib
 import datetime as dt
 import re
 from collections import defaultdict
+from functools import lru_cache
 from itertools import combinations
 
+from . import duplicados
+from .sumas import exact_subsets
 from .data import SEPA, Phase, Txn, ascii_upper, name_key, norm_text, num_variants
 
 PAYMENT_FACTORY = {"ES00": {"ES01", "ES02", "PT01"}}
@@ -26,7 +30,7 @@ class Row:
 
 # ---------------------------------------------------------------- categorías sin partida (POLICIES §4)
 NONITEM_RULES = [
-    (r"ZBA SWEEP|CASH ?POOL|BARRIDO|NIVELACION|TRASPASO ENTRE CUENTAS ES00|TRASPASO PROPIO|SWEEP", "CASH_POOL"),
+    (r"ZBA SWEEP|CASH ?POOL|CASH CONCENTRATION|BARRIDO|NIVELACION|TRASPASO ENTRE CUENTAS ES00|TRASPASO PROPIO|SWEEP", "CASH_POOL"),
     (r"NOMINA|PAYROLL|SALARIES|SALAIRES|GEHALT|LOHN", "PAYROLL"),
     (r"SEGURIDAD SOCIAL|SEG\. SOCIAL|SOCIAL CHARGES|URSSAF|TGSS|SOZIALVERS|COTISATIONS", "SOCIAL_SECURITY"),
     (r"DEVOLUCION IMPUESTO|TAX REFUND|DEVOLUCION IVA|REMBOURSEMENT TVA|STEUERERSTATTUNG", "TAX_REFUND"),
@@ -62,24 +66,66 @@ def classify_nonitem(t: Txn):
     return None, ""
 
 
+RUN_ID = re.compile(r"\b[A-Z]{2}\d{10,}\b")
+# LATE: descuento pasado de plazo. Es fórmula exacta y POLICIES §3 lo trata como PARTIAL, que es lo que hace settle().
+EXPLAINED_SHORTFALLS = ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "LATE")
+OPTIONAL_PLUGINS = {"learned"}  # Solo estos pueden faltar: sin un plugin obligatorio se pierden puntos sin aviso.
+# `abonos` no se activa: en holdout no sube la nota (90,65 sin él, 90,64 con él) y añade riesgo en sobrepagos (PR #12).
+DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,proveedores,mismo_importe,nombres_cortados,cobros_cortos"
+# (primero, después): el segundo transforma en prepare() lo que deja el primero; al revés no lo vería, y sin ningún aviso.
+PLUGIN_ORDER = (("m2_avisos", "mismo_importe"),)
+
+
+def load_plugins(names: str) -> list:
+    """Los módulos de los plugins pedidos, tras comprobar que su orden funciona (`PLUGIN_ORDER`)."""
+    requested = [n for n in names.split(",") if n]
+    for first, then in PLUGIN_ORDER:
+        if first in requested and then in requested and requested.index(first) > requested.index(then):
+            raise SystemExit(f"BANKREC_PLUGINS: {then} tiene que ir detrás de {first}.")
+    loaded = []
+    for name in requested:
+        module_name = f"bankrec.{name}"
+        try:
+            loaded.append(importlib.import_module(module_name))
+        except ModuleNotFoundError as error:
+            if name not in OPTIONAL_PLUGINS or error.name != module_name:
+                raise
+    return loaded
+
+
+AMOUNT_TOLERANCE_CENTS = 2
+CITED_MIN_DIGITS = 4
+MAX_COMPLETION_ITEMS = 18
+DUE_MARGIN_DAYS = 3
+DISCOUNT_GRACE_DAYS = 3  # POLICIES §3 SHORT_DISCOUNT
+MAX_DUE_CANDIDATES = 26
+MAX_OVERPAYMENT_SHARE = 0.10
+
+
+@lru_cache(maxsize=None)
+def plain_number(number):
+    return re.sub(r"[^A-Z0-9]", "", ascii_upper(number))
+
+
+MAX_PARTIES_TRIED = 4
+MAX_SUBSET_ITEMS = 14
+
+
 class Engine:
     def __init__(self, ph: Phase):
+        """Índices de la fase, estado de las partidas y plugins en el orden de `BANKREC_PLUGINS`."""
         self.ph = ph
         self.items = ph.items
         self.rows: list[Row] = []
         self.settled_by = defaultdict(list)  # item -> [(txn_id, amount)]
         self.iban_learned = {}
+        self.cheque_items = {}
+        self.card_items = {}
         self._prep_batches()
         self.reversal = self._find_reversals()
         self.plugins = []
-        import importlib
         import os
-        names = os.environ.get("BANKREC_PLUGINS", "remittance,pdfclauses,learned").split(",")
-        for name in [n for n in names if n]:
-            try:
-                mod = importlib.import_module(f"bankrec.{name}")
-            except ModuleNotFoundError:
-                continue
+        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", DEFAULT_PLUGINS)):
             if hasattr(mod, "prepare"):
                 mod.prepare(self)
             if hasattr(mod, "match"):
@@ -123,17 +169,28 @@ class Engine:
         self.rows.append(Row(t.id, "", None, cat, exc, rule, ev))
 
     # ------------------------------------------------------------ excepciones (POLICIES §2-§3)
-    def discount_ok(self, it, t, cash_item):
+    def _discount_terms(self, it):
+        """Lo que se paga por `it` con descuento y el último día para tomarlo (POLICIES §3); None si sus condiciones no lo dan."""
         term = self.ph.terms.get(it.terms or "")
         if not term or not term.get("early_payment_discount_pct"):
             return None
-        pct = float(term["early_payment_discount_pct"])
-        days = int(term.get("discount_days") or 0)
-        disc = int(round(it.total * pct / 100))
-        if abs(cash_item - (it.total - disc)) <= 2:
-            in_time = it.issue and t.date <= it.issue + dt.timedelta(days=days + 3)
-            return "SHORT_DISCOUNT" if in_time else "LATE"
-        return None
+        to_pay = it.total - int(round(it.total * float(term["early_payment_discount_pct"]) / 100))
+        days = int(term.get("discount_days") or 0) + DISCOUNT_GRACE_DAYS
+        return to_pay, it.issue + dt.timedelta(days=days) if it.issue else None
+
+    def _discounted_total(self, it, t):
+        """Lo que se paga por `it` con descuento si `t` llega a plazo; None si no corresponde aplicarlo."""
+        terms = self._discount_terms(it)
+        if not terms or not terms[1] or t.date > terms[1]:
+            return None
+        return terms[0]
+
+    def discount_ok(self, it, t, cash_item):
+        """`SHORT_DISCOUNT` si el cobro es el importe con descuento y llega a plazo, `LATE` si llega tarde; None si es otro importe."""
+        terms = self._discount_terms(it)
+        if not terms or abs(cash_item - terms[0]) > 2:
+            return None
+        return "SHORT_DISCOUNT" if self._discounted_total(it, t) is not None else "LATE"
 
     def explain_short(self, it, t, short_item, cash_item):
         """Por qué falta dinero en una factura. Devuelve la excepción o None."""
@@ -145,12 +202,30 @@ class Engine:
             for r in WITHHOLDING[country]:
                 if abs(short_item - it.total * r) <= max(2, it.total * 0.0005):
                     return "SHORT_WITHHOLDING"
-        cross = (t.orig_ccy is not None) or (country and country not in SEPA)
+        foreign = country and country not in SEPA and country != self.ph.entity_country.get(it.entity)
+        cross = t.orig_ccy is not None or "/CHGS/" in t.up or foreign  # un pago nacional no pasa por banco intermediario
         if cross and it.side == "AR":
             short_eur = self.ph.fx.conv(short_item, it.ccy, "EUR", t.date)
             if 0 < short_eur <= 6000 and short_item <= 0.02 * it.total:
                 return "SHORT_BANK_CHARGES"
         return None
+
+    def _discount_subset(self, invoices, credit_notes, t, cash, max_eligible=10):
+        """Ids de las facturas con descuento a tiempo (POLICIES §3) que explican el cobro exacto; None si no hay
+        una solución única. El resto de facturas y los abonos van por su importe completo."""
+        if len(invoices) < 2 or any(it.ccy != t.ccy for it in invoices + credit_notes):
+            return None
+        to_pay = {it.id: amount for it in invoices if (amount := self._discounted_total(it, t)) is not None}
+        if not to_pay or len(to_pay) > max_eligible:
+            return None
+        base = sum(max(it.open, 0) for it in invoices) - sum(max(c.open, 0) for c in credit_notes)  # como `exp` en settle
+        sols = []
+        ids = list(to_pay)
+        for n in range(1, len(ids) + 1):
+            for sub in combinations(ids, n):
+                if abs(base - sum(self.items[i].total - to_pay[i] for i in sub) - cash) <= 2:
+                    sols.append(set(sub))
+        return sols[0] if len(sols) == 1 else None
 
     def settle(self, t, cands, rule, ev="", party=None):
         """Reparte el importe del movimiento entre partidas candidatas y pone las excepciones."""
@@ -202,11 +277,10 @@ class Engine:
         # falta dinero
         if len(invoices) == 1:
             it = invoices[0]
+            # importe cobrado para la factura, en su divisa: se lee antes de que full() deje los abonos a cero
+            net_credit = sum(c.open if c.ccy == it.ccy else self.ph.fx.conv(c.open, c.ccy, it.ccy, t.date) for c in credits)
             for c in credits:
                 full(c)
-            cash_item = cash + sum(self.to_bank(c.open, c, t) for c in credits) if False else None
-            # importe cobrado para la factura, en su divisa
-            net_credit = sum(c.total for c in credits)
             cash_item = (cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)) + net_credit
             short = it.open - cash_item
             exc = self.explain_short(it, t, short, cash_item)
@@ -216,18 +290,22 @@ class Engine:
                 self.emit(t, it, cash_item, "PARTIAL", rule, ev)
             return True
         # varias facturas: ¿descuento en todas?
-        disc_sum, all_disc = 0, True
-        for it in invoices:
-            term = self.ph.terms.get(it.terms or "")
-            if term and term.get("early_payment_discount_pct"):
-                pct = float(term["early_payment_discount_pct"])
-                disc_sum += it.total - int(round(it.total * pct / 100))
-            else:
-                all_disc = False
-                break
-        if all_disc and abs(disc_sum - sum(c.total for c in credits) - cash) <= 2 * len(invoices):
+        terms = {it.id: self._discount_terms(it) for it in invoices}
+        all_disc = all(terms.values())
+        if all_disc and abs(sum(self.to_bank(terms[it.id][0], it, t) for it in invoices)
+                            - sum(self.to_bank(max(c.open, 0), c, t) for c in credits) - cash) <= 2 * len(invoices):
             for it in cands:
-                full(it, "SHORT_DISCOUNT" if self.sign(it, t) > 0 else "")
+                if it.id in terms and self._discounted_total(it, t) is None:
+                    # POLICIES §3 PARTIAL: fuera de plazo no se acepta el descuento y la diferencia queda abierta
+                    self.emit(t, it, min(terms[it.id][0], it.open), "PARTIAL", rule, ev)
+                else:
+                    full(it, "SHORT_DISCOUNT" if it.id in terms else "")
+            return True
+        # POLICIES §3 SHORT_DISCOUNT: el descuento solo en las facturas que llegan a plazo; vale solo con solución única
+        subset = self._discount_subset(invoices, credits, t, cash)
+        if subset is not None:
+            for it in cands:
+                full(it, "SHORT_DISCOUNT" if it.id in subset else "")
             return True
         # pago de menos repartido: el más antiguo primero, la última queda parcial
         remaining = cash + sum(self.to_bank(c.open, c, t) for c in credits)
@@ -271,10 +349,7 @@ class Engine:
         for r in ph.runs:
             self.run_rows[r["run_id"]].append(r)
             self.e2e_rows[r["end_to_end_id"]].append(r)
-        self.transfers_by_amount = defaultdict(list)
-        for e2e, rs in self.e2e_rows.items():
-            r0 = rs[0]
-            self.transfers_by_amount[(r0["debtor_account_id"], int(round(float(r0["transfer_amount"]) * 100)))].append(e2e)
+        self.transfers_by_amount = self._index_transfers()
         self.used_batches = set()
 
     def item_by_number(self, number, entity=None, party=None, kinds=None, amount=None):
@@ -291,7 +366,7 @@ class Engine:
             out = [i for i in out if i.party == party] or out
         if amount is not None and len(out) > 1:
             out = [i for i in out if abs(i.open - amount) <= 2 or abs(i.total - amount) <= 2] or out
-        out.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min))
+        out.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min, i.id))
         return out[0] if out else None
 
     def m_dd_batch(self, t):
@@ -368,6 +443,7 @@ class Engine:
             it = self.item_by_number(r["order_number"], t.entity, kinds={"ARI"}, amount=gross)
             if it:
                 self.emit(t, it, gross, "", "card_settlement", f"liquidación {sid}")
+                self.card_items[(r["card"], gross)] = it  # Por si llega un contracargo (plugin devoluciones).
         return True
 
     def m_cheque(self, t):
@@ -394,7 +470,7 @@ class Engine:
             if len(stub) >= 5:
                 for iid in self.ph.by_suffix.get(stub[-6:].rjust(6, "0"), set()) | self.ph.by_num.get(stub, set()):
                     c = self.items[iid]
-                    if c.side == "AR" and self.entity_ok(c, t) and (abs(c.open - amt) <= 2 or abs(c.total - amt) <= 2):
+                    if c.side == "AR" and c.open > 0 and self.entity_ok(c, t) and (abs(c.open - amt) <= 2 or abs(c.total - amt) <= 2):
                         it = c
                         break
             if not it:
@@ -402,6 +478,7 @@ class Engine:
             if it:
                 exc = "PARTIAL" if it.open - amt > 2 else ""
                 self.emit(t, it, min(amt, it.open) if exc == "" else amt, exc, "cheque_deposit", f"remesa {dep}")
+                self.cheque_items[r["cheque_number"]] = it  # Por si llega devuelto (plugin devoluciones).
         return True
 
     def run_doc_item(self, r, t):
@@ -462,22 +539,67 @@ class Engine:
             cache[rid] = out
         return cache[rid]
 
+    @staticmethod
+    def _transfers_of(rows):
+        """Filas de un mismo end_to_end_id, una lista por transferencia: el id se repite entre beneficiarios y divisas."""
+        groups = defaultdict(list)
+        for r in rows:
+            groups[(r["debtor_account_id"], r["beneficiary"], r["currency"], r["transfer_amount"])].append(r)
+        return list(groups.values())
+
+    def _index_transfers(self):
+        index = defaultdict(list)
+        for e2e, rows in self.e2e_rows.items():
+            for group in self._transfers_of(rows):
+                index[(group[0]["debtor_account_id"], int(round(float(group[0]["transfer_amount"]) * 100)))].append(e2e)
+        return index
+
+    def _transfer_for(self, rows, t):
+        """La transferencia de este cargo: la de su importe, o su importe original, o el beneficiario que cita el texto."""
+        groups = self._transfers_of(rows)
+        if len(groups) == 1:
+            return rows
+        own = [g for g in groups if g[0]["debtor_account_id"] == t.account] or groups
+        amt = abs(t.amount)
+
+        def cents(group):
+            return int(round(float(group[0]["transfer_amount"]) * 100))
+
+        exact = [g for g in own if abs(cents(g) - amt) <= 2]
+        original = [g for g in own if t.orig_amount and g[0]["currency"] == t.orig_ccy and abs(cents(g) - t.orig_amount) <= 2]
+        named = [g for g in own if all(w in t.up for w in name_key(g[0]["beneficiary"]).split()[:2])]
+        same_currency = [g for g in own if g[0]["currency"] == t.ccy]
+        return (exact or original or named or same_currency or own)[0]
+
+    @staticmethod
+    def _cited_runs(t):
+        """Ids de remesa del texto. El banco puede partirlos entre dos campos: «PR0101250 | 71007»."""
+        return list(dict.fromkeys(RUN_ID.findall(t.up) + RUN_ID.findall(t.up.replace(" | ", ""))))
+
     def m_payment_run(self, t):
         if t.amount >= 0:
             return False
         amt = -t.amount
         if t.e2e and t.e2e in self.e2e_rows:
-            self.emit_run_rows(t, self.e2e_rows[t.e2e], "payment_run_e2e", f"e2e {t.e2e}")
+            self.emit_run_rows(t, self._transfer_for(self.e2e_rows[t.e2e], t), "payment_run_e2e", f"e2e {t.e2e}")
             return True
-        for rid in re.findall(r"\b[A-Z]{2}\d{10,}\b", t.up):
+        for rid in self._cited_runs(t):
             rs = self.run_rows.get(rid)
             if not rs:
                 continue
+            if rs[0]["run_type"] == "aggregated":
+                # Un solo cargo por remesa y cuenta (POLICIES §5.3). La suma no sirve: mezcla divisas. El run_id se repite entre sociedades.
+                own = [r for r in rs if r["debtor_account_id"] == t.account]
+                if not own or (rid, t.account) in self.used_batches:
+                    continue
+                self.used_batches.add((rid, t.account))
+                self.emit_run_rows(t, own, "payment_run_aggregated", f"remesa {rid}")
+                return True
             if rs[0]["run_type"] == "transfers":
                 # un cargo por beneficiario: solo la transferencia de este importe
                 sub = defaultdict(list)
                 for r in rs:
-                    sub[r["end_to_end_id"]].append(r)
+                    sub[(r["end_to_end_id"], r["beneficiary"], r["currency"], r["transfer_amount"])].append(r)
                 hits = [e for e, x in sub.items() if abs(int(round(float(x[0]["transfer_amount"]) * 100)) - amt) <= 2
                         and e not in self.used_batches]
                 if not hits:
@@ -525,7 +647,7 @@ class Engine:
                     self.used_batches.add(key)
                     self.emit_run_rows(t, g, "payment_run", f"remesa {rid}")
                     return True
-        e2es = [e for e in self.transfers_by_amount.get((t.account, amt), []) if e not in self.used_batches]
+        e2es = [e for e in self.transfers_by_amount.get((t.account, amt), []) if (e, amt) not in self.used_batches]
         if e2es:
             def score(e):
                 r0 = self.e2e_rows[e][0]
@@ -536,8 +658,8 @@ class Engine:
             e = min(e2es, key=score)
             r0 = self.e2e_rows[e][0]
             if abs((dt.date.fromisoformat(r0["execution_date"]) - t.date).days) <= 5:
-                self.used_batches.add(e)
-                self.emit_run_rows(t, self.e2e_rows[e], "payment_run_amount", f"transfer {e}")
+                self.used_batches.add((e, amt))
+                self.emit_run_rows(t, self._transfer_for(self.e2e_rows[e], t), "payment_run_amount", f"transfer {e}")
                 return True
         return False
 
@@ -563,7 +685,7 @@ class Engine:
         best = max(scored.values(), default=0)
         if not best:
             return []
-        return [p for p, v in sorted(scored.items(), key=lambda x: -x[1]) if v >= best - 5]
+        return [p for p, v in sorted(scored.items(), key=lambda x: (-x[1], x[0])) if v >= best - 5]
 
     def resolve_name(self, raw):
         c = self.resolve_names(raw)
@@ -681,12 +803,14 @@ class Engine:
                         if it.party in fam and it.kind in kinds:
                             items.append(it)
         items = list({i.id: i for i in items}.values())
+        if not self._adds_up(items, t) and self._settle_cited(t, parties, kinds):
+            return True
         if not items:
             return False
         open_items = [i for i in items if i.open > 0]
         if not open_items:
             # ya liquidadas: ¿pago duplicado? (POLICIES §3 DUPLICATE_PAYMENT)
-            it = items[0]
+            it = min(items, key=lambda i: (i.issue or dt.date.min, i.id))
             if abs(abs(t.amount) - self.to_bank(it.total, it, t)) <= max(2, it.total * 0.005):
                 if it.side == "AR" and it.method == "dd" and not re.search(r"ADEUDO|RECIBO|DIRECT DEBIT|LASTSCHRIFT|PRELEV", t.up):
                     # recibo devuelto que el cliente vuelve a pagar por transferencia: no es duplicado
@@ -697,8 +821,76 @@ class Engine:
             return False
         if len(open_items) > 1:
             open_items = self.best_subset(open_items, abs(t.amount), t) or open_items
+        extra = self._complete_cited(t, open_items, party or open_items[0].party)
+        if extra:
+            return self.settle(t, [i.id for i in [*open_items, *extra]], "ref_completed", "refs + resto por suma exacta",
+                               party=party or open_items[0].party)
         return self.settle(t, [i.id for i in open_items], "ref", "refs " + ",".join(i.number for i in open_items[:5]),
                            party=party or open_items[0].party)
+
+    def _complete_cited(self, t, cited, party):
+        """El banco corta la lista de facturas (POLICIES §5.5): el resto del cobro se busca entre las demás partidas abiertas
+        del cliente. Solo con solución única y pocas candidatas: con más, varias combinaciones suman lo mismo."""
+        if t.amount <= 0:
+            return None
+        missing = abs(t.amount) - sum(self.sign(i, t) * self.to_bank(i.open, i, t) for i in cited)
+        if missing <= AMOUNT_TOLERANCE_CENTS:
+            return None
+        known = {i.id for i in cited}
+        others = [i for i in self.open_items_of(party, t, {"ARI", "ARC"}) if i.id not in known]
+        return self._unique_completion(others, missing, MAX_COMPLETION_ITEMS, t) or self._complete_with_due(t, cited, others, missing)
+
+    def _unique_completion(self, candidates, missing, max_candidates, t):
+        """Las candidatas que suman lo que falta, solo si la combinación es única; si no, None."""
+        if not candidates or len(candidates) > max_candidates:
+            return None
+        values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in candidates]
+        solutions = exact_subsets(values, int(round(missing)), AMOUNT_TOLERANCE_CENTS)
+        return [candidates[position] for position in solutions[0]] if len(solutions) == 1 else None
+
+    def _complete_with_due(self, t, cited, others, missing):
+        """Si con todas no se decide: solo las facturas vencidas, que acotan las candidatas (hasta 26). Con una sola factura
+        citada y un exceso pequeño no se busca: es un sobrepago, y lo decide settle (POLICIES §3 OVERPAYMENT)."""
+        if len(cited) == 1 and missing <= MAX_OVERPAYMENT_SHARE * (abs(t.amount) - missing):
+            return None
+        due = [i for i in others if i.kind == "ARI" and (i.due is None or (i.due - t.date).days <= DUE_MARGIN_DAYS)]
+        return self._unique_completion(due, missing, MAX_DUE_CANDIDATES, t)
+
+    def _adds_up(self, items, t):
+        open_items = [i for i in items if i.open > 0]
+        return bool(open_items) and abs(sum(self.sign(i, t) * self.to_bank(i.open, i, t) for i in open_items) - abs(t.amount)) <= AMOUNT_TOLERANCE_CENTS
+
+    def _settle_cited(self, t, parties, kinds):
+        """Trozos de número en el texto (POLICIES §5.5: sin prefijo, cortados, sin ceros) de facturas abiertas de un cliente
+        identificado. Solo valen si suman exactamente el cobro y un único cliente cuadra: una cita sola no basta."""
+        tokens = {tok for tok in re.findall(r"[A-Z0-9]+", t.up) if sum(ch.isdigit() for ch in tok) >= CITED_MIN_DIGITS}
+        if not tokens:
+            return False
+        hits = {}
+        for party in dict.fromkeys([*parties, *self.scan_names(t)]):
+            cited = [i for i in self.open_items_of(party, t, kinds) if any(tok in plain_number(i.number) for tok in tokens)]
+            picks = self._exact_with_credits(cited, party, t) if cited else None
+            if picks:
+                hits[party] = picks
+        if len(hits) != 1:
+            return False
+        party, picks = next(iter(hits.items()))
+        return self.settle(t, [i.id for i in picks], "ref_cited", "citas " + ",".join(i.number for i in picks[:5]), party=party)
+
+    def _exact_with_credits(self, cited, party, t):
+        """Las citadas que suman el cobro, o las que lo superan justo en abonos no citados (settle los añade)."""
+        cash = abs(t.amount)
+        exact = self.best_subset(cited, cash, t)
+        if exact:
+            return exact
+        invoices = [i for i in cited if self.sign(i, t) > 0]
+        gap = sum(self.to_bank(i.open, i, t) for i in invoices) - cash
+        if gap <= AMOUNT_TOLERANCE_CENTS or not invoices:
+            return None
+        credits = [self.to_bank(c.open, c, t) for c in self.open_items_of(party, t, {"ARC"} if t.amount > 0 else {"APC"})]
+        if any(abs(c - gap) <= AMOUNT_TOLERANCE_CENTS for c in credits) or any(abs(a + b - gap) <= AMOUNT_TOLERANCE_CENTS for a, b in combinations(credits, 2)):
+            return invoices
+        return None
 
     def best_subset(self, items, cash, t, max_n=40):
         """Qué partidas suman exactamente el importe. Orden de preferencia: todas, las más antiguas (FIFO), DP."""
@@ -720,11 +912,12 @@ class Engine:
                 if acc > cash + 2 and min(vals) > 0:
                     break
         reach = {0: ()}
+        limit = cash + 2 + sum(-x for x in vals if x < 0)
         for j, v in enumerate(vals):
             new = {}
             for sm, comb in reach.items():
                 ns = sm + v
-                if ns not in reach and ns not in new and ns <= cash + 2 + sum(-x for x in vals if x < 0):
+                if ns not in reach and ns not in new and ns <= limit:
                     new[ns] = comb + (j,)
             reach.update(new)
             if len(reach) > 300000:
@@ -738,18 +931,66 @@ class Engine:
         parties, how = self.resolve_parties(t)
         if not parties:
             parties, how = self.scan_names(t), "nombre_texto"
-        for party in parties[:4]:
+        tried = parties[:MAX_PARTIES_TRIED]
+        for party in tried:
             if self._party_amount(t, party, how):
                 return True
+        return self._party_rescue(t, tried) or self._party_due_subset(t)
+
+    def _party_due_subset(self, t):
+        """Cobro de varias facturas sin citas: casi nadie paga antes de vencer, y eso acota las candidatas hasta que la suma
+        exacta identifica. Solo con solución única y un único cliente; si no, el cobro no se fuerza (POLICIES §3)."""
+        if t.amount <= 0:
+            return False
+        hits = {}
+        for party in dict.fromkeys([*self.resolve_parties(t)[0], *self.scan_names(t)]):
+            due = [i for i in self.open_items_of(party, t, {"ARI", "ARC"})
+                   if i.due is None or (i.due - t.date).days <= DUE_MARGIN_DAYS]
+            if not 2 <= len(due) <= MAX_DUE_CANDIDATES:
+                continue
+            values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in due]
+            solutions = exact_subsets(values, abs(t.amount), AMOUNT_TOLERANCE_CENTS)
+            if len(solutions) == 1 and len(solutions[0]) > 1:
+                hits[party] = [due[position] for position in solutions[0]]
+        if len(hits) != 1:
+            return False
+        party, picks = next(iter(hits.items()))
+        return self.settle(t, [i.id for i in picks], "party_due_subset", f"contraparte {party} · vencidas por suma exacta", party=party)
+
+    def _party_rescue(self, t, tried):
+        """Terceros que el camino normal no llegó a probar: homónimos de más y nombres que solo ve scan_names.
+        Solo con evidencia exacta y un único candidato: POLICIES §3 UNIDENTIFIED pide no forzar."""
+        cash = abs(t.amount)
+        exact, subsets = {}, {}
+        for party in dict.fromkeys([*self.resolve_parties(t)[0], *self.scan_names(t)]):
+            if party in tried:
+                continue
+            its = self.open_items_of(party, t, self._party_kinds(party, t))
+            same = [i for i in its if abs(self.to_bank(i.open, i, t) - cash) <= 2]
+            if same:
+                exact[party] = same[:1]
+            elif 1 < len(its) <= MAX_SUBSET_ITEMS:  # con más, muchas combinaciones suman lo mismo: no identifica
+                sub = self.best_subset(its, cash, t, max_n=MAX_SUBSET_ITEMS)
+                if sub:
+                    subsets[party] = sub
+        for found, rule in ((exact, "party_rescue_exact"), (subsets, "party_rescue_subset")):
+            if found:
+                if len(found) > 1:
+                    return False
+                party, picks = next(iter(found.items()))
+                return self.settle(t, [i.id for i in picks], rule, f"contraparte {party}", party=party)
         return False
 
-    def _party_amount(self, t, party, how):
-        kinds = {"ARI", "ARC"} if t.amount > 0 else {"API", "APC"}
+    @staticmethod
+    def _party_kinds(party, t):
         if party.startswith("S") and t.amount > 0:
-            kinds = {"APC"}  # el proveedor nos devuelve un abono suyo (POLICIES §4, último punto)
-        elif party.startswith("C") and t.amount < 0:
-            kinds = {"ARC"}  # rappel o abono pagado al cliente por transferencia
-        its = self.open_items_of(party, t, kinds)
+            return {"APC"}  # el proveedor nos devuelve un abono suyo (POLICIES §4, último punto)
+        if party.startswith("C") and t.amount < 0:
+            return {"ARC"}  # rappel o abono pagado al cliente por transferencia
+        return {"ARI", "ARC"} if t.amount > 0 else {"API", "APC"}
+
+    def _party_amount(self, t, party, how):
+        its = self.open_items_of(party, t, self._party_kinds(party, t))
         if not its:
             return False
         cash = abs(t.amount)
@@ -764,7 +1005,7 @@ class Engine:
                     same = pick
             return self.settle(t, [same[0].id], f"party_amount_{how}", f"contraparte {party}", party=party)
         sub = self.best_subset([i for i in its if self.sign(i, t) > 0] + [i for i in its if self.sign(i, t) < 0], cash, t,
-                               max_n=14)
+                               max_n=MAX_SUBSET_ITEMS)
         if sub:
             return self.settle(t, [i.id for i in sub], f"party_subset_{how}", f"contraparte {party}")
         inv = [i for i in its if self.sign(i, t) > 0]
@@ -777,9 +1018,9 @@ class Engine:
             if 0 < short <= 0.11 * exp:
                 cash_item = cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)
                 exc = self.explain_short(it, t, it.open - cash_item, cash_item)
-                if exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
+                if exc in EXPLAINED_SHORTFALLS:
                     found.setdefault(exc, it)
-        for exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
+        for exc in EXPLAINED_SHORTFALLS:
             if exc in found:
                 return self.settle(t, [found[exc].id], f"party_short_{how}", f"contraparte {party}")
         for it in inv:
@@ -844,7 +1085,8 @@ class Engine:
             if cat:
                 self.emit_cat(t, cat, "", why)
             elif t.amount > 0:
-                self.emit_cat(t, "UNIDENTIFIED", "UNIDENTIFIED", "fallback_receipt")
+                if not (duplicados.settle_duplicate(self, t) and len(self.rows) > n0):
+                    self.emit_cat(t, "UNIDENTIFIED", "UNIDENTIFIED", "fallback_receipt")
             else:
                 self.emit_cat(t, "BANK_FEES", "", "fallback_debit")
         return self.rows
