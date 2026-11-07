@@ -6,6 +6,7 @@ import datetime as dt
 import os
 import subprocess
 import sys
+from collections import defaultdict
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -334,3 +335,40 @@ class TestDerivaDeFinal:
         eng = motor([it], by_num=by_num, names={"Proveedor ZA": "S1"})
         r = doc(numero="KWI26-000417", beneficiario="Proveedor ZA", cuenta="ZA01-BANK-ZAR", moneda="ZAR")
         assert eng.run_doc_item(r, cargo(cuenta="ZA01-BANK-ZAR", ccy="ZAR")).id == it.id
+
+
+def test_el_cargo_del_viernes_no_se_lleva_otra_remesa():
+    """Issue #21: la fecha del confirming se prueba antes que las búsquedas por importe, que miran cualquier remesa."""
+    run = "CF010025011055"
+    vencimientos = {"INV0": dt.date(2025, 3, 8), "INV1": dt.date(2025, 3, 18), "INV2": dt.date(2025, 3, 18), "OTRA": dt.date(2025, 3, 6)}
+
+    def fila(remesa, tipo, e2e, proveedor, importe, documento, ejecucion="2025-03-05"):
+        return {
+            "run_id": remesa, "run_type": tipo, "end_to_end_id": e2e, "execution_date": ejecucion, "debtor_account_id": "ES01-BANK-EUR",
+            "beneficiary": proveedor, "currency": "EUR", "transfer_amount": importe, "document_number": documento, "document_amount": importe,
+        }
+
+    filas = [
+        fila(run, "confirming", f"{run}-0000", "Prov Cero", "100.00", "INV0"),
+        fila(run, "confirming", f"{run}-0001", "Prov Uno", "200.00", "INV1"),
+        fila(run, "confirming", f"{run}-0002", "Prov Dos", "300.00", "INV2"),
+        fila("PR010125030601", "transfers", "PR010125030601-0007", "Otro Proveedor", "100.00", "OTRA", ejecucion="2025-03-06"),
+    ]
+    motor = Engine.__new__(Engine)
+    motor.run_rows, motor.e2e_rows = defaultdict(list), defaultdict(list)
+    for r in filas:
+        motor.run_rows[r["run_id"]].append(r)
+        motor.e2e_rows[r["end_to_end_id"]].append(r)
+    motor.transfers_by_amount = motor._index_transfers()
+    motor.used_batches = set()
+    motor.run_doc_item = lambda r, t: SimpleNamespace(due=vencimientos[r["document_number"]])
+    salida = []
+    motor.emit_run_rows = lambda t, rs, rule, ev: salida.append((rule, sorted(r["document_number"] for r in rs)))
+    proveedores._wrap_confirming(motor)
+    viernes = SimpleNamespace(
+        amount=-10000, account="ES01-BANK-EUR", e2e="", date=dt.date(2025, 3, 7), ccy="EUR", orig_amount=None, orig_ccy=None,
+        up=f"PAGO CONFIRMING | REMESA {run} 1 PROVEEDORES",
+    )
+
+    assert motor.m_payment_run(viernes) is True
+    assert salida == [("payment_run_confirming", ["INV0"])]

@@ -16,6 +16,8 @@ from __future__ import annotations
 import datetime as dt
 import re
 import types
+from collections import defaultdict
+from itertools import combinations
 
 from .data import ascii_upper, num_variants
 
@@ -94,6 +96,34 @@ def _cites_confirming(engine, t) -> bool:
     return False
 
 
+def _confirming_pick(engine, t, due_fn) -> bool:
+    """La rama de confirming de Engine.m_payment_run (engine.py:571-596), con el vencimiento que da due_fn y nada más:
+    sin los grupos por fecha de ejecución ni la búsqueda por importe, que pueden coger otra remesa."""
+    amt = -t.amount
+    m = re.search(r"\b(\d+) PROVEEDOR", t.up)
+    n = int(m.group(1)) if m else None
+    for rid in engine._cited_runs(t):
+        rs = engine.run_rows.get(rid)
+        if not rs or rs[0].get("run_type") != "confirming":
+            continue
+        pool = [(e, v) for e, v in due_fn(rid, rs, t).items()
+                if (rid, e) not in engine.used_batches and -1 <= (t.date - v[0]).days <= 5]
+        by_day = defaultdict(list)
+        for e, v in pool:
+            by_day[v[0]].append((e, v))
+        pick = next((by_day[d] for d in sorted(by_day, key=lambda d: abs((t.date - d).days))
+                     if abs(sum(v[2] for _, v in by_day[d]) - amt) <= 2 and n in (None, len(by_day[d]))), None)
+        if pick is None and n and n <= 4 and len(pool) <= 40:
+            pick = next((list(c) for c in combinations(pool, n) if abs(sum(v[2] for _, v in c) - amt) <= 2), None)
+        if pick:
+            for e, _ in pick:
+                engine.used_batches.add((rid, e))
+            engine.emit_run_rows(t, [r for _, v in pick for r in v[1]], "payment_run_confirming",
+                                 f"remesa {rid} · {len(pick)} proveedores al vencimiento")
+            return True
+    return False
+
+
 def _wrap_confirming(engine) -> None:
     """POLICIES §5.3 confirming: el banco carga a cada proveedor en su vencimiento más tardío, pero lo que vence en
     fin de semana se paga el lunes (holdout: 3.037 de 3.200 grupos de proveedor; cargos agrupables 480 -> 636 de
@@ -109,14 +139,10 @@ def _wrap_confirming(engine) -> None:
         return rolled_cache[rid]
 
     def m_payment_run(t):
-        if t.amount >= 0 or not _cites_confirming(engine, t):
-            return orig_run(t)
-        engine._confirming_due = rolled_due
-        try:
-            if orig_run(t):
+        # solo la rama de confirming con cada vencimiento; si ninguno cuadra, el motor entero como antes
+        if t.amount < 0 and not (t.e2e and t.e2e in engine.e2e_rows) and _cites_confirming(engine, t):
+            if _confirming_pick(engine, t, rolled_due) or _confirming_pick(engine, t, exact_due):
                 return True
-        finally:
-            engine._confirming_due = exact_due
         return orig_run(t)
 
     engine.m_payment_run = m_payment_run
