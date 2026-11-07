@@ -49,13 +49,22 @@ def prepare(engine) -> None:
     """Envuelve `scan_names`: añade el nombre cortado solo si el importe exacto señala a un único cliente."""
     original = engine.scan_names
     parties = parties_by_entity(engine)
+    cut_cache: dict[tuple[str, str], set[str]] = {}
 
     def scan_names(t):
         """Lo que ya encontraba el motor y, solo en cobros, el único cliente con nombre cortado e importe exacto."""
         hits = original(t)
-        if t.amount <= 0:
+        if t.amount <= 0 or any(has_exact_invoice(engine, p, t) for p in hits):
             return hits
-        exact = [party for party in cut_names(engine, t, parties.get(t.entity, set())) if has_exact_invoice(engine, party, t)]
+        tid = getattr(t, "id", None)
+        key = (tid, t.entity) if tid is not None else None
+        if key is not None and key in cut_cache:
+            cands = cut_cache[key]
+        else:
+            cands = cut_names(engine, t, parties.get(t.entity, set()))
+            if key is not None:
+                cut_cache[key] = cands
+        exact = [party for party in cands if has_exact_invoice(engine, party, t)]
         return [*hits, exact[0]] if len(exact) == 1 and exact[0] not in hits else hits
 
     engine.scan_names = scan_names

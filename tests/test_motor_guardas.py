@@ -14,12 +14,11 @@ from types import SimpleNamespace
 import pytest
 
 from bankrec import devoluciones, m2_avisos, pdfclauses, preflight, remittance
-from bankrec.data import Item
+from bankrec.data import DATA, Item
 from bankrec.engine import Engine, Row, _days_apart, load_plugins, to_cents
 from bankrec.run import assemble, report_broken_advices, report_plugin_errors
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data"
 
 
 class _Txn:

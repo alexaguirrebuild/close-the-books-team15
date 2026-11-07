@@ -11,6 +11,7 @@ import re
 from collections import defaultdict
 from functools import lru_cache
 from itertools import combinations
+from types import SimpleNamespace
 
 from . import duplicados
 from .sumas import exact_subsets
@@ -270,7 +271,10 @@ class Engine:
             for r in WITHHOLDING[country]:
                 if abs(short_item - it.total * r) <= max(2, it.total * 0.0005):
                     return "SHORT_WITHHOLDING"
-        foreign = country and country not in SEPA and country != self.ph.entity_country.get(it.entity)
+        ent_country = self.ph.entity_country.get(it.entity) or (
+            it.entity[:2] if getattr(it, "entity", None) and len(it.entity) >= 2 and it.entity[:2].isalpha() else None
+        )
+        foreign = country and country not in (SEPA - {"GB", "CH", "PL"}) and country != ent_country
         cross = t.orig_ccy is not None or "/CHGS/" in t.up or foreign  # un pago nacional no pasa por banco intermediario
         if cross and it.side == "AR":
             short_eur = self.ph.fx.conv(short_item, it.ccy, "EUR", t.date)
@@ -375,6 +379,21 @@ class Engine:
             for it in cands:
                 full(it, "SHORT_DISCOUNT" if it.id in subset else "")
             return True
+        # POLICIES §3 SHORT_WITHHOLDING sobre varias facturas del mismo país con tasa única (Issue #64)
+        if not credits and len(invoices) >= 2 and all(getattr(it, "side", "AR") == "AR" and it.ccy == t.ccy for it in invoices):
+            party_country = getattr(self.ph, "party_country", {})
+            countries = {party_country.get(getattr(it, "party", None)) for it in invoices}
+            if len(countries) == 1:
+                country = next(iter(countries))
+                if country in WITHHOLDING:
+                    rates = [
+                        r for r in WITHHOLDING[country]
+                        if abs(sum(it.open - int(round(it.total * r)) for it in invoices) - cash) <= 2 * len(invoices)
+                    ]
+                    if len(rates) == 1:
+                        for it in invoices:
+                            full(it, "SHORT_WITHHOLDING")
+                        return True
         # pago de menos repartido: el más antiguo primero, la última queda parcial
         remaining = cash + sum(self.to_bank(c.open, c, t) for c in credits)
         for c in credits:
@@ -453,8 +472,8 @@ class Engine:
                             if alt:
                                 it = alt[0]
                     if it:
-                        exc = "PARTIAL" if it.open - amt > 2 and it.total - amt > 2 else ""
-                        self.emit(t, it, amt, exc, "dd_batch", f"remesa {bid}")
+                        exc = "PARTIAL" if it.open - amt > 2 and it.total - amt > 2 else ("OVERPAYMENT" if amt - it.open > 2 else "")
+                        self.emit(t, it, it.open if exc == "OVERPAYMENT" else amt, exc, "dd_batch", f"remesa {bid}")
                 self.used_batches.add(bid)
                 return True
         return False
@@ -488,9 +507,9 @@ class Engine:
             self.emit(t, it, amt, "RETURNED", "dd_return_mandate", f"mandato {m.group(1)}")
             return True
         # cuotas iguales cada mes: la devuelta es la última cobrada ANTES de la devolución, nunca una futura
-        past = [x for x in cand if x.get("collection_date") and
-                0 <= (t.date - dt.date.fromisoformat(x["collection_date"][:10])).days <= 90]
-        r = max(past or cand, key=lambda x: x["collection_date"])
+        past = [x for x in cand if (cd := _aux_day(x.get("collection_date"))) and
+                0 <= (t.date - cd).days <= 90]
+        r = max(past or cand, key=lambda x: x.get("collection_date") or "")
         it = self.item_by_number(r["remittance_info"], t.entity, kinds={"ARI"})
         if not it:
             return False
@@ -510,7 +529,8 @@ class Engine:
             gross = to_cents(r["gross"])
             it = self.item_by_number(r["order_number"], t.entity, kinds={"ARI"}, amount=gross)
             if it:
-                self.emit(t, it, gross, "", "card_settlement", f"liquidación {sid}")
+                exc = "OVERPAYMENT" if gross - it.open > 2 else ""
+                self.emit(t, it, it.open if exc == "OVERPAYMENT" else gross, exc, "card_settlement", f"liquidación {sid}")
                 self.card_items[(r["card"], gross)] = it  # Por si llega un contracargo (plugin devoluciones).
         return True
 
@@ -544,8 +564,8 @@ class Engine:
             if not it:
                 it = self.find_by_party_amount(r["drawer"], amt, t, kinds={"ARI"})
             if it:
-                exc = "PARTIAL" if it.open - amt > 2 else ""
-                self.emit(t, it, min(amt, it.open) if exc == "" else amt, exc, "cheque_deposit", f"remesa {dep}")
+                exc = "PARTIAL" if it.open - amt > 2 else ("OVERPAYMENT" if amt - it.open > 2 else "")
+                self.emit(t, it, it.open if exc == "OVERPAYMENT" else amt, exc, "cheque_deposit", f"remesa {dep}")
                 self.cheque_items[r["cheque_number"]] = it  # Por si llega devuelto (plugin devoluciones).
         return True
 
@@ -582,7 +602,10 @@ class Engine:
                 amt = self.ph.fx.conv(amt, r["currency"], it.ccy, t.date)
             exc = ""
             if not it.is_credit:
-                if it.open - amt > max(2, it.total * 0.005):
+                if it.open <= 0 and any(abs(a - amt) <= 2 for _, a, _ in self.settled_by.get(it.id, ())):
+                    exc = "DUPLICATE_PAYMENT"
+                    amt = it.total
+                elif it.open - amt > max(2, it.total * 0.005):
                     exc = "PARTIAL"
                 elif it.ccy != t.ccy:
                     exc = "FX_DIFFERENCE"
@@ -671,7 +694,11 @@ class Engine:
                 hits = [e for e, x in sub.items() if abs(to_cents(x[0]["transfer_amount"]) - amt) <= 2
                         and e not in self.used_batches]
                 if not hits:
-                    continue
+                    # Remesa citada repetida: solo si hay una única transferencia de ese importe (Issue #61)
+                    any_hits = [e for e, x in sub.items() if abs(to_cents(x[0]["transfer_amount"]) - amt) <= 2]
+                    if len(any_hits) != 1:
+                        continue
+                    hits = any_hits
                 self.used_batches.add(hits[0])
                 self.emit_run_rows(t, sub[hits[0]], "payment_run_transfer", f"remesa {rid}")
                 return True
@@ -1156,5 +1183,6 @@ class Engine:
                 if not (duplicados.settle_duplicate(self, t) and len(self.rows) > n0):
                     self.emit_cat(t, "UNIDENTIFIED", "UNIDENTIFIED", "fallback_receipt")
             else:
-                self.emit_cat(t, "BANK_FEES", "", "fallback_debit")
+                if not (duplicados.settle_duplicate(self, t) and len(self.rows) > n0):
+                    self.emit_cat(t, "BANK_FEES", "", "fallback_debit")
         return self.rows
