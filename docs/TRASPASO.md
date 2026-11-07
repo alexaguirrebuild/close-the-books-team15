@@ -10,7 +10,7 @@ Quien recibe este repo (Claude, Codex, Antigravity o una persona) lee esto antes
 
 ## Quién lleva qué
 
-Reparto medido a las 14:00. Di en el canal del equipo qué lote coges. Un lote por persona, y **solo se tocan los ficheros de tu lote**. Los techos suponen esa parte perfecta: no se suman ni son previsiones.
+Reparto medido a las 14:00. Di en el canal del equipo qué lote coges. Un lote por persona. **Los ficheros de cada lote son el punto de partida, no un límite:** una PR puede tocar los que la regla necesite, hasta los 200 de `CLAUDE.md`. Los techos suponen esa parte perfecta: no se suman ni son previsiones.
 
 | Lote | Ficheros | Qué ataca | Dónde está | Techo |
 |---|---|---|---|---|
@@ -24,7 +24,9 @@ Reparto medido a las 14:00. Di en el canal del equipo qué lote coges. Un lote p
 | Nombres cortados: `bankrec/nombres_cortados.py` | Sesión de Pablo. Pendiente de holdout |
 | `cuadra/` | Sesión de Pablo. Solo revisión y demo: no genera envíos |
 
-**No tocar:** el resto de `bankrec/`, incluido `engine.py`, y `scripts/`, `vendor/`, `pipeline/`, `cuadra/`, `pyproject.toml` y `uv.lock`.
+**No tocar:** `vendor/`, porque es el evaluador oficial.
+
+**Avisa en el canal antes de tocar** los ficheros de otro lote y lo compartido (`bankrec/engine.py`, `bankrec/data.py`, `scripts/`, `pipeline/`, `cuadra/`, `pyproject.toml` y `uv.lock`), y cambia lo mínimo.
 
 ## Cómo se trabaja en un lote
 
@@ -43,8 +45,9 @@ uv run python -m bankrec.run --phase holdout
 - **Antes de generar LIVE o FINAL:** `unset BANKREC_PLUGINS`. Si queda de una medición, salen sin los plugins por defecto. `bankrec.run` imprime al arrancar cuáles carga: compruébalo.
 - **Avisos enlazados:** copia `m2_remittance.csv.gz` de `train` y de `sample` a `<ruta>/out/<fase>/matches/`. No van en git. Pídeselos a Pablo: sin ellos la nota sale más baja y no se puede comparar con la referencia.
 - **Plugin:** un módulo en `bankrec/` con `prepare(engine)` y `match(engine, t)`. `bankrec/devoluciones.py` sirve de modelo. `match` se ejecuta después de las remesas y las categorías claras, y antes de `m_refs` y `m_party_amount`.
-- **Para cambiar algo anterior o interno:** envuelve en `prepare` el método que toque (`engine.m_cheque`, `engine.m_payment_run`, `engine.explain_short`…), sin editar `engine.py`. Lo hace `_wrap_resolve` en `bankrec/pdfclauses.py`.
-- **Activarlo:** tu PR no lo activa. Quien la fusiona añade el plugin a la lista de `engine.py` y vuelve a comprobar el holdout. En la PR pon la nota de antes y de después.
+- **Para cambiar algo anterior o interno:** si basta, envuelve en `prepare` el método que toque (`engine.m_cheque`, `engine.m_payment_run`, `engine.explain_short`…), como hace `_wrap_resolve` en `bankrec/pdfclauses.py`. Si no basta, edita `engine.py` y explica el motivo en la PR.
+- **Activarlo:** puedes añadir el plugin a la lista de `engine.py` en tu propia PR si tu holdout se midió con esa lista. Si no, lo añade quien la fusiona y vuelve a comprobar el holdout. En la PR pon la nota de antes y de después.
+- **Un plugin que ya está en esa lista se activa al fusionar:** cualquier regla nueva en él necesita holdout antes de entrar.
 
 ## Qué falta para 95
 
