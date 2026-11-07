@@ -1,6 +1,7 @@
 """Normalised views, items and masters of one phase."""
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 from .csvload import CsvSpec, load_csv
@@ -113,11 +114,32 @@ MASTER_FILES = {
 }
 
 
+MIN_MASTER_SHARE = 0.5
+
+
+def _data_rows(path: Path) -> int:
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        return max(sum(1 for _ in csv.reader(handle)) - 1, 0)
+
+
+def _warn_if_master_shrank(ctx: IngestContext, new: Path, previous: Path) -> None:
+    """`masters_final/` sustituye al maestro entero, no lo fusiona: si trae pocas filas, se pierden las anteriores."""
+    if not previous.is_file():
+        return
+    try:
+        new_rows, previous_rows = _data_rows(new), _data_rows(previous)
+    except (OSError, UnicodeDecodeError, csv.Error):
+        return  # load_csv informa de un fichero que no se puede leer
+    if new_rows < MIN_MASTER_SHARE * previous_rows:
+        ctx.issues.warn("MASTER_SHRANK", "masters", f"{new.name} trae {new_rows} filas y el maestro anterior tenía {previous_rows}; el nuevo lo sustituye entero")
+
+
 def _master_path(ctx: IngestContext, file_name: str) -> Path:
     override = ctx.layout.masters_override_dir
     if override is None:
         return ctx.layout.masters_dir / file_name
     if (override / file_name).is_file():
+        _warn_if_master_shrank(ctx, override / file_name, ctx.layout.masters_dir / file_name)
         return override / file_name
     ctx.issues.warn("MASTER_NOT_UPDATED", "masters", f"{file_name} no está en {override.name}; se usa el maestro anterior")
     return ctx.layout.masters_dir / file_name

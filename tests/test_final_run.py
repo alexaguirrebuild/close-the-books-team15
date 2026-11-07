@@ -202,8 +202,45 @@ class TestFinalDelComando:
     def test_el_envio_se_deja_al_usuario(self, final_run):
         texto = final_run.next_step("final")
 
-        assert "! python scripts/submit.py FINAL out/sub_final.csv.gz" in texto
+        assert "! uv run python scripts/submit.py FINAL out/sub_final.csv.gz" in texto
         assert "OK" in texto
 
     def test_en_el_ensayo_no_propone_enviar(self, final_run):
         assert "submit" not in final_run.next_step("live")
+
+
+class TestValidacionConErroresDeIngesta:
+    def lanza(self, final_run, tmp_path, monkeypatch, capsys, informe):
+        ruta = tmp_path / "out" / "final" / "validate__sub_final.json"
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(json.dumps(informe), encoding="utf-8")
+        monkeypatch.setattr(final_run, "clear_stale", lambda phase: None)
+        monkeypatch.setattr(final_run, "run_steps", lambda *a: (1, [(final_run.VALIDATE, 1.0, 1)]))
+        monkeypatch.setattr(final_run, "new_entities_report", lambda phase: ["INFORME DE SOCIEDADES"])
+        codigo = final_run.main(["--phase", "final", "--allow-ingest-errors"])
+        return codigo, capsys.readouterr().out
+
+    def test_solo_ingesta_ensena_el_informe_y_el_comando_pero_no_lo_da_por_valido(self, final_run, tmp_path, monkeypatch, capsys):
+        codigo, salida = self.lanza(final_run, tmp_path, monkeypatch, capsys, {"official_format_ok": True, "error_counts": {"INGEST_HAD_ERRORS": 2}})
+        assert codigo == 1
+        assert "INFORME DE SOCIEDADES" in salida
+        assert "--accept-ingest-errors" in salida
+        assert "No hay fichero listo" not in salida
+        assert "Fichero listo y validado" not in salida
+
+    @pytest.mark.parametrize("informe", [
+        {"official_format_ok": False, "error_counts": {"INGEST_HAD_ERRORS": 2}},
+        {"official_format_ok": True, "error_counts": {"INGEST_HAD_ERRORS": 2, "MISSING_LINES": 1}},
+        {"official_format_ok": True, "error_counts": {}},
+    ])
+    def test_con_otro_problema_sigue_parado(self, final_run, tmp_path, monkeypatch, capsys, informe):
+        codigo, salida = self.lanza(final_run, tmp_path, monkeypatch, capsys, informe)
+        assert codigo == 1
+        assert "No hay fichero listo" in salida
+        assert "--accept-ingest-errors" not in salida.split("No hay fichero listo")[0]
+
+    def test_sin_informe_sigue_parado(self, final_run, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(final_run, "clear_stale", lambda phase: None)
+        monkeypatch.setattr(final_run, "run_steps", lambda *a: (1, [(final_run.VALIDATE, 1.0, 1)]))
+        assert final_run.main(["--phase", "final"]) == 1
+        assert "No hay fichero listo" in capsys.readouterr().out

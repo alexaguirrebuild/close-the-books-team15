@@ -1,5 +1,7 @@
 """Guardas del motor: lo que en FINAL costaría puntos sin que nadie lo notara."""
 import builtins
+import datetime as dt
+from collections import defaultdict
 import gzip
 import json
 import os
@@ -11,9 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from bankrec import pdfclauses, preflight
-from bankrec.engine import Engine, Row, load_plugins
-from bankrec.run import assemble, report_broken_advices
+from bankrec import devoluciones, m2_avisos, pdfclauses, preflight, remittance
+from bankrec.data import Item
+from bankrec.engine import Engine, Row, _days_apart, load_plugins, to_cents
+from bankrec.run import assemble, report_broken_advices, report_plugin_errors
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -321,3 +324,213 @@ def test_generar_un_fichero_nunca_abre_el_golden_aunque_este_al_lado(monkeypatch
 
     assert not [path for path in abiertos if "golden" in path.lower()]
     assert any("bank_transactions" in path for path in abiertos)
+
+
+def plugin(nombre, **metodos):
+    return SimpleNamespace(__name__=f"bankrec.{nombre}", **metodos)
+
+
+def movimiento(amount=-1000, cp_iban=""):
+    return SimpleNamespace(id="T1", amount=amount, up="", text="", ref1="", ref2="", rmt="", code="", subcode="", cp_iban=cp_iban, cp_name="", date=None)
+
+
+def motor_para_plugins(*plugins, movimientos=None, partidas=()):
+    """El bucle de `run` con todo lo que no es de plugins apagado: se ve qué hace con cada plugin y con el motor base."""
+    eng = Engine.__new__(Engine)
+    eng.rows, eng.iban_learned, eng.reversal = [], {}, set()
+    eng.settled_by = defaultdict(list)
+    eng.items = {item.id: item for item in partidas}
+    eng.ph = SimpleNamespace(txns=movimientos or [movimiento()])
+    eng.plugins = list(plugins)
+    eng.base_llamado = []
+    for nombre in ("m_dd_batch", "m_dd_return", "m_card", "m_cheque", "m_payment_run", "m_party_amount"):
+        setattr(eng, nombre, lambda t: False)
+    eng.m_refs = lambda t: eng.base_llamado.append(t.id) or False
+    return eng
+
+
+def partida(item_id="P1", cents=1000, open_=None):
+    return Item(id=item_id, kind="ARI", side="AR", entity="ES01", number=item_id, party="C1", ccy="EUR", total=cents, open=cents if open_ is None else open_)
+
+
+class TestPluginQueFallaEnMatch:
+    def test_no_para_la_fase_y_sigue_con_el_motor_base(self):
+        eng = motor_para_plugins(plugin("roto", match=lambda engine, t: 1 / 0))
+        filas = eng.run()
+        assert eng.base_llamado == ["T1"]
+        assert [(r.txn, r.category) for r in filas] == [("T1", "BANK_FEES")]
+
+    def test_deshace_las_filas_y_el_saldo_de_lo_que_emitio(self):
+        item = partida()
+
+        def emite_y_falla(engine, t):
+            engine.emit(t, item, 400, "PARTIAL", "roto")
+            raise ValueError("dato raro")
+
+        eng = motor_para_plugins(plugin("roto", match=emite_y_falla), partidas=[item])
+        filas = eng.run()
+        assert item.open == 1000
+        assert eng.settled_by[item.id] == []
+        assert [r.item for r in filas] == [""]
+
+    def test_una_devolucion_vuelve_al_saldo_exacto_aunque_toparan_con_el_total(self):
+        item = partida(open_=900)
+
+        def devuelve_y_falla(engine, t):
+            engine.emit(t, item, 500, "RETURNED", "roto")  # topa en 1000: sumar y restar 500 no daría 900
+            raise ValueError("dato raro")
+
+        motor_para_plugins(plugin("roto", match=devuelve_y_falla), partidas=[item]).run()
+        assert item.open == 900
+
+    def test_no_queda_aprendido_el_iban_de_lo_que_se_deshizo(self):
+        item = partida()
+
+        def emite_y_falla(engine, t):
+            engine.emit(t, item, 400, "", "roto")
+            raise ValueError("dato raro")
+
+        eng = motor_para_plugins(plugin("roto", match=emite_y_falla), movimientos=[movimiento(cp_iban="ES1")], partidas=[item])
+        eng.iban_learned = {}
+        eng.run()
+        assert eng.iban_learned == {}
+
+    def test_conserva_el_iban_que_ya_estaba_aprendido(self):
+        item = partida()
+
+        def emite_y_falla(engine, t):
+            engine.emit(t, item, 400, "", "roto")
+            raise ValueError("dato raro")
+
+        eng = motor_para_plugins(plugin("roto", match=emite_y_falla), movimientos=[movimiento(cp_iban="ES1")], partidas=[item])
+        eng.iban_learned = {"ES1": "OTRO"}
+        eng.run()
+        assert eng.iban_learned == {"ES1": "OTRO"}
+
+    def test_deshace_tambien_una_fila_escrita_a_mano_sin_partida_conocida(self):
+        def fila_y_falla(engine, t):
+            engine.rows.append(Row(t.id, "DESCONOCIDA", 100, "", "", "roto"))
+            raise ValueError("dato raro")
+
+        filas = motor_para_plugins(plugin("roto", match=fila_y_falla)).run()
+        assert [r.item for r in filas] == [""]
+
+    def test_el_siguiente_plugin_se_sigue_probando(self):
+        vistos = []
+        bueno = plugin("bueno", match=lambda engine, t: vistos.append(t.id) or False)
+        motor_para_plugins(plugin("roto", match=lambda engine, t: 1 / 0), bueno).run()
+        assert vistos == ["T1"]
+
+    def test_queda_anotado_quien_fallo_en_que_movimiento_y_por_que(self):
+        eng = motor_para_plugins(plugin("roto", match=lambda engine, t: 1 / 0))
+        eng.run()
+        assert eng.plugin_errors == [("bankrec.roto", "T1", "ZeroDivisionError('division by zero')")]
+
+    def test_system_exit_sigue_parando(self):
+        def obligatorio(engine, t):
+            raise SystemExit("falta un fichero obligatorio")
+
+        with pytest.raises(SystemExit):
+            motor_para_plugins(plugin("obligatorio", match=obligatorio)).run()
+
+    def test_un_fallo_del_motor_base_sigue_parando(self):
+        eng = motor_para_plugins()
+        eng.m_refs = lambda t: 1 / 0
+        with pytest.raises(ZeroDivisionError):
+            eng.run()
+
+    def test_una_regla_correcta_no_cambia(self):
+        item = partida()
+        bueno = plugin("bueno", match=lambda engine, t: engine.emit(t, item, 1000, "", "bueno") or True)
+        eng = motor_para_plugins(bueno, partidas=[item])
+        filas = eng.run()
+        assert [(r.item, r.amount) for r in filas] == [("P1", 1000)]
+        assert not getattr(eng, "plugin_errors", [])
+
+
+class TestPluginQueFallaEnPrepare:
+    def carga(self, monkeypatch, *modulos):
+        monkeypatch.setattr("bankrec.engine.load_plugins", lambda nombres: list(modulos))
+        eng = Engine.__new__(Engine)
+        eng.plugins = []
+        eng._load_plugins("da igual")
+        return eng
+
+    def test_se_desactiva_ese_plugin_y_siguen_los_demas(self, monkeypatch):
+        def roto(engine):
+            raise KeyError("columna")
+
+        bueno = plugin("bueno", match=lambda engine, t: False)
+        eng = self.carga(monkeypatch, plugin("roto", prepare=roto, match=lambda engine, t: False), bueno)
+        assert eng.plugins == [bueno]
+        assert eng.plugin_errors == [("bankrec.roto", "prepare", "KeyError('columna')")]
+
+    def test_deshace_lo_que_envolvio_antes_de_fallar(self, monkeypatch):
+        def envuelve_y_falla(engine):
+            engine.settle = lambda *a: pytest.fail("envoltura a medias")
+            raise ValueError("dato raro")
+
+        eng = self.carga(monkeypatch, plugin("roto", prepare=envuelve_y_falla))
+        assert "settle" not in eng.__dict__
+
+    def test_system_exit_sigue_parando(self, monkeypatch):
+        def obligatorio(engine):
+            raise SystemExit("Falta m2_remittance")
+
+        with pytest.raises(SystemExit):
+            self.carga(monkeypatch, plugin("m2_avisos", prepare=obligatorio))
+
+    def test_un_plugin_sano_se_prepara_una_vez(self, monkeypatch):
+        vistos = []
+        self.carga(monkeypatch, plugin("bueno", prepare=lambda engine: vistos.append(engine)))
+        assert len(vistos) == 1
+
+
+class TestAvisoDeFallosDePlugin:
+    def test_dice_cuantos_y_enseña_los_primeros(self, capsys):
+        errores = [("bankrec.roto", f"T{n}", "ValueError('x')") for n in range(7)]
+        report_plugin_errors(SimpleNamespace(plugin_errors=errores))
+        salida = capsys.readouterr().out
+        assert "7 fallos de plugin" in salida
+        assert "T4" in salida and "T5" not in salida
+
+    def test_sin_fallos_no_dice_nada(self, capsys):
+        report_plugin_errors(SimpleNamespace())
+        assert capsys.readouterr().out == ""
+
+
+class TestConversionesConCamposVacios:
+    def test_un_aviso_con_importe_vacio_no_lanza(self):
+        item = partida()
+        eng = motor_para_plugins(partidas=[item])
+        eng.m2_rows = {"T1": [{"item_id": "P1", "amount": "", "exception": "", "advice_id": "A1"}]}
+        assert m2_avisos.match(eng, movimiento()) is True
+
+    def test_devoluciones_con_importe_vacio_vale_cero(self):
+        assert devoluciones._cents("") == 0
+
+    def test_un_aviso_con_fecha_mala_cuenta_como_roto_y_no_lanza(self, tmp_path, monkeypatch):
+        carpeta = tmp_path / "remittance_advices"
+        carpeta.mkdir()
+        (carpeta / "a.txt").write_text("x", encoding="utf-8")
+        filas = [{"file": "a.txt", "format": "txt", "entity": "ES01", "payer_name": "X", "received_date": "no es fecha"}]
+        monkeypatch.setattr(remittance, "rows", lambda path: filas)
+        monkeypatch.setattr(remittance, "read_advice", lambda path, fmt: {"lines": [{"paid": 1}], "total": None, "ref": ""})
+        (carpeta / "index.csv").write_text("x", encoding="utf-8")
+        eng = SimpleNamespace(ph=SimpleNamespace(dir=tmp_path), items={}, resolve_name=lambda raw: None)
+        remittance.prepare(eng)
+        assert [archivo for archivo, _ in eng.ra_errors] == ["a.txt"]
+
+
+class TestDatosMalosEnFicherosAuxiliares:
+    def test_un_importe_no_numerico_vale_cero(self):
+        assert to_cents("12,50") == 0 and to_cents(" ") == 0
+
+    def test_un_importe_normal_no_cambia(self):
+        assert to_cents("12.50") == 1250 and to_cents("") == 0
+
+    def test_una_fecha_vacia_queda_la_ultima_candidata(self):
+        fecha = dt.date(2025, 1, 10)
+        assert _days_apart("2025-01-12", fecha) == 2
+        assert _days_apart("", fecha) > 1000
+        assert _days_apart("no es fecha", fecha) > 1000

@@ -14,7 +14,8 @@ from itertools import combinations
 
 from . import duplicados
 from .sumas import exact_subsets
-from .data import SEPA, Phase, Txn, ascii_upper, name_key, norm_text, num_variants
+from .data import SEPA, Phase, Txn, ascii_upper, day, name_key, norm_text, num_variants
+from .data import cents
 
 PAYMENT_FACTORY = {"ES00": {"ES01", "ES02", "PT01"}}
 WITHHOLDING = {"MX": (0.0125, 0.015, 0.10), "BR": (0.0125, 0.015, 0.10), "MA": (0.0125, 0.015, 0.10)}
@@ -107,11 +108,37 @@ def plain_number(number):
     return re.sub(r"[^A-Z0-9]", "", ascii_upper(number))
 
 
+UNKNOWN_DATE_DAYS = 10 ** 6  # un lote sin fecha es el último candidato, pero no para la fase
+
+
+def to_cents(value) -> int:
+    """Importe de un fichero auxiliar: vacío o mal formado cuenta como cero. La ingesta ya informa de ello como BAD_VALUE."""
+    try:
+        return cents(value)
+    except ValueError:
+        return 0
+
+
+def _aux_day(text: str):
+    """Fecha de un fichero auxiliar; None si está vacía o mal formada."""
+    try:
+        return day(text)
+    except ValueError:
+        return None
+
+
+def _days_apart(text: str, date) -> int:
+    parsed = _aux_day(text)
+    return abs((parsed - date).days) if parsed else UNKNOWN_DATE_DAYS
+
+
 MAX_PARTIES_TRIED = 4
 MAX_SUBSET_ITEMS = 14
 
 
 class Engine:
+    _undo_log = None  # solo mientras corre un plugin: lo que hace falta para deshacer lo que emita si lanza
+
     def __init__(self, ph: Phase):
         """Índices de la fase, estado de las partidas y plugins en el orden de `BANKREC_PLUGINS`."""
         self.ph = ph
@@ -125,11 +152,49 @@ class Engine:
         self.reversal = self._find_reversals()
         self.plugins = []
         import os
-        for mod in load_plugins(os.environ.get("BANKREC_PLUGINS", DEFAULT_PLUGINS)):
-            if hasattr(mod, "prepare"):
-                mod.prepare(self)
+        self._load_plugins(os.environ.get("BANKREC_PLUGINS", DEFAULT_PLUGINS))
+
+    def _load_plugins(self, names: str) -> None:
+        """Un `prepare` que lanza deja el motor como estaba y sin ese plugin. `SystemExit`, el de un fichero obligatorio, sigue parando."""
+        for mod in load_plugins(names):
+            before = dict(self.__dict__)
+            try:
+                if hasattr(mod, "prepare"):
+                    mod.prepare(self)
+            except Exception as error:  # noqa: BLE001 - en FINAL, sin un plugin hay fichero; sin motor, no
+                self.__dict__.clear()
+                self.__dict__.update(before)
+                self._record_plugin_error(mod, "prepare", error)
+                continue
             if hasattr(mod, "match"):
                 self.plugins.append(mod)
+
+    def _record_plugin_error(self, mod, where: str, error: Exception) -> None:
+        self.__dict__.setdefault("plugin_errors", []).append((mod.__name__, where, repr(error)))
+
+    def _match_plugin(self, mod, t) -> bool:
+        """Un `match` que lanza deja el movimiento como estaba y sigue con el resto. Las reglas del motor no pasan por aquí."""
+        n_rows = len(self.rows)
+        self._undo_log = []
+        try:
+            return mod.match(self, t)
+        except Exception as error:  # noqa: BLE001 - en FINAL, sin esa regla hay fichero; sin motor, no
+            self._undo_since(n_rows)
+            self._record_plugin_error(mod, t.id, error)
+            return False
+        finally:
+            self._undo_log = None
+
+    def _undo_since(self, n_rows: int) -> None:
+        for item, open_before, n_settled, iban, learned in reversed(self._undo_log):
+            item.open = open_before
+            del self.settled_by[item.id][n_settled:]
+            if iban:
+                if learned is None:
+                    self.iban_learned.pop(iban, None)
+                else:
+                    self.iban_learned[iban] = learned
+        del self.rows[n_rows:]
 
     # ------------------------------------------------------------ utilidades
     def entity_ok(self, it, t):
@@ -155,6 +220,8 @@ class Engine:
         return self.ph.fx.conv(cents_item, it.ccy, t.ccy, t.date)
 
     def emit(self, t, it, amount, exc, rule, ev=""):
+        if self._undo_log is not None:
+            self._undo_log.append((it, it.open, len(self.settled_by[it.id]), t.cp_iban, self.iban_learned.get(t.cp_iban)))
         amount = int(round(amount))
         self.rows.append(Row(t.id, it.id, amount, "", exc, rule, ev))
         if exc == "RETURNED":
@@ -340,7 +407,7 @@ class Engine:
             self.card_sets[r["settlement_id"]].append(r)
         self.card_by_amount = defaultdict(list)
         for sid, rs in self.card_sets.items():
-            self.card_by_amount[(rs[0]["account_id"], sum(int(round(float(x["net"]) * 100)) for x in rs))].append(sid)
+            self.card_by_amount[(rs[0]["account_id"], sum(to_cents(x["net"]) for x in rs))].append(sid)
         self.cheque_deps = defaultdict(list)
         for r in ph.cheques:
             self.cheque_deps[r["deposit_id"]].append(r)
@@ -374,9 +441,9 @@ class Engine:
             return False
         for bid in re.findall(r"\b\d{9,12}\b", t.up):
             rs = self.dd_batches.get(bid)
-            if rs and abs(int(round(float(rs[0]["batch_total"]) * 100)) - t.amount) <= 2:
+            if rs and abs(to_cents(rs[0]["batch_total"]) - t.amount) <= 2:
                 for r in rs:
-                    amt = int(round(float(r["amount"]) * 100))
+                    amt = to_cents(r["amount"])
                     it = self.item_by_number(r["remittance_info"], t.entity, kinds={"ARI"}, amount=amt)
                     if not it or it.open <= 0:
                         party = self.mandate_party.get(ascii_upper(r["mandate_id"])) or                             self.ph.party_by_iban.get((r.get("debtor_iban") or "").replace(" ", ""))
@@ -400,10 +467,10 @@ class Engine:
         cand = []
         m = re.search(r"(VTM-[A-Z]{2}-\d+)", t.up)
         if m:
-            cand = [r for r in self.dd_by_mandate.get(m.group(1), []) if abs(int(round(float(r["amount"]) * 100)) - amt) <= 2]
+            cand = [r for r in self.dd_by_mandate.get(m.group(1), []) if abs(to_cents(r["amount"]) - amt) <= 2]
         if not cand:
             for bid in re.findall(r"\d{9,12}", t.up):
-                cand = [r for r in self.dd_batches.get(bid, []) if abs(int(round(float(r["amount"]) * 100)) - amt) <= 2]
+                cand = [r for r in self.dd_batches.get(bid, []) if abs(to_cents(r["amount"]) - amt) <= 2]
                 if cand:
                     break
         if not cand:
@@ -436,10 +503,10 @@ class Engine:
         sids = [s for s in sids if s not in self.used_batches]
         if not sids:
             return False
-        sid = min(sids, key=lambda s: abs((dt.date.fromisoformat(self.card_sets[s][0]["settlement_date"]) - t.date).days))
+        sid = min(sids, key=lambda s: _days_apart(self.card_sets[s][0]["settlement_date"], t.date))
         self.used_batches.add(sid)
         for r in self.card_sets[sid]:
-            gross = int(round(float(r["gross"]) * 100))
+            gross = to_cents(r["gross"])
             it = self.item_by_number(r["order_number"], t.entity, kinds={"ARI"}, amount=gross)
             if it:
                 self.emit(t, it, gross, "", "card_settlement", f"liquidación {sid}")
@@ -457,14 +524,14 @@ class Engine:
         if not dep:
             for did, rs in self.cheque_deps.items():
                 if did not in self.used_batches and rs[0]["account_id"] == t.account and \
-                        abs(int(round(float(rs[0]["deposit_total"]) * 100)) - t.amount) <= 2:
+                        abs(to_cents(rs[0]["deposit_total"]) - t.amount) <= 2:
                     dep = did
                     break
         if not dep:
             return False
         self.used_batches.add(dep)
         for r in self.cheque_deps[dep]:
-            amt = int(round(float(r["amount"]) * 100))
+            amt = to_cents(r["amount"])
             it = None
             stub = re.sub(r"\D", "", r["stub_reference"] or "")
             if len(stub) >= 5:
@@ -486,7 +553,7 @@ class Engine:
         if not party:
             party = self.resolve_name(r["beneficiary"])
         kinds = {"API", "APC", "ARC"} if r["document_type"] != "INVOICE" else {"API", "ARC"}
-        amt = abs(int(round(float(r["document_amount"]) * 100)))
+        amt = abs(to_cents(r["document_amount"]))
         cands = set()
         for v in num_variants(r["document_number"]):
             cands |= self.ph.by_num.get(v, set())
@@ -509,7 +576,7 @@ class Engine:
             it = self.run_doc_item(r, t)
             if not it:
                 continue
-            amt = abs(int(round(float(r["document_amount"]) * 100)))
+            amt = abs(to_cents(r["document_amount"]))
             if it.ccy != r["currency"]:
                 amt = self.ph.fx.conv(amt, r["currency"], it.ccy, t.date)
             exc = ""
@@ -533,9 +600,9 @@ class Engine:
                 dues = []
                 for r in g:
                     it = self.run_doc_item(r, t)
-                    dues.append(it.due if it and it.due else dt.date.fromisoformat(r["execution_date"]))
-                amt = sum(int(round(float(r["document_amount"]) * 100)) for r in g)
-                out[e] = (max(dues), g, amt)
+                    dues.append(it.due if it and it.due else _aux_day(r["execution_date"]))
+                amt = sum(to_cents(r["document_amount"]) for r in g)
+                out[e] = (max((due for due in dues if due), default=t.date), g, amt)
             cache[rid] = out
         return cache[rid]
 
@@ -551,7 +618,7 @@ class Engine:
         index = defaultdict(list)
         for e2e, rows in self.e2e_rows.items():
             for group in self._transfers_of(rows):
-                index[(group[0]["debtor_account_id"], int(round(float(group[0]["transfer_amount"]) * 100)))].append(e2e)
+                index[(group[0]["debtor_account_id"], to_cents(group[0]["transfer_amount"]))].append(e2e)
         return index
 
     def _transfer_for(self, rows, t):
@@ -563,7 +630,7 @@ class Engine:
         amt = abs(t.amount)
 
         def cents(group):
-            return int(round(float(group[0]["transfer_amount"]) * 100))
+            return to_cents(group[0]["transfer_amount"])
 
         exact = [g for g in own if abs(cents(g) - amt) <= 2]
         original = [g for g in own if t.orig_amount and g[0]["currency"] == t.orig_ccy and abs(cents(g) - t.orig_amount) <= 2]
@@ -600,7 +667,7 @@ class Engine:
                 sub = defaultdict(list)
                 for r in rs:
                     sub[(r["end_to_end_id"], r["beneficiary"], r["currency"], r["transfer_amount"])].append(r)
-                hits = [e for e, x in sub.items() if abs(int(round(float(x[0]["transfer_amount"]) * 100)) - amt) <= 2
+                hits = [e for e, x in sub.items() if abs(to_cents(x[0]["transfer_amount"]) - amt) <= 2
                         and e not in self.used_batches]
                 if not hits:
                     continue
@@ -642,7 +709,7 @@ class Engine:
                 key = (rid, g[0]["execution_date"], len(g))
                 if key in self.used_batches:
                     continue
-                st = sum({r["end_to_end_id"]: float(r["transfer_amount"]) for r in g}.values())
+                st = sum({r["end_to_end_id"]: to_cents(r["transfer_amount"]) / 100 for r in g}.values())
                 if abs(int(round(st * 100)) - amt) <= 2:
                     self.used_batches.add(key)
                     self.emit_run_rows(t, g, "payment_run", f"remesa {rid}")
@@ -651,13 +718,13 @@ class Engine:
         if e2es:
             def score(e):
                 r0 = self.e2e_rows[e][0]
-                d = abs((dt.date.fromisoformat(r0["execution_date"]) - t.date).days)
+                d = _days_apart(r0["execution_date"], t.date)
                 nm = name_key(r0["beneficiary"]).split()
                 hit = sum(1 for w in nm[:2] if w in t.up)
                 return (-hit, d)
             e = min(e2es, key=score)
             r0 = self.e2e_rows[e][0]
-            if abs((dt.date.fromisoformat(r0["execution_date"]) - t.date).days) <= 5:
+            if _days_apart(r0["execution_date"], t.date) <= 5:
                 self.used_batches.add((e, amt))
                 self.emit_run_rows(t, self._transfer_for(self.e2e_rows[e], t), "payment_run_amount", f"transfer {e}")
                 return True
@@ -1071,7 +1138,7 @@ class Engine:
                 self.emit_cat(t, cat, "", why)
                 continue
             for p in self.plugins:
-                if p.match(self, t) and len(self.rows) > n0:
+                if self._match_plugin(p, t) and len(self.rows) > n0:
                     done = True
                     break
             if done:

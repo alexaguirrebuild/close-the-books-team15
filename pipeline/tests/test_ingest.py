@@ -3,14 +3,17 @@ import gzip
 import json
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import duckdb
 import pytest
 
+from bankcheck.alerts import could_hold_data
 from bankcheck.csvload import CsvSpec, load_csv
 from bankcheck.db import IngestContext, bulk_insert, open_build
 from bankcheck.ingest import run_ingest
 from bankcheck.issues import IssueLog, Manifest
+from bankcheck.tables import _master_path
 from bankcheck.pdf_index import pdf_text
 from bankcheck.roots import GoldenAccessError, resolve_layout
 
@@ -271,6 +274,34 @@ class TestIngest:
         unread = {row[0] for row in query(root, "SELECT file FROM ingest_issue WHERE code = 'FILE_NOT_READ'")}
         assert unread == {"live/payment_runs/UK01_202508_0.csv.gz", "live/bank_statements/suelto.sta"}
 
+    def test_hidden_system_files_are_not_even_reported(self, root: Path) -> None:
+        (root / "live" / ".DS_Store").write_text("x", encoding="utf-8")
+
+        assert run_ingest(layout_of(root)).published is True
+        assert query(root, "SELECT count(*) FROM ingest_issue WHERE code = 'FILE_NOT_READ'") == [(0,)]
+
+    @pytest.mark.parametrize("name", ["README.txt", "notas.md", "__MACOSX/x"])
+    def test_a_file_that_cannot_hold_data_is_a_warning(self, root: Path, name: str) -> None:
+        path = root / "live" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("nota", encoding="utf-8")
+
+        result = run_ingest(layout_of(root))
+
+        assert result.ok is True
+        assert result.published is True
+        assert query(root, "SELECT severity FROM ingest_issue WHERE code = 'FILE_NOT_READ'") == [("WARN",)]
+
+    @pytest.mark.parametrize("name", ["extra.csv", "extra.csv.gz", "bank_statements/extra.sta", "bank_statements/extra.n43", "bank_statements/extra.txt", "remittance_advices/extra.txt"])
+    def test_a_file_that_could_hold_data_is_still_an_error(self, root: Path, name: str) -> None:
+        path = root / "live" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+
+        result = run_ingest(layout_of(root), allow_errors=True)
+
+        assert result.ok is False
+
     def test_pdfs_only_indexed_do_not_count_as_unread_and_golden_is_noted(self, root: Path) -> None:
         gz(root / "live" / "golden_allocations.csv.gz", "bank_txn_id", "x")
 
@@ -368,6 +399,90 @@ class TestCsvLoad:
         assert [issue.code for issue in ctx.issues.items] == ["BAD_HEADER"]
         assert ctx.issues.has_errors
 
+    def values(self, ctx: IngestContext) -> list[tuple]:
+        return ctx.con.execute("SELECT * EXCLUDE (src_file) FROM t ORDER BY a").fetchall()
+
+    def test_an_extra_column_loads_with_a_warning_and_no_error(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "extra.csv"
+        plain(path, "a,b,legal_name_2026", "1,2.50,Nombre")
+
+        assert load_csv(ctx, self.spec(), [path]) == 1
+
+        assert [issue.code for issue in ctx.issues.items] == ["EXTRA_COLUMNS"]
+        assert not ctx.issues.has_errors
+        assert "legal_name_2026" in ctx.issues.items[0].detail
+        assert [column[0] for column in ctx.con.execute("DESCRIBE t").fetchall()] == ["a", "b", "src_file"]
+
+    def test_columns_in_another_order_are_read_by_name(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "order.csv"
+        plain(path, "b,a", "2.50,1")
+
+        assert load_csv(ctx, self.spec(), [path]) == 1
+
+        assert not ctx.issues.has_errors
+        assert ctx.con.execute("SELECT a, CAST(b AS VARCHAR) FROM t").fetchall() == [("1", "2.50")]
+
+    def test_an_extra_column_in_the_middle_does_not_shift_the_values(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "middle.csv"
+        plain(path, "a,nueva,b", "1,X,2.50")
+
+        assert load_csv(ctx, self.spec(), [path]) == 1
+
+        assert ctx.con.execute("SELECT a, CAST(b AS VARCHAR) FROM t").fetchall() == [("1", "2.50")]
+
+    def test_files_with_different_headers_load_together(self, ctx: IngestContext, tmp_path: Path) -> None:
+        exact, extra, reordered = tmp_path / "1.csv", tmp_path / "2.csv", tmp_path / "3.csv"
+        plain(exact, "a,b", "1,1.00")
+        plain(extra, "a,b,nueva", "2,2.00,X")
+        plain(reordered, "b,a", "3.00,3")
+
+        assert load_csv(ctx, self.spec(), [exact, extra, reordered]) == 3
+
+        assert ctx.con.execute("SELECT a, CAST(b AS VARCHAR) FROM t ORDER BY a").fetchall() == [("1", "1.00"), ("2", "2.00"), ("3", "3.00")]
+        assert ctx.con.execute("SELECT count(DISTINCT src_file) FROM t").fetchone() == (3,)
+
+    def test_a_trailing_comma_in_the_header_is_an_extra_column(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "trailing.csv"
+        plain(path, "a,b,", "1,2.50,")
+
+        assert load_csv(ctx, self.spec(), [path]) == 1
+        assert [issue.code for issue in ctx.issues.items] == ["EXTRA_COLUMNS"]
+
+    def test_two_extra_columns_with_the_same_name_load(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "twice.csv"
+        plain(path, "a,b,nueva,nueva", "1,2.50,X,Y")
+
+        assert load_csv(ctx, self.spec(), [path]) == 1
+
+    def test_a_missing_expected_column_is_still_bad_header(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "missing.csv"
+        plain(path, "a,nueva", "1,X")
+
+        assert load_csv(ctx, self.spec(), [path]) == 0
+        assert [issue.code for issue in ctx.issues.items] == ["BAD_HEADER"]
+
+    def test_an_expected_column_twice_is_bad_header_because_it_is_ambiguous(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "ambiguous.csv"
+        plain(path, "a,b,a", "1,2.50,9")
+
+        assert load_csv(ctx, self.spec(), [path]) == 0
+        assert [issue.code for issue in ctx.issues.items] == ["BAD_HEADER"]
+
+    def test_a_malformed_row_is_reported_in_a_file_with_an_extra_column(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "bad_row_extra.csv"
+        plain(path, "a,b,nueva", "1,2.50,X", "1,2,3,4,5", "5,6.00,Y")
+
+        assert load_csv(ctx, self.spec(), [path]) == 2
+        assert "CSV_ROW_REJECTED" in [issue.code for issue in ctx.issues.items]
+
+    def test_a_bad_value_is_still_reported_in_a_file_with_an_extra_column(self, ctx: IngestContext, tmp_path: Path) -> None:
+        path = tmp_path / "bad_value_extra.csv"
+        plain(path, "a,b,nueva", "1,no-es-numero,X")
+
+        load_csv(ctx, self.spec(), [path])
+
+        assert "BAD_VALUE" in [issue.code for issue in ctx.issues.items]
+
     def test_a_malformed_row_is_rejected_visibly(self, ctx: IngestContext, tmp_path: Path) -> None:
         path = tmp_path / "bad_row.csv"
         plain(path, "a,b", "1,2.50", "1,2,3,4", "5,6.00")
@@ -402,3 +517,38 @@ def test_bulk_insert_keeps_commas_quotes_newlines_and_nulls(tmp_path: Path) -> N
 
     assert written == 2
     assert con.execute("SELECT * FROM t ORDER BY b").fetchall() == [('x,"y"\nz', 1), (None, None)]
+
+
+class TestWhatCanBlockFinal:
+    PHASE = Path("/d/final")
+    OVERRIDE = PHASE / "masters_final"
+
+    @pytest.mark.parametrize("name", ["masters_final/otro.csv", "masters_final/README.txt", "README.txt", "notas.md", "__MACOSX/a.csv", ".DS_Store", "paquete.zip"])
+    def test_cannot_hold_data(self, name: str) -> None:
+        assert could_hold_data(self.PHASE / name, self.PHASE, self.OVERRIDE) is False
+
+    @pytest.mark.parametrize("name", ["extra.csv", "extra.csv.gz", "bank_statements/a.sta", "bank_statements/a.n43", "bank_statements/a.xml", "bank_statements/a.txt", "remittance_advices/ES01/a.txt", "remittance_advices/a.xlsx", "suelto.pdf"])
+    def test_could_hold_data(self, name: str) -> None:
+        assert could_hold_data(self.PHASE / name, self.PHASE, self.OVERRIDE) is True
+
+    @pytest.mark.parametrize("name", ["masters_final/masters_final/customers.csv", "masters_final/final/otro.csv", "masters_final/customers.csv.gz", "masters_final/customers_20260630.csv"])
+    def test_a_known_master_in_another_form_must_not_be_lost_in_silence(self, name: str) -> None:
+        assert could_hold_data(self.PHASE / name, self.PHASE, self.OVERRIDE) is True
+
+    def test_without_masters_final_a_csv_there_would_still_be_data(self) -> None:
+        assert could_hold_data(self.OVERRIDE / "otro.csv", self.PHASE, None) is True
+
+    def master_ctx(self, tmp_path: Path, new_rows: int, previous_rows: int) -> SimpleNamespace:
+        previous, override = tmp_path / "masters", tmp_path / "masters_final"
+        previous.mkdir()
+        override.mkdir()
+        plain(previous / "customers.csv", "id", *[f"C{n}" for n in range(previous_rows)])
+        plain(override / "customers.csv", "id", *[f"C{n}" for n in range(new_rows)])
+        return SimpleNamespace(layout=SimpleNamespace(masters_override_dir=override, masters_dir=previous), issues=IssueLog())
+
+    @pytest.mark.parametrize(("new_rows", "warned"), [(49, True), (50, False), (120, False)])
+    def test_a_master_with_too_few_rows_is_a_warning(self, tmp_path: Path, new_rows: int, warned: bool) -> None:
+        ctx = self.master_ctx(tmp_path, new_rows, 100)
+        assert _master_path(ctx, "customers.csv") == ctx.layout.masters_override_dir / "customers.csv"
+        assert [issue.code for issue in ctx.issues.items] == (["MASTER_SHRANK"] if warned else [])
+        assert not ctx.issues.has_errors

@@ -7,15 +7,16 @@ from __future__ import annotations
 
 import re
 
+from .data import cents
+
 TRANSFER_RETURN = re.compile(r"(?:DEVOLUCION TRANSFERENCIA|RETURN)\s+[A-Z]{2}\d{2}\b")
 RUN_E2E = re.compile(r"\b[A-Z]{2}\d{10,}-\d{4}\b")
 CHEQUE_RETURN = re.compile(r"(?:RETURNED ITEM CHK|CHEQUE IMPAYE)\s+(\d+)")
 CARD_RETURN = re.compile(r"(?:CHARGEBACK|CONTRACARGO TARJ)\s+(\*{4}\d{4})")
-CENTS = 100
 
 
 def _cents(value: str) -> int:
-    return abs(int(round(float(value) * CENTS)))
+    return abs(cents(value))
 
 
 def _returned_transfer_rows(engine, t) -> list[dict]:

@@ -76,6 +76,13 @@ def write(rows, path, explain_path=None):
                 w.writerow([r.txn, r.item, amt, r.category, r.exception, r.rule, r.evidence])
 
 
+def report_plugin_errors(eng):
+    errors = getattr(eng, "plugin_errors", [])
+    if errors:
+        ejemplos = "; ".join(f"{name} en {where}: {detail}" for name, where, detail in errors[:5])
+        print(f"  AVISO: {len(errors)} fallos de plugin; se han deshecho y la fase ha seguido: {ejemplos}", flush=True)
+
+
 def report_broken_advices(eng):
     broken = getattr(eng, "ra_errors", [])
     if broken:
@@ -134,6 +141,7 @@ def main(argv=None):
     eng = Engine(ph)
     rows = eng.run()
     report_broken_advices(eng)
+    report_plugin_errors(eng)
     since = dt.date.fromisoformat(a.since) if a.since else None
     rows = assemble(ph, rows, since)
     tag = "holdout" if a.phase == "holdout" else a.phase + (f"_since{a.since}" if a.since else "")

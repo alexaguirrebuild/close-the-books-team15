@@ -10,13 +10,12 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
-from .data import rows
+from .data import cents, rows
 from .engine import Row
 
 STAGE_FILE = Path("matches") / "m2_remittance.csv.gz"
 REQUIRED_IN = ("live", "final")
 DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "out"
-CENTS = 100
 
 
 def _stage_path(phase: str) -> Path:
@@ -45,11 +44,11 @@ def match(engine, t) -> bool:
     if not lines:
         return False
     for line in lines:
-        cents = int(round(float(line["amount"]) * CENTS))
+        amount = cents(line["amount"])
         evidence = f"aviso {line['advice_id']}"
         item = engine.items.get(line["item_id"])
         if item is None:
-            engine.rows.append(Row(t.id, line["item_id"], cents, "", line["exception"], "m2_avisos", evidence))
+            engine.rows.append(Row(t.id, line["item_id"], amount, "", line["exception"], "m2_avisos", evidence))
         else:
-            engine.emit(t, item, cents, line["exception"], "m2_avisos", evidence)
+            engine.emit(t, item, amount, line["exception"], "m2_avisos", evidence)
     return True
