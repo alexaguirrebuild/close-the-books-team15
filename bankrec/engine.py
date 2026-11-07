@@ -89,6 +89,7 @@ CITED_MIN_DIGITS = 4
 MAX_COMPLETION_ITEMS = 18
 DUE_MARGIN_DAYS = 3
 MAX_DUE_CANDIDATES = 26
+MAX_OVERPAYMENT_SHARE = 0.10
 
 
 @lru_cache(maxsize=None)
@@ -824,11 +825,22 @@ class Engine:
             return None
         known = {i.id for i in cited}
         others = [i for i in self.open_items_of(party, t, {"ARI", "ARC"}) if i.id not in known]
-        if not others or len(others) > MAX_COMPLETION_ITEMS:
+        return self._unique_completion(others, missing, MAX_COMPLETION_ITEMS, t) or self._complete_with_due(t, cited, others, missing)
+
+    def _unique_completion(self, candidates, missing, max_candidates, t):
+        if not candidates or len(candidates) > max_candidates:
             return None
-        values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in others]
+        values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in candidates]
         solutions = exact_subsets(values, int(round(missing)), AMOUNT_TOLERANCE_CENTS)
-        return [others[position] for position in solutions[0]] if len(solutions) == 1 else None
+        return [candidates[position] for position in solutions[0]] if len(solutions) == 1 else None
+
+    def _complete_with_due(self, t, cited, others, missing):
+        """Si con todas no se decide: solo las facturas vencidas, que acotan las candidatas (hasta 26). Con una sola factura
+        citada y un exceso pequeño no se busca: es un sobrepago, y lo decide settle (POLICIES §3 OVERPAYMENT)."""
+        if len(cited) == 1 and missing <= MAX_OVERPAYMENT_SHARE * (abs(t.amount) - missing):
+            return None
+        due = [i for i in others if i.kind == "ARI" and (i.due is None or (i.due - t.date).days <= DUE_MARGIN_DAYS)]
+        return self._unique_completion(due, missing, MAX_DUE_CANDIDATES, t)
 
     def _adds_up(self, items, t):
         open_items = [i for i in items if i.open > 0]

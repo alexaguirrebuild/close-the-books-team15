@@ -35,8 +35,8 @@ class TestExactSubsets:
         assert exact_subsets([], 100) == []
 
 
-def item(number, cents=1000, kind="ARI", party="C1"):
-    return Item(id=number, kind=kind, side="AR", entity="ES01", number=number, party=party, ccy="EUR", total=cents, open=cents, issue=dt.date(2025, 5, 1))
+def item(number, cents=1000, kind="ARI", party="C1", due=None, entity="ES01"):
+    return Item(id=number, kind=kind, side="AR", entity=entity, number=number, party=party, ccy="EUR", total=cents, open=cents, issue=dt.date(2025, 5, 1), due=due)
 
 
 def engine(others):
@@ -100,3 +100,75 @@ class TestCompletar:
         t = movement(-1300)
         assert eng.m_refs(t) in (True, False)
         assert all(rule != "ref_completed" for _, rule in eng.settled)
+
+
+PAST_DUE = DAY - dt.timedelta(days=5)
+NOT_DUE = DAY + dt.timedelta(days=30)
+
+
+def fillers(count, due=PAST_DUE, start=0):
+    """Partidas con importes grandes y separados: ninguna suma casual llega al resto que se busca."""
+    return [item(f"R{n + start:02d}", 900000 + 7001 * n, due=due) for n in range(count)]
+
+
+class TestCompletarConVencidas:
+    """Si la búsqueda general no da respuesta, se prueba solo con facturas vencidas, que son las que un cliente paga."""
+
+    def test_un_abono_que_da_otra_solucion_no_impide_completar(self):
+        others = [item("A", 300, due=PAST_DUE), item("B", 500, due=PAST_DUE), item("N", 200, kind="ARC"), item("Z", 1000, due=NOT_DUE)]
+        eng = engine(others)  # A+B y Z-N suman lo mismo: la búsqueda general no decide
+        assert eng.m_refs(movement(1800))
+        assert eng.settled == [(sorted([CITED, "A", "B"]), "ref_completed")]
+
+    def test_mas_de_18_partidas_pero_pocas_vencidas(self):
+        eng = engine([item("A", 300, due=PAST_DUE), *fillers(25, due=NOT_DUE)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [(sorted([CITED, "A"]), "ref_completed")]
+
+    def test_hasta_26_vencidas_si_se_busca(self):
+        eng = engine([item("A", 300, due=PAST_DUE), *fillers(25)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [(sorted([CITED, "A"]), "ref_completed")]
+
+    def test_mas_de_26_vencidas_no_se_busca(self):
+        eng = engine([item("A", 300, due=PAST_DUE), *fillers(26)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [([CITED], "ref")]
+
+    def test_dos_soluciones_entre_las_vencidas_se_queda_con_lo_citado(self):
+        eng = engine([item("A", 300, due=PAST_DUE), item("B", 300, due=PAST_DUE), *fillers(20)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [([CITED], "ref")]
+
+    def test_la_que_completa_aun_no_ha_vencido(self):
+        eng = engine([item("A", 300, due=NOT_DUE), *fillers(20)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [([CITED], "ref")]
+
+    def test_vence_dentro_del_margen(self):
+        eng = engine([item("A", 300, due=DAY + dt.timedelta(days=3)), *fillers(20)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [(sorted([CITED, "A"]), "ref_completed")]
+
+    def test_solo_cuadra_con_un_abono(self):
+        eng = engine([item("N", 300, kind="ARC", due=PAST_DUE), item("A", 600, due=PAST_DUE), *fillers(20)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [([CITED], "ref")]
+
+    def test_otra_sociedad_no_cuenta(self):
+        eng = engine([item("A", 300, due=PAST_DUE, entity="FR01"), *fillers(20)])
+        assert eng.m_refs(movement(1300))
+        assert eng.settled == [([CITED], "ref")]
+
+    def test_un_exceso_pequeno_sobre_una_factura_citada_es_sobrepago(self):
+        eng = engine([item("A", 50, due=PAST_DUE), *fillers(20)])
+        assert eng.m_refs(movement(1050))
+        assert eng.settled == [([CITED], "ref")]
+
+    def test_con_dos_citadas_un_exceso_pequeno_si_se_completa(self):
+        eng = engine([item("OTRA", 1000), item("A", 100, due=PAST_DUE), *fillers(20)])
+        eng.ph.by_num["FV240427096"] = {"OTRA"}
+        t = movement(2100)
+        t.tokens = {"FV240427095", "FV240427096"}
+        assert eng.m_refs(t)
+        assert eng.settled == [(sorted([CITED, "OTRA", "A"]), "ref_completed")]
