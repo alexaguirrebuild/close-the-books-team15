@@ -87,6 +87,8 @@ def load_plugins(names: str) -> list:
 AMOUNT_TOLERANCE_CENTS = 2
 CITED_MIN_DIGITS = 4
 MAX_COMPLETION_ITEMS = 18
+DUE_MARGIN_DAYS = 3
+MAX_DUE_CANDIDATES = 26
 
 
 @lru_cache(maxsize=None)
@@ -878,7 +880,27 @@ class Engine:
         for party in tried:
             if self._party_amount(t, party, how):
                 return True
-        return self._party_rescue(t, tried)
+        return self._party_rescue(t, tried) or self._party_due_subset(t)
+
+    def _party_due_subset(self, t):
+        """Cobro de varias facturas sin citas: casi nadie paga antes de vencer, y eso acota las candidatas hasta que la suma
+        exacta identifica. Solo con solución única y un único cliente; si no, el cobro no se fuerza (POLICIES §3)."""
+        if t.amount <= 0:
+            return False
+        hits = {}
+        for party in dict.fromkeys([*self.resolve_parties(t)[0], *self.scan_names(t)]):
+            due = [i for i in self.open_items_of(party, t, {"ARI", "ARC"})
+                   if i.due is None or (i.due - t.date).days <= DUE_MARGIN_DAYS]
+            if not 2 <= len(due) <= MAX_DUE_CANDIDATES:
+                continue
+            values = [int(round(self.sign(i, t) * self.to_bank(i.open, i, t))) for i in due]
+            solutions = exact_subsets(values, abs(t.amount), AMOUNT_TOLERANCE_CENTS)
+            if len(solutions) == 1 and len(solutions[0]) > 1:
+                hits[party] = [due[position] for position in solutions[0]]
+        if len(hits) != 1:
+            return False
+        party, picks = next(iter(hits.items()))
+        return self.settle(t, [i.id for i in picks], "party_due_subset", f"contraparte {party} · vencidas por suma exacta", party=party)
 
     def _party_rescue(self, t, tried):
         """Terceros que el camino normal no llegó a probar: homónimos de más y nombres que solo ve scan_names.
