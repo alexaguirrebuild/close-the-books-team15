@@ -42,6 +42,7 @@ export function ExportScreen() {
   const openCase = useStore((s) => s.openCase)
   const filters = useStore((s) => s.filters)
   const setFilters = useStore((s) => s.setFilters)
+  const [percentDraft, setPercentDraft] = useState<string | null>(null)
   const [summary, setSummary] = useState<ExportSummary | null>(null)
   const [issues, setIssues] = useState<ValidationIssue[]>([])
   const [preview, setPreview] = useState<Record<string, string>[]>([])
@@ -152,11 +153,13 @@ export function ExportScreen() {
                 min={0}
                 max={100}
                 disabled={!options.includeProposals}
-                value={Math.round(options.minConfidence * 100)}
+                value={percentDraft ?? Math.round(options.minConfidence * 100)}
                 onChange={(e) => {
+                  setPercentDraft(e.target.value)
                   const minConfidence = minConfidenceFromPercent(e.target.value)
                   if (minConfidence !== null) setOptions({ minConfidence })
                 }}
+                onBlur={() => setPercentDraft(null)}
               />
               %
             </label>

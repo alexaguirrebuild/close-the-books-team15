@@ -591,9 +591,33 @@ test.describe('engine output', () => {
     await expect(page.getByText(/confianza/i)).toHaveCount(0)
   })
 
+  const exportMinConfidence = (page: Page) =>
+    page.evaluate(() => (window as unknown as { __cuadra: { getState(): { exportOptions: { minConfidence: number } } } }).__cuadra.getState().exportOptions.minConfidence)
+
+  test('lets the confidence field stay empty while typing, and keeps the last valid filter', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'con golden' }).click()
+    await page.getByRole('button', { name: /Cargar datos/ }).click()
+    await expect(page.locator('.rail')).toBeVisible({ timeout: 30_000 })
+    await page.keyboard.press('Alt+Digit3')
+    const field = page.getByLabel(/Solo con confianza desde/)
+    await field.fill('80')
+    await expect.poll(() => exportMinConfidence(page)).toBe(0.8)
+
+    await field.fill('')
+    await expect(field).toHaveValue('')
+    expect(await exportMinConfidence(page)).toBe(0.8)
+    await field.blur()
+    await expect(field).toHaveValue('80')
+
+    await field.fill('150')
+    await expect.poll(() => exportMinConfidence(page)).toBe(1)
+    await field.blur()
+    await expect(field).toHaveValue('100')
+  })
+
   test('forgets the confidence filter when another dataset loads', async ({ page }) => {
-    const minConfidence = () =>
-      page.evaluate(() => (window as unknown as { __cuadra: { getState(): { exportOptions: { minConfidence: number } } } }).__cuadra.getState().exportOptions.minConfidence)
+    const minConfidence = () => exportMinConfidence(page)
 
     await page.goto('/')
     await page.getByRole('button', { name: 'con golden' }).click()
