@@ -1,0 +1,28 @@
+# Big datasets (download separately from the Data page)
+/train/
+/train 2/
+/live/
+/final/
+*.tar.gz
+*.zip
+
+# Secrets
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Pipeline outputs and caches
+submission*.csv
+submission*.csv.gz
+sub_*.csv.gz
+cache/
+.cache/
+
+# OS / tooling
+.DS_Store
+.claude-flow/
+/bankrec-docs-and-masters/sample/
