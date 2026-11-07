@@ -143,18 +143,20 @@ export function ExportScreen() {
             <input type="checkbox" checked={options.includeProposals} onChange={(e) => setOptions({ includeProposals: e.target.checked })} />
             Incluir las propuestas sin revisar
           </label>
-          <label className="inline-number">
-            Solo con confianza desde
-            <input
-              type="number"
-              min={0}
-              max={100}
-              disabled={!options.includeProposals}
-              value={Math.round(options.minConfidence * 100)}
-              onChange={(e) => setOptions({ minConfidence: Number(e.target.value) / 100 })}
-            />
-            %
-          </label>
+          {meta?.hasConfidence && (
+            <label className="inline-number">
+              Solo con confianza desde
+              <input
+                type="number"
+                min={0}
+                max={100}
+                disabled={!options.includeProposals}
+                value={Math.round(options.minConfidence * 100)}
+                onChange={(e) => setOptions({ minConfidence: Number(e.target.value) / 100 })}
+              />
+              %
+            </label>
+          )}
         </fieldset>
 
         {offersFile ? (

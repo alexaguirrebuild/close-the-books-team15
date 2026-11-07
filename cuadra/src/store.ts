@@ -15,7 +15,7 @@ import {
   type LogEntry,
 } from './data/decisions'
 import { buildDiagnosis } from './data/diagnosis'
-import { buildExportRows, type ExportOptions } from './data/exportSubmission'
+import { buildExportRows, DEFAULT_EXPORT_OPTIONS, type ExportOptions } from './data/exportSubmission'
 import { ingest, type DatasetMeta, type Progress } from './data/ingest'
 import { appendLog, readLog } from './data/log'
 import { datasetKey, type Plan, type SourceFile } from './data/preflight'
@@ -209,7 +209,7 @@ export const useStore = create<State & Actions>((set, get) => {
     counts: null,
     diagnosisRevision: 0,
     caseVersion: 0,
-    exportOptions: { includeProposals: true, minConfidence: 0 },
+    exportOptions: DEFAULT_EXPORT_OPTIONS,
     sessionTimes: [],
 
     loadDataset: async (plan) => {
@@ -234,6 +234,7 @@ export const useStore = create<State & Actions>((set, get) => {
           progress: null,
           screen: 'panel',
           filters: DEFAULT_FILTERS,
+          exportOptions: DEFAULT_EXPORT_OPTIONS,
           queueTotal,
           cursorPos: 1,
           benchRid: null,

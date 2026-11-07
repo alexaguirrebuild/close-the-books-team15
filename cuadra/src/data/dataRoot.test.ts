@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { detectLayouts, filesOfLayout, shouldEnter, type PhaseLayout } from './dataRoot'
+import { detectLayouts, filesOfLayout, phaseOfEngineFile, shouldEnter, type PhaseLayout } from './dataRoot'
 
 const live: PhaseLayout = { phase: 'live', phaseDir: 'live', mastersDir: 'bankrec-docs-and-masters/masters', outDir: 'out/live' }
 
@@ -32,6 +32,16 @@ describe('detectLayouts', () => {
   test('finds nothing in a folder that is itself a dataset', () => {
     expect(detectLayouts(['bank_transactions.csv.gz', 'masters/fx_rates.csv'])).toEqual([])
   })
+
+  test('finds the phases and the masters inside data/, where the engine keeps them', () => {
+    const layouts = detectLayouts([
+      'data/live/bank_transactions.csv.gz',
+      'data/sample/bank_transactions.csv.gz',
+      'data/masters/fx_rates.csv',
+    ])
+    expect(layouts.map((l) => l.phase)).toEqual(['sample', 'live'])
+    expect(layouts[1]).toEqual({ phase: 'live', phaseDir: 'data/live', mastersDir: 'data/masters', outDir: 'out/live' })
+  })
 })
 
 describe('filesOfLayout', () => {
@@ -52,6 +62,18 @@ describe('filesOfLayout', () => {
     ])
   })
 
+  test('keeps what the engine writes for this phase directly under out/, and nothing else from there', () => {
+    const paths = filesOfLayout(live, [
+      source('out/explain_live.csv.gz'),
+      source('out/sub_live.csv.gz'),
+      source('out/sub_train.csv.gz'),
+      source('out/explain_holdout.csv.gz'),
+      source('out/_txns.csv.gz'),
+      source('out/_golden_holdout.csv.gz'),
+    ]).map((s) => s.path)
+    expect(paths).toEqual(['out/explain_live.csv.gz', 'out/sub_live.csv.gz'])
+  })
+
   test('puts the masters of FINAL before the general ones, because they replace them', () => {
     const final: PhaseLayout = { ...live, phase: 'final', phaseDir: 'final', outDir: 'out/final' }
     const paths = filesOfLayout(final, [
@@ -59,6 +81,27 @@ describe('filesOfLayout', () => {
       source('final/masters_final/fx_rates.csv'),
     ]).map((s) => s.path)
     expect(paths).toEqual(['final/masters_final/fx_rates.csv', 'bankrec-docs-and-masters/masters/fx_rates.csv'])
+  })
+})
+
+describe('phaseOfEngineFile', () => {
+  test('reads the phase from the name the engine gives its files', () => {
+    expect(phaseOfEngineFile('explain_live.csv.gz')).toBe('live')
+    expect(phaseOfEngineFile('sub_final.csv')).toBe('final')
+  })
+
+  test('accepts a copy with a suffix, such as a saved submission', () => {
+    expect(phaseOfEngineFile('sub_live_648cc9c.csv.gz')).toBe('live')
+    expect(phaseOfEngineFile('sub_train_since2025-01-01.csv.gz')).toBe('train')
+  })
+
+  test('treats the holdout as TRAIN, because its rows come from there', () => {
+    expect(phaseOfEngineFile('explain_holdout.csv.gz')).toBe('train')
+  })
+
+  test('says nothing about any other name', () => {
+    expect(phaseOfEngineFile('mi_revision.csv')).toBeNull()
+    expect(phaseOfEngineFile('sub_lively.csv')).toBeNull()
   })
 })
 

@@ -76,12 +76,13 @@ async function planFile(role: FileRole, source: SourceFile): Promise<PlannedFile
 }
 
 const isStage = (path: string) => /(^|\/)matches\//.test(path)
+const ENGINE_RULE_COLUMN = /^(rule|regla)$/i
 
-/** The most finished file wins: named proposals, then the merged submission, then the baseline. */
+/** The most finished file wins: named proposals and the engine's explained rows, then the merged submission, then the baseline. */
 function proposalRank(path: string): number {
   const name = (path.split('/').at(-1) ?? '').toLowerCase()
   if (isStage(path)) return 3
-  if (/^(propuestas|proposals)/.test(name)) return 0
+  if (/^(propuestas|proposals|explain_)/.test(name)) return 0
   if (/^(submission|sub_|merged)/.test(name)) return 1
   if (/^baseline/.test(name)) return 2
   return 4
@@ -124,7 +125,9 @@ export async function buildPlan(name: string, sources: SourceFile[], options: Pl
 
   const primary = await pickProposal(proposals, options.proposalPath)
   if (primary) files.proposals = await planFile('proposals', primary)
-  const stages = proposals.filter((source) => isStage(source.path) && source.path !== primary?.path)
+  // The engine says where each row came from: the stages and their confidence belong to another pipeline.
+  const fromEngine = ENGINE_RULE_COLUMN.test(files.proposals?.mapping.source ?? '')
+  const stages = fromEngine ? [] : proposals.filter((source) => isStage(source.path) && source.path !== primary?.path)
   const enrichments = await Promise.all(stages.map((source) => planFile('proposals', source)))
 
   return {
@@ -155,7 +158,9 @@ export type PlanProblem = { role?: FileRole; message: string }
 
 export function planProblems(plan: Plan): PlanProblem[] {
   const problems: PlanProblem[] = []
-  if (!plan.files.bank) problems.push({ message: 'Falta bank_transactions.csv en la carpeta.' })
+  if (!plan.files.bank) {
+    problems.push({ message: 'Falta bank_transactions.csv en la carpeta. Si los datos son enlaces simbólicos, elige la carpeta original: el navegador no los sigue.' })
+  }
   if (!plan.files.ar && !plan.files.ap && !plan.files.cn && !plan.files.open) {
     problems.push({ message: 'Falta al menos un fichero de partidas: ar_invoices, ap_invoices, credit_notes u open_items_at_start.' })
   }
