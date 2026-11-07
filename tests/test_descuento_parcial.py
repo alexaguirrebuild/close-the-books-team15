@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from bankrec.engine import Engine
 
-TERMS = {"T10": {"early_payment_discount_pct": "2", "discount_days": "10"}, "T30": {}}
+TERMS = {"T10": {"early_payment_discount_pct": "2", "discount_days": "10"}, "T5": {"early_payment_discount_pct": "5", "discount_days": "10"}, "T30": {}}
 
 
 def motor(*items) -> Engine:
@@ -133,3 +133,15 @@ def test_discount_ok_distingue_a_tiempo_tarde_y_otro_importe():
     assert motor_.discount_ok(a, cobro(98000, dt.date(2025, 3, 14)), 98000) == "SHORT_DISCOUNT"
     assert motor_.discount_ok(a, cobro(98000, dt.date(2025, 3, 15)), 98000) == "LATE"
     assert motor_.discount_ok(a, cobro(97000, dt.date(2025, 3, 14)), 97000) is None
+
+
+def test_el_descuento_en_varias_facturas_se_compara_en_la_divisa_del_cobro():
+    """Facturas en USD y cobro en EUR: sin convertir, el descuento no cuadra nunca y el cobro acaba repartido como parcial."""
+    a = factura("A", 100000, "T5", A_TIEMPO)
+    b = factura("B", 50000, "T5", A_TIEMPO)
+    a.ccy = b.ccy = "USD"
+    motor_ = motor(a, b)
+    motor_.ph.fx = SimpleNamespace(conv=lambda importe, *_: importe * 0.5)
+
+    assert motor_.settle(cobro(71250, DIA_DEL_COBRO), ["A", "B"], "ref")
+    assert filas_de(motor_) == {"A": (100000, "FX_DIFFERENCE"), "B": (50000, "FX_DIFFERENCE")}

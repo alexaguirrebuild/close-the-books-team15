@@ -70,7 +70,8 @@ RUN_ID = re.compile(r"\b[A-Z]{2}\d{10,}\b")
 # LATE: descuento pasado de plazo. Es fórmula exacta y POLICIES §3 lo trata como PARTIAL, que es lo que hace settle().
 EXPLAINED_SHORTFALLS = ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "LATE")
 OPTIONAL_PLUGINS = {"learned"}  # Solo estos pueden faltar: sin un plugin obligatorio se pierden puntos sin aviso.
-DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,abonos,proveedores,mismo_importe,nombres_cortados,cobros_cortos"
+# `abonos` no se activa: en holdout no sube la nota (90,65 sin él, 90,64 con él) y añade riesgo en sobrepagos (PR #12).
+DEFAULT_PLUGINS = "devoluciones,m2_avisos,remittance,pdfclauses,learned,proveedores,mismo_importe,nombres_cortados,cobros_cortos"
 # (primero, después): el segundo transforma en prepare() lo que deja el primero; al revés no lo vería, y sin ningún aviso.
 PLUGIN_ORDER = (("m2_avisos", "mismo_importe"),)
 
@@ -209,15 +210,15 @@ class Engine:
                 return "SHORT_BANK_CHARGES"
         return None
 
-    def _discount_subset(self, invoices, credits, t, cash, max_eligible=10):
+    def _discount_subset(self, invoices, credit_notes, t, cash, max_eligible=10):
         """Ids de las facturas con descuento a tiempo (POLICIES §3) que explican el cobro exacto; None si no hay
         una solución única. El resto de facturas y los abonos van por su importe completo."""
-        if len(invoices) < 2 or any(it.ccy != t.ccy for it in invoices + credits):
+        if len(invoices) < 2 or any(it.ccy != t.ccy for it in invoices + credit_notes):
             return None
         to_pay = {it.id: amount for it in invoices if (amount := self._discounted_total(it, t)) is not None}
         if not to_pay or len(to_pay) > max_eligible:
             return None
-        base = sum(max(it.open, 0) for it in invoices) - sum(max(c.open, 0) for c in credits)  # como `exp` en settle
+        base = sum(max(it.open, 0) for it in invoices) - sum(max(c.open, 0) for c in credit_notes)  # como `exp` en settle
         sols = []
         ids = list(to_pay)
         for n in range(1, len(ids) + 1):
@@ -291,7 +292,8 @@ class Engine:
         # varias facturas: ¿descuento en todas?
         terms = {it.id: self._discount_terms(it) for it in invoices}
         all_disc = all(terms.values())
-        if all_disc and abs(sum(to_pay for to_pay, _ in terms.values()) - sum(max(c.open, 0) for c in credits) - cash) <= 2 * len(invoices):
+        if all_disc and abs(sum(self.to_bank(terms[it.id][0], it, t) for it in invoices)
+                            - sum(self.to_bank(max(c.open, 0), c, t) for c in credits) - cash) <= 2 * len(invoices):
             for it in cands:
                 if it.id in terms and self._discounted_total(it, t) is None:
                     # POLICIES §3 PARTIAL: fuera de plazo no se acepta el descuento y la diferencia queda abierta

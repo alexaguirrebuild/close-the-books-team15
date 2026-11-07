@@ -35,7 +35,9 @@ def prepare(engine) -> None:
     indexes: dict[str, dict[str, set[str]]] = {}
 
     def scan_names(t):
-        """Los nombres encontrados entre los terceros de la sociedad; si no hay ninguno, la búsqueda de siempre."""
+        """Los nombres encontrados entre los terceros de la sociedad; si no hay ninguno, la búsqueda de siempre.
+
+        Cambia `name_index` mientras busca: vale porque el motor recorre los movimientos de uno en uno, sin hilos."""
         whole = engine.ph.name_index
         if t.entity not in indexes:
             indexes[t.entity] = scoped_index(whole, parties.get(t.entity, set()))
