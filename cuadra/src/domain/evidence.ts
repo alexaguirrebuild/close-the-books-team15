@@ -33,6 +33,7 @@ function party({ partyName, counterparty }: EvidenceInput): EvidenceStep {
   return { ...base, state: 'ok', text: different ? `${partyName}. Ordenante: ${counterparty}` : partyName }
 }
 
+/** Where the proposal comes from: its reason if it has one, then the advice behind it, then its rule. */
 function origin({ proposal }: EvidenceInput): EvidenceStep {
   const base = { id: 'origin', label: 'De dónde sale' }
   if (!proposal.length) return { ...base, state: 'warn', text: 'No hay propuesta' }

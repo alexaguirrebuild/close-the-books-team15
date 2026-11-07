@@ -241,6 +241,7 @@ export function LoadScreen() {
   )
 }
 
+/** Lets a person choose the engine's explain file by hand when the folder scan does not reach it. */
 function EngineFilePicker({ onPick }: { onPick: (file: File) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   return (

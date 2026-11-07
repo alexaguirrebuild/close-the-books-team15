@@ -105,6 +105,7 @@ async function pickProposal(candidates: SourceFile[], wanted: string | null | un
   return dated.reduce((latest, next) => (next.at > latest.at ? next : latest)).source
 }
 
+/** Sorts the files of a folder by role, chooses the proposals and their stages, and records what it ignored. */
 export async function buildPlan(name: string, sources: SourceFile[], options: PlanOptions = {}): Promise<Plan> {
   const files: Plan['files'] = {}
   const pdfs: SourceFile[] = []
@@ -162,6 +163,7 @@ export function withMapping(plan: Plan, role: FileRole, field: string, column: s
 
 export type PlanProblem = { role?: FileRole; message: string }
 
+/** What stops this plan from loading: missing files and required columns without a mapping. */
 export function planProblems(plan: Plan): PlanProblem[] {
   const problems: PlanProblem[] = []
   if (!plan.files.bank) {

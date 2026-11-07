@@ -438,6 +438,7 @@ const RATE_INSERT_BATCH = 2000
 
 const list = async (db: Db, sql: string) => (await db.query(sql)).map((r) => str(r.v)).filter(Boolean)
 
+/** Loads the files of the plan into the database and returns what the dataset holds. Throws without a bank file. */
 export async function ingest(
   db: Db,
   plan: Plan,

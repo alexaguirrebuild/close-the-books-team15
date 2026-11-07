@@ -26,6 +26,7 @@ const SKIPPED_IN_PHASE = new Set(['bank_statements', 'direct_debit_batches', 'ca
 const parentOf = (path: string) => path.split('/').slice(0, -1).join('/')
 const nameOf = (path: string) => path.split('/').at(-1) ?? path
 
+/** The phases found among the paths: a phase is a known folder that holds its bank_transactions file. */
 export function detectLayouts(paths: string[]): PhaseLayout[] {
   const folders = new Set(paths.map(parentOf))
   const statements = new Set(paths.filter((path) => STATEMENTS.test(nameOf(path))).map(parentOf))

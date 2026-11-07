@@ -45,6 +45,7 @@ export function ruleName(rule: string): string | null {
   return EXACT[rule] ?? FAMILIES.find(([prefix]) => rule.startsWith(prefix))?.[1] ?? null
 }
 
+/** The readable name of an engine rule. An unknown rule keeps its own name, with spaces instead of underscores. */
 export function ruleLabel(rule: string): string {
   return ruleName(rule) ?? rule.replace(/_/g, ' ')
 }

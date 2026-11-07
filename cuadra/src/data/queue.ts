@@ -44,6 +44,7 @@ export function availableViews(support: ViewSupport | null): QueueView[] {
 
 const PRIORITY_HINT_WITHOUT_CONFIDENCE = 'El motor no da confianza: primero las líneas con más partidas y excepciones raras.'
 
+/** The line that explains a view. Without confidence, the priority view cannot promise to find the doubtful cases. */
 export function viewHint(view: QueueView, hasConfidence: boolean): string {
   return view === 'priority' && !hasConfidence ? PRIORITY_HINT_WITHOUT_CONFIDENCE : VIEW_HINT[view]
 }
