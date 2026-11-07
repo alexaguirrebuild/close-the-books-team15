@@ -124,3 +124,10 @@ class TestMatch:
         assert m2_avisos.match(engine, cobro()) is True
         assert isinstance(engine.rows[0], Row)
         assert (engine.rows[0].item, engine.rows[0].amount) == ("ARI-9", 10000)
+
+    def test_marca_el_aviso_como_usado_para_que_remittance_no_lo_repita(self, fichero):
+        engine = self.preparado(fichero, ["T1", "ARI-1", "100.00", "", "", "m2", "1", "US01/RA_1.csv", "1"], **{"ARI-1": factura("ARI-1", 10000)})
+        engine.ra_used = set()
+
+        assert m2_avisos.match(engine, cobro()) is True
+        assert "US01/RA_1.csv" in engine.ra_used

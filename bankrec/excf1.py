@@ -67,7 +67,7 @@ def main(argv=None):
         print(f"     se nos escapa como: {dict(miss[c].most_common(4))}  · segmentos: {dict(miss_seg[c].most_common(3))}")
         if fp[c]:
             print(f"     la ponemos de más cuando era: {dict(wrong[c].most_common(4))}")
-    print(f"macro-F1 aprox: {sum(f1s) / len(f1s):.3f}")
+    print(f"macro-F1 aprox: {sum(f1s) / len(f1s):.3f}" if f1s else "macro-F1 aprox: 0.000")
 
 
 if __name__ == "__main__":

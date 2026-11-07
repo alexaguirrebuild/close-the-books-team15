@@ -46,7 +46,7 @@ NONITEM_RULES = [
     (r"PRIMA SEGURO|INSURANCE|ASSURANCE|VERSICHERUNG|POLIZA SEGURO", "INSURANCE"),
     (r"PROFORMA|ANTICIPO PROFORMA|PF\d{2}-", "CUSTOMER_ADVANCE"),
     (r"DEVOLUCION PAGO DUPLICADO|REFUND DUPLICATE|REMBOURSEMENT DOUBLE", "CUSTOMER_REFUND"),
-    (r"REEMBOLSO|ABONO PAGO DOBLE|ERSTATTUNG DOPPEL|REMBOURSEMENT", "SUPPLIER_REFUND"),
+    (r"REEMBOLSO|ABONO PAGO DOBLE|ERSTATTUNG DOPPEL|REMBOURSEMENT|DEVOLUCION PAGO DUPLICADO|REFUND DUPLICATE", "SUPPLIER_REFUND"),
     (r"COMISION|COMISIONES|GASTOS|FEE|CHARGES|FRAIS|GEBUHR|ENTGELT|MANTENIMIENTO CUENTA|CUOTA TPV", "BANK_FEES"),
 ]
 NONITEM_RE = [(re.compile(p), c) for p, c in NONITEM_RULES]
@@ -324,9 +324,13 @@ class Engine:
         invoices = [it for it in cands if self.sign(it, t) > 0]
         credits = [it for it in cands if self.sign(it, t) < 0]
 
+        def is_inv(it):
+            return getattr(it, "kind", it.id[:3]) in ("ARI", "API")
+
         def full(it, exc=""):
-            if fx and self.sign(it, t) > 0 and it.ccy != t.ccy and exc in ("", "SHORT_DISCOUNT", "SHORT_WITHHOLDING",
-                                                                            "SHORT_BANK_CHARGES", "OVERPAYMENT"):
+            if fx and self.sign(it, t) > 0 and is_inv(it) and it.ccy != t.ccy and exc in (
+                "", "SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "OVERPAYMENT"
+            ):
                 exc = "FX_DIFFERENCE"
             self.emit(t, it, it.open, exc, rule, ev)
 
@@ -336,7 +340,7 @@ class Engine:
             return True
         if diff < 0:  # sobra dinero
             # sobrepago real: como mucho un 10 % de más; más que eso es un cobro de varias facturas que no vemos todas
-            if len(invoices) == 1 and not credits and cash <= 1.10 * exp:
+            if len(invoices) == 1 and is_inv(invoices[0]) and not credits and cash <= 1.10 * exp:
                 full(invoices[0], "OVERPAYMENT")
             else:
                 for it in cands:
@@ -351,11 +355,11 @@ class Engine:
                 full(c)
             cash_item = (cash if it.ccy == t.ccy else self.ph.fx.conv(cash, t.ccy, it.ccy, t.date)) + net_credit
             short = it.open - cash_item
-            exc = self.explain_short(it, t, short, cash_item)
+            exc = self.explain_short(it, t, short, cash_item) if is_inv(it) else None
             if exc in ("SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES"):
                 full(it, exc)
             else:
-                self.emit(t, it, cash_item, "PARTIAL", rule, ev)
+                self.emit(t, it, cash_item, "PARTIAL" if is_inv(it) else "", rule, ev)
             return True
         # varias facturas: ¿descuento en todas?
         terms = {it.id: self._discount_terms(it) for it in invoices}

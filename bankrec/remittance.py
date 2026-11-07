@@ -338,7 +338,7 @@ def prepare(engine):
     engine.ra_list = []
     engine.ra_by_total = defaultdict(list)
     engine.ra_by_ref = defaultdict(list)
-    engine.ra_used = set()
+    engine.ra_used = getattr(engine, "ra_used", set())
     engine.ra_fx = defaultdict(list)
     engine.ra_fx_dates = {}
     engine.ra_num = defaultdict(list)
@@ -455,6 +455,8 @@ def _find_adv(engine, t):
             continue
         delta = (a["received"] - t.date).days
         cited = _cited(t, a)
+        if a["file"] in fxset and not party and not cited:
+            continue
         total_ok = a["total"] == cash or a["sum_paid"] == cash or a["file"] in fxset
         if not cited and not (-5 <= delta <= 15):
             continue
