@@ -153,6 +153,10 @@ class FX:
         return amount / self.rate(frm, d) * self.rate(to, d)
 
 
+PHASE_START = {"live": dt.date(2025, 7, 1), "final": dt.date(2026, 1, 1)}
+RECENT_DAYS = 180
+
+
 class Phase:
     def __init__(self, name: str, holdout: "dt.date | None" = None):
         self.name = name
@@ -175,13 +179,33 @@ class Phase:
         self.txns.sort(key=lambda t: (t.date, t.id))
         if holdout:
             self._cut_holdout(holdout)
-        self.dd = self._csvs("direct_debit_batches")
+        self.dd = self._prev_csvs("direct_debit_batches") + self._csvs("direct_debit_batches")
         self.cards = self._csvs("card_settlements")
         self.cheques = self._csvs("cheque_deposits")
-        self.runs = self._csvs("payment_runs")
+        self.runs = self._prev_csvs("payment_runs") + self._csvs("payment_runs")
         self._index()
 
     # ---------- carga ----------
+    def _prev_csvs(self, sub, months=2):
+        """Remesas de la fase anterior de los últimos `months` meses: el confirming de junio se carga en julio,
+        y las devoluciones de principios de mes citan remesas del mes anterior."""
+        order = ["train", "live", "final"]
+        if self.name not in order or order.index(self.name) == 0 or not self.txns:
+            return []
+        prev = DATA / order[order.index(self.name) - 1] / sub
+        y, m = self.txns[0].date.year, self.txns[0].date.month
+        keep = set()
+        for _ in range(months):
+            m -= 1
+            if m == 0:
+                y, m = y - 1, 12
+            keep.add(f"{y}{m:02d}")
+        out = []
+        for f in sorted(glob.glob(str(prev / "*.csv"))):
+            if any(re.search(rf"_{k}[_.]", Path(f).name) for k in keep):
+                out.extend(rows(f))
+        return out
+
     def _csvs(self, sub):
         out = []
         for p in sorted(glob.glob(str(self.dir / sub / "*.csv"))):
@@ -218,6 +242,8 @@ class Phase:
         p_open = self.dir / "open_items_at_start.csv.gz"
         if p_open.exists():
             start = {r["item_id"]: r for r in rows(p_open)}
+        # cerradas recientes con saldo 0: las necesitan las devoluciones (RETURNED) y los pagos duplicados
+        recent = PHASE_START.get(self.name, dt.date.max) - dt.timedelta(days=RECENT_DAYS)
         for ph in prev:
             d = DATA / ph
             if not d.exists() or not start:
@@ -228,6 +254,8 @@ class Phase:
                     for r in rows(p):
                         if r["item_id"] in start:
                             add(r, cents(start[r["item_id"]]["open_amount"]))
+                        elif r["issue_date"] and day(r["issue_date"]) >= recent:
+                            add(r, 0)
         for iid, r in start.items():  # las que no se pudieron enriquecer
             if iid not in self.items:
                 kind = r["item_type"] if r["item_type"] in ("ARI", "ARC", "API", "APC") else iid[:3]
@@ -266,6 +294,9 @@ class Phase:
             o = min(live_open.get(iid, 0) + paid.get(iid, 0), it.total)
             if o > 0:
                 it.open = o
+                keep[iid] = it
+            elif it.issue and it.issue >= cut - dt.timedelta(days=RECENT_DAYS):
+                it.open = 0
                 keep[iid] = it
         self.items = keep
         self.txns = [t for t in self.txns if t.date >= cut]

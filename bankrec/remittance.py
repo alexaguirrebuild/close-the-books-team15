@@ -388,7 +388,7 @@ DISPUTE_RX = re.compile(r"PRICE|PRECIO|PREIS|PRIX|DAMAG|DANAD|ROTO|DEFECT|ENDOMM
                         r"PENAL|LATE|RETRASO|RETARD|VERSPAET|CO-?OP|COOP|MKT|MARKETING|LOGIST|FLETE|FREIGHT|TRANSPORT|"
                         r"DISPUT|CLAIM|RECLAM|RETURN|DEVOLUC|QUALITY|CALIDAD|DIFERENCIA|DIFFERENCE|DIFF|MERCANC|GOODS")
 DISCOUNT_RX = re.compile(r"DISCOUNT|DESCUENTO|DTO|PRONTO PAGO|ESCOMPTE|SKONTO|EARLY")
-WITHHOLD_RX = re.compile(r"WITHHOLD|RETENCION|RETENUE|RETENCAO|IRPF|TAX AT SOURCE|QUELLENSTEUER")
+WITHHOLD_RX = re.compile(r"WITHHOLD|RETENCION|RETENUE|RETENCAO|RETIDO|IRPF|IRRF|\bISR\b|\bRET\b|\bWHT\b|TAX AT SOURCE|QUELLENSTEUER|IMPOSTO|IMPUESTO")
 CHARGE_RX = re.compile(r"BANK CHARGE|COMISION|GASTOS BANC|FRAIS BANC|BANKGEB|CHARGES")
 
 
@@ -632,6 +632,12 @@ def match(engine, t):
     return True
 
 
+def _withholding_rate(engine, it, short):
+    from .engine import WITHHOLDING
+    rates = WITHHOLDING.get(engine.ph.party_country.get(it.party))
+    return bool(rates) and it.side == "AR" and any(abs(short - it.total * r) <= max(2, it.total * 0.0005) for r in rates)
+
+
 def _emit_line(engine, t, adv, ln, it, ev, override=None):
     fxline = it.ccy != t.ccy
     if it.kind == "ARC":
@@ -658,13 +664,16 @@ def _emit_line(engine, t, adv, ln, it, ev, override=None):
             exc, amount = "SHORT_WITHHOLDING", max(it.open, paid)
         elif CHARGE_RX.search(reason) and not DISPUTE_RX.search(reason):
             exc, amount = "SHORT_BANK_CHARGES", max(it.open, paid)
+        elif short > 2 and _withholding_rate(engine, it, short):
+            # motivo raro pero la diferencia es exactamente un tipo de retención del país (POLICIES §3)
+            exc, amount = "SHORT_WITHHOLDING", max(it.open, paid)
         elif short > 2:
             exc, amount = "SHORT_DISPUTE", paid
         else:
             amount = max(it.open, paid)
     if amount > it.total and it.total > 0:
         # el aviso paga más que la factura: sobrepago (la parte que sobra queda en cuenta)
-        if exc == "":
+        if exc == "" and amount <= 1.10 * it.total:
             exc = "OVERPAYMENT"
         amount = it.total
     if fxline and exc in ("", "SHORT_DISCOUNT", "SHORT_WITHHOLDING", "SHORT_BANK_CHARGES", "OVERPAYMENT"):

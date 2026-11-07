@@ -112,7 +112,7 @@ class Engine:
         amount = int(round(amount))
         self.rows.append(Row(t.id, it.id, amount, "", exc, rule, ev))
         if exc == "RETURNED":
-            it.open += amount
+            it.open = min(it.open + amount, it.total)  # una devolución reabre, pero nunca por encima del total
         else:
             it.open -= amount
         self.settled_by[it.id].append((t.id, amount))
@@ -192,7 +192,8 @@ class Engine:
                 full(it)
             return True
         if diff < 0:  # sobra dinero
-            if len(invoices) == 1 and not credits:
+            # sobrepago real: como mucho un 10 % de más; más que eso es un cobro de varias facturas que no vemos todas
+            if len(invoices) == 1 and not credits and cash <= 1.10 * exp:
                 full(invoices[0], "OVERPAYMENT")
             else:
                 for it in cands:
@@ -309,7 +310,7 @@ class Engine:
                             if alt:
                                 it = alt[0]
                     if it:
-                        exc = "PARTIAL" if it.open - amt > 2 else ""
+                        exc = "PARTIAL" if it.open - amt > 2 and it.total - amt > 2 else ""
                         self.emit(t, it, amt, exc, "dd_batch", f"remesa {bid}")
                 self.used_batches.add(bid)
                 return True
@@ -410,11 +411,17 @@ class Engine:
         for v in num_variants(r["document_number"]):
             cands |= self.ph.by_num.get(v, set())
         cands = [self.items[c] for c in cands if self.items[c].kind in kinds]
+        ent = (r.get("debtor_account_id") or t.account or "").split("-")[0]
         if party:
             cands = [c for c in cands if c.party == party] or cands
         if len(cands) > 1:
             cands = [c for c in cands if abs(c.open - amt) <= 2 or abs(c.total - amt) <= 2 or c.open > 0] or cands
-        cands.sort(key=lambda i: (-(i.open > 0), i.issue or dt.date.min))
+
+        def exact(i):  # factoring: el beneficiario es la financiera, manda el importe del documento
+            a = amt if i.ccy == r["currency"] else self.ph.fx.conv(amt, r["currency"], i.ccy, t.date)
+            return abs(i.open - a) <= max(2, a * 0.005) or abs(i.total - a) <= max(2, a * 0.005)
+        # la sociedad que paga suele ser la de la factura, pero la holding paga por las filiales (ap_paid_by_holding)
+        cands.sort(key=lambda i: (-exact(i), -(i.entity == ent), -(i.open > 0), i.issue or dt.date.min))
         return cands[0] if cands else None
 
     def emit_run_rows(self, t, rs, rule, ev):
@@ -432,6 +439,25 @@ class Engine:
                 elif it.ccy != t.ccy:
                     exc = "FX_DIFFERENCE"
             self.emit(t, it, amt, exc, rule, ev)
+
+    def _confirming_due(self, rid, rs, t):
+        """Confirming: cada proveedor (e2e) se paga en el vencimiento más tardío de sus facturas, y el banco carga
+        de una vez los proveedores de ese día («N PROVEEDORES»). Devuelve {e2e: (fecha_pago, filas, importe)}."""
+        cache = self.__dict__.setdefault("_conf_due", {})
+        if rid not in cache:
+            by_e2e = defaultdict(list)
+            for r in rs:
+                by_e2e[r["end_to_end_id"]].append(r)
+            out = {}
+            for e, g in by_e2e.items():
+                dues = []
+                for r in g:
+                    it = self.run_doc_item(r, t)
+                    dues.append(it.due if it and it.due else dt.date.fromisoformat(r["execution_date"]))
+                amt = sum(int(round(float(r["document_amount"]) * 100)) for r in g)
+                out[e] = (max(dues), g, amt)
+            cache[rid] = out
+        return cache[rid]
 
     def m_payment_run(self, t):
         if t.amount >= 0:
@@ -456,11 +482,37 @@ class Engine:
                 self.used_batches.add(hits[0])
                 self.emit_run_rows(t, sub[hits[0]], "payment_run_transfer", f"remesa {rid}")
                 return True
-            # aggregated / confirming: un cargo por fichero o por vencimiento
+            # aggregated / confirming: un cargo por fichero, por fecha de ejecución o (confirming) por vencimiento
             groups = defaultdict(list)
             for r in rs:
                 groups[r["execution_date"]].append(r)
             cand = [rs] + list(groups.values())
+            if rs[0]["run_type"] == "confirming":
+                conf = self._confirming_due(rid, rs, t)
+                m = re.search(r"\b(\d+) PROVEEDOR", t.up)
+                n = int(m.group(1)) if m else None
+                pool = [(e, v) for e, v in conf.items() if (rid, e) not in self.used_batches
+                        and -1 <= (t.date - v[0]).days <= 5]
+                pick = None
+                by_day = defaultdict(list)
+                for e, v in pool:
+                    by_day[v[0]].append((e, v))
+                for d in sorted(by_day, key=lambda d: abs((t.date - d).days)):
+                    grp = by_day[d]
+                    if abs(sum(v[2] for _, v in grp) - amt) <= 2 and (n is None or n == len(grp)):
+                        pick = grp
+                        break
+                if pick is None and n and n <= 4 and len(pool) <= 40:
+                    for comb in combinations(pool, n):
+                        if abs(sum(v[2] for _, v in comb) - amt) <= 2:
+                            pick = list(comb)
+                            break
+                if pick:
+                    for e, v in pick:
+                        self.used_batches.add((rid, e))
+                    self.emit_run_rows(t, [r for _, v in pick for r in v[1]], "payment_run_confirming",
+                                       f"remesa {rid} · {len(pick)} proveedores al vencimiento")
+                    return True
             for g in cand:
                 key = (rid, g[0]["execution_date"], len(g))
                 if key in self.used_batches:
@@ -540,6 +592,33 @@ class Engine:
                         out.append(p)
                         how = how or "nombre"
         return out, how
+
+    def scan_names(self, t):
+        """Último recurso: un nombre completo de contraparte dentro del texto del banco (PIX RECEBIDO X, TT IN X,
+        DIRECT CREDIT X…). Vale también si el banco lo corta al final del campo."""
+        segs = [name_key(x) for x in re.split(r"\|", " | ".join(filter(None, (t.text, t.rmt, t.ref1, t.ref2))))]
+        best, hits = 0, []
+        for seg in segs:
+            toks = seg.split()
+            n = len(toks)
+            for i, tok in enumerate(toks):
+                for pid in self.ph.name_index.get(tok, ()):
+                    for nk in self.ph.party_names.get(pid, ()):
+                        nt = nk.split()
+                        L = len(nt)
+                        if toks[i:i + L] == nt:
+                            sc = sum(len(w) for w in nt)
+                        elif i + L > n and n - i >= 2 and toks[i:n - 1] == nt[:n - 1 - i] and nt[n - 1 - i].startswith(toks[-1]):
+                            sc = sum(len(w) for w in toks[i:])  # cortado por el banco
+                        else:
+                            continue
+                        if sc < 8 or (L == 1 and len(nt[0]) < 7):
+                            continue
+                        if sc > best:
+                            best, hits = sc, [pid]
+                        elif sc == best and pid not in hits:
+                            hits.append(pid)
+        return hits
 
     def resolve_party(self, t):
         ps, how = self.resolve_parties(t)
@@ -650,6 +729,8 @@ class Engine:
 
     def m_party_amount(self, t):
         parties, how = self.resolve_parties(t)
+        if not parties:
+            parties, how = self.scan_names(t), "nombre_texto"
         for party in parties[:4]:
             if self._party_amount(t, party, how):
                 return True
