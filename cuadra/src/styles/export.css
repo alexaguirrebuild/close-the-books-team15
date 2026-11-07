@@ -1,0 +1,159 @@
+.send {
+  display: grid;
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+  min-height: 100%;
+}
+
+.send-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.send-title {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.send-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.send-summary dt {
+  color: var(--ink-2);
+}
+
+.send-summary .is-attention dt,
+.send-summary .is-attention dd {
+  color: var(--review);
+  font-weight: 500;
+}
+
+.send-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--select);
+}
+
+.inline-number {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-number input {
+  width: 68px;
+}
+
+.review-only {
+  padding: 10px 12px;
+  background: var(--review-wash);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+
+.send-team {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.send-team-actions {
+  justify-content: flex-start;
+}
+
+.send-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 24px;
+}
+
+.valid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--balanced);
+  font-weight: 500;
+}
+
+.issues {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.issue {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+
+.issue summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.issue-title {
+  flex: 1;
+  font-weight: 500;
+}
+
+.issue-error summary {
+  color: var(--error);
+}
+
+.issue-error {
+  border-color: var(--error);
+}
+
+.issue-warning summary svg {
+  color: var(--review);
+}
+
+.send-preview-title {
+  margin-top: 16px;
+}
+
+.table-scroll-x {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+
+@media (width < 900px) {
+  .send {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

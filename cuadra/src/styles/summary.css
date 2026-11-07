@@ -1,0 +1,226 @@
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px 24px 40px;
+}
+
+.summary-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.summary-title {
+  font-size: var(--text-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.summary-lede {
+  max-width: 72ch;
+  margin-top: 6px;
+  color: var(--ink-2);
+  font-size: var(--text-lg);
+}
+
+.summary-cta {
+  flex: none;
+  height: 42px;
+  padding: 0 16px;
+}
+
+.flow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+
+.flow-step {
+  position: relative;
+  min-width: 0;
+}
+
+/* The connector between two steps of the flow. */
+.flow-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -22px;
+  width: 22px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.flow-node {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  transition: border-color var(--fast) var(--ease);
+}
+
+.flow-node:hover {
+  border-color: var(--ink-3);
+}
+
+.flow-node.is-next {
+  border-color: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select);
+}
+
+.flow-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.flow-value {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.flow-note {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-warnings {
+  padding: 10px 14px;
+  background: var(--review-wash);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+}
+
+.diagnosis {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.summary-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+
+.score-total {
+  font-size: var(--text-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.score-block td {
+  padding-right: 6px;
+  padding-left: 0;
+}
+
+.score-block td.right {
+  white-space: nowrap;
+}
+
+.score-button {
+  align-self: flex-start;
+}
+
+.segments td {
+  padding: 5px 12px;
+  font-size: var(--text-sm);
+}
+
+.segment-accuracy {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+  text-align: right;
+}
+
+/* Bars: one series, thin, rounded only at the data end, on a recessive track. */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+.bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  background: var(--neutral-wash);
+  border-radius: 0 4px 4px 0;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--select);
+  border-radius: 0 4px 4px 0;
+}
+
+.bar-value {
+  min-width: 44px;
+  text-align: right;
+}
+
+@media (width < 1180px) {
+  .flow {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .flow-step::after {
+    display: none;
+  }
+
+  .diagnosis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .summary-title {
+    font-size: 32px;
+  }
+}

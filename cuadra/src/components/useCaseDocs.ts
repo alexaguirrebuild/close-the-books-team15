@@ -4,6 +4,8 @@ import type { Db, Priority } from '../data/db'
 import type { Candidate } from '../domain/candidates'
 
 const CANDIDATES_TO_SEARCH = 6
+/** Shorter pieces of the bank text, like a prefix or a year, appear in every document. */
+const MIN_CONCEPT_TERM = 6
 
 type PdfSearch = (db: Db, terms: string[], priority?: Priority) => Promise<PdfHit[]>
 
@@ -12,7 +14,8 @@ export function useCaseDocs(db: Db | null, data: CaseData, candidates: Candidate
   const [docs, setDocs] = useState<PdfHit[]>([])
   const terms = useMemo(() => {
     const printed = candidates.slice(0, CANDIDATES_TO_SEARCH).map((c) => c.item.printed)
-    return [...new Set([...data.tokens.map((t) => t.text), ...printed])].filter(Boolean)
+    const fromConcept = data.tokens.filter((t) => t.norm.length >= MIN_CONCEPT_TERM).map((t) => t.text)
+    return [...new Set([...fromConcept, ...printed])].filter(Boolean)
   }, [data.tokens, candidates])
   const key = terms.join('|')
 
@@ -38,27 +41,4 @@ export function useCaseDocs(db: Db | null, data: CaseData, candidates: Candidate
   }, [db, key, search])
 
   return docs
-}
-
-type DocsPanelProps = { docs: PdfHit[]; onOpen: (file: string) => void }
-
-export function DocsPanel({ docs, onOpen }: DocsPanelProps) {
-  if (!docs.length) return null
-  return (
-    <section className="docs" aria-label="Documentos relacionados">
-      <h2 className="label">Documentos que lo mencionan</h2>
-      <ul>
-        {docs.map((doc, index) => (
-          <li key={`${doc.file}-${doc.page}`}>
-            <button className="doc" onClick={() => onOpen(doc.file)}>
-              <span className="doc-file mono-small">
-                {index === 0 && <kbd>O</kbd>} {doc.file.split('/').at(-1)}, pág. {doc.page}
-              </span>
-              <span className="doc-snippet">{doc.snippet}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
 }

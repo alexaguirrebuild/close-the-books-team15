@@ -1,0 +1,48 @@
+:root {
+  --ground: #f5f6f8;
+  --surface: #ffffff;
+  --sunken: #eef0f3;
+  --ink: #16181d;
+  --ink-2: #5b616e;
+  --ink-3: #626877;
+  --line: #e3e5e9;
+  --line-strong: #c9ccd3;
+
+  /* Blue of a cheque: what the reviewer has selected or has the cursor on. */
+  --select: #2447c7;
+  --select-wash: #e9edfb;
+
+  /* The three things a movement can be: it adds up, it needs eyes, or something is wrong. */
+  --balanced: #0e7c5a;
+  --balanced-wash: #e3f4ec;
+  --review: #9a5b00;
+  --review-wash: #fff1d6;
+  --error: #b3261e;
+  --error-wash: #fce8e6;
+  --neutral-wash: #eceef1;
+
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --shadow-float: 0 16px 40px rgb(22 24 29 / 16%), 0 2px 6px rgb(22 24 29 / 8%);
+
+  --sans: 'IBM Plex Sans Variable', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-figure: 34px;
+  --text-display: 44px;
+
+  --rail-width: 64px;
+  --scope-height: 52px;
+  --list-width: 320px;
+  --decision-width: 380px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fast: 120ms;
+
+  color-scheme: light;
+}

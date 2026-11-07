@@ -3,7 +3,26 @@ import { copyToBytes, lit, numOr, sqlNum, str, type Db } from './db'
 
 export const SUBMISSION_HEADER = 'bank_txn_id,item_id,amount,category,exception'
 
+/**
+ * LIVE and FINAL are scored by the team's engine, so no submission file leaves this tool for them.
+ * It is an allowlist: a folder opened without a known phase could be either of them.
+ */
+export const canDownloadSubmission = (phase: string | null): boolean => phase === 'train' || phase === 'sample'
+
 export type ExportOptions = { includeProposals: boolean; minConfidence: number }
+
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = { includeProposals: true, minConfidence: 0 }
+
+/** The minimum confidence for a percentage typed by hand, limited to 0-100; null if the field holds no usable number. */
+export function minConfidenceFromPercent(raw: string): number | null {
+  const percent = raw.trim() ? Number(raw) : Number.NaN
+  return Number.isFinite(percent) ? Math.min(Math.max(percent, 0), 100) / 100 : null
+}
+
+/** The percentage a field shows for a minimum confidence: with the decimals typed, without the noise of floating point. */
+export function percentFromMinConfidence(confidence: number): string {
+  return String(Number((confidence * 100).toFixed(6)))
+}
 
 export type ExportSummary = {
   rows: number
@@ -11,6 +30,8 @@ export type ExportSummary = {
   fromReview: number
   fromProposals: number
   autoUnidentified: number
+  /** Size of the file uncompressed, which is what the server limits. */
+  bytes: number
 }
 
 export type ValidationSample = { line: number; txn: string; detail: string }
@@ -23,6 +44,13 @@ export type ValidationIssue = {
 }
 
 const SAMPLE_LIMIT = 50
+/** Four commas and the end of line of each row. */
+const FIELD_SEPARATORS = 5
+const MAX_BYTES = 60 * 1024 * 1024
+const MAX_ROWS = 3_000_000
+const ITEM_ID = '(ARI|ARC|API|APC)-[0-9]{4}-[0-9]{7}'
+const UNIDENTIFIED = lit('UNIDENTIFIED')
+const ROW_BYTES = `length(txn_id) + length(coalesce(item_id, '')) + length(amount) + length(coalesce(category, '')) + length(coalesce(exception, '')) + ${FIELD_SEPARATORS}`
 
 /** Builds share working tables, so overlapping requests must wait for each other. */
 let exportQueue: Promise<unknown> = Promise.resolve()
@@ -44,11 +72,14 @@ async function build(db: Db, options: ExportOptions): Promise<ExportSummary> {
   await db.query(
     `CREATE OR REPLACE TABLE export_src AS
      WITH decided AS (
-       SELECT rid, txn_id, item_id, amount, category, exception, 'review' AS origin FROM decision_rows
+       SELECT rid, txn_id, item_id, amount,
+              CASE WHEN item_id IS NULL THEN coalesce(category, CASE WHEN exception = ${UNIDENTIFIED} THEN ${UNIDENTIFIED} END) END AS category,
+              exception, 'review' AS origin
+       FROM decision_rows
      ), proposed AS (
        SELECT p.rid, p.txn_id, p.item_id,
               coalesce(p.amount, i.open_amount) AS amount,
-              CASE WHEN p.item_id IS NULL THEN p.category END AS category,
+              CASE WHEN p.item_id IS NULL THEN coalesce(p.category, CASE WHEN p.exception = ${UNIDENTIFIED} THEN ${UNIDENTIFIED} END) END AS category,
               p.exception, 'proposal' AS origin
        FROM prop p
        JOIN txn_q t ON t.rid = p.rid
@@ -57,8 +88,8 @@ async function build(db: Db, options: ExportOptions): Promise<ExportSummary> {
      ), combined AS (
        SELECT * FROM decided UNION ALL SELECT * FROM proposed
      ), missing AS (
-       SELECT t.rid, t.id AS txn_id, NULL::VARCHAR AS item_id, NULL::DOUBLE AS amount, NULL::VARCHAR AS category,
-              'UNIDENTIFIED' AS exception, 'auto' AS origin
+       SELECT t.rid, t.id AS txn_id, NULL::VARCHAR AS item_id, NULL::DOUBLE AS amount, ${UNIDENTIFIED} AS category,
+              ${UNIDENTIFIED} AS exception, 'auto' AS origin
        FROM txn t WHERE NOT EXISTS (SELECT 1 FROM combined c WHERE c.rid = t.rid)
      )
      SELECT * FROM combined UNION ALL SELECT * FROM missing`,
@@ -67,18 +98,17 @@ async function build(db: Db, options: ExportOptions): Promise<ExportSummary> {
     `CREATE OR REPLACE TABLE export_rows AS
      SELECT CAST(row_number() OVER (ORDER BY s.rid, s.item_id NULLS LAST) + 1 AS INTEGER) AS line,
             s.rid, s.txn_id, s.item_id, s.origin, s.category, s.exception,
-            coalesce(s.amount, CASE WHEN s.item_id IS NULL THEN abs(t.amount) END) AS amount_num,
-            CASE WHEN coalesce(s.amount, CASE WHEN s.item_id IS NULL THEN abs(t.amount) END) IS NULL THEN ''
-                 WHEN round(coalesce(s.amount, CASE WHEN s.item_id IS NULL THEN abs(t.amount) END), 2) = 0 THEN '0.00'
-                 ELSE printf('%.2f', coalesce(s.amount, CASE WHEN s.item_id IS NULL THEN abs(t.amount) END)) END AS amount
-     FROM export_src s LEFT JOIN txn t ON t.rid = s.rid`,
+            CASE WHEN s.item_id IS NOT NULL THEN abs(s.amount) END AS amount_num,
+            CASE WHEN s.item_id IS NULL OR s.amount IS NULL THEN '' ELSE printf('%.2f', abs(s.amount)) END AS amount
+     FROM export_src s`,
   )
   await db.query('DROP TABLE export_src')
   const [summary] = await db.query(
     `SELECT count(*) AS rows_n, count(DISTINCT txn_id) AS txns,
             count(DISTINCT txn_id) FILTER (WHERE origin = 'review') AS review,
             count(DISTINCT txn_id) FILTER (WHERE origin = 'proposal') AS proposal,
-            count(DISTINCT txn_id) FILTER (WHERE origin = 'auto') AS auto
+            count(DISTINCT txn_id) FILTER (WHERE origin = 'auto') AS auto,
+            CAST(sum(${ROW_BYTES}) AS BIGINT) AS bytes
      FROM export_rows`,
   )
   return {
@@ -87,6 +117,7 @@ async function build(db: Db, options: ExportOptions): Promise<ExportSummary> {
     fromReview: numOr(summary?.review, 0),
     fromProposals: numOr(summary?.proposal, 0),
     autoUnidentified: numOr(summary?.auto, 0),
+    bytes: numOr(summary?.bytes, 0) + SUBMISSION_HEADER.length + 1,
   }
 }
 
@@ -97,6 +128,10 @@ type Check = {
   sql: string
 }
 
+/**
+ * Errors are only what the server rejects (FORMAT.md, starter/bankrec_score.py), so a valid
+ * file can never be blocked here. What is merely suspicious stays a warning.
+ */
 function checks(categories: string[]): Check[] {
   const closed = EXCEPTIONS.map((e) => lit(e)).join(',')
   const categoryList = categories.map((c) => lit(c)).join(',')
@@ -109,9 +144,10 @@ function checks(categories: string[]): Check[] {
       sql: `SELECT line, txn_id AS txn, txn_id AS detail FROM export_rows e WHERE rid IS NULL OR NOT EXISTS (SELECT 1 FROM txn t WHERE t.rid = e.rid)`,
     },
     {
+      // Not an error: the server does not check it, and a return or a duplicate can hit an item settled in an earlier phase.
       code: 'unknown_item',
-      severity: 'error',
-      title: 'item_id que no existe',
+      severity: 'warning',
+      title: 'Partida que no está en esta fase: normal en devoluciones y duplicados de otra anterior; si no es el caso, revísala',
       sql: `SELECT line, txn_id AS txn, item_id AS detail FROM export_rows e WHERE item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM items i WHERE i.item_id = e.item_id)`,
     },
     {
@@ -123,10 +159,43 @@ function checks(categories: string[]): Check[] {
             ) WHERE n > 1`,
     },
     {
+      code: 'bad_item_id',
+      severity: 'error',
+      title: 'item_id con un formato que el servidor rechaza',
+      sql: `SELECT line, txn_id AS txn, item_id AS detail FROM export_rows WHERE item_id IS NOT NULL AND NOT regexp_full_match(item_id, '${ITEM_ID}')`,
+    },
+    {
       code: 'bad_amount',
       severity: 'error',
-      title: 'Importe mal formado',
-      sql: `SELECT line, txn_id AS txn, coalesce(nullif(amount, ''), 'vacío') AS detail FROM export_rows WHERE NOT regexp_full_match(amount, '-?[0-9]+\\.[0-9]{2}')`,
+      title: 'Partida sin importe válido',
+      sql: `SELECT line, txn_id AS txn, coalesce(nullif(amount, ''), 'vacío') AS detail FROM export_rows WHERE item_id IS NOT NULL AND NOT regexp_full_match(amount, '[0-9]+\\.[0-9]{2}')`,
+    },
+    {
+      code: 'duplicate_no_item',
+      severity: 'error',
+      title: 'Más de una fila sin partida en un movimiento',
+      sql: `SELECT line, txn_id AS txn, coalesce(category, '') AS detail FROM (
+              SELECT line, txn_id, category, count(*) OVER (PARTITION BY txn_id) AS n FROM export_rows WHERE item_id IS NULL
+            ) WHERE n > 1`,
+    },
+    {
+      code: 'items_and_category',
+      severity: 'error',
+      title: 'Movimiento con partidas y fila sin partida a la vez',
+      sql: `SELECT min(line) AS line, txn_id AS txn, txn_id AS detail FROM export_rows
+            GROUP BY txn_id HAVING count(item_id) > 0 AND count(*) > count(item_id)`,
+    },
+    {
+      code: 'too_many_rows',
+      severity: 'error',
+      title: 'El fichero supera los 3 millones de filas',
+      sql: `SELECT 0 AS line, '' AS txn, CAST(count(*) AS VARCHAR) AS detail FROM export_rows HAVING count(*) > ${MAX_ROWS}`,
+    },
+    {
+      code: 'too_large',
+      severity: 'error',
+      title: 'El fichero supera los 60 MB sin comprimir',
+      sql: `SELECT 0 AS line, '' AS txn, CAST(sum(${ROW_BYTES}) AS VARCHAR) AS detail FROM export_rows HAVING sum(${ROW_BYTES}) > ${MAX_BYTES}`,
     },
     {
       code: 'category_with_item',
@@ -142,8 +211,8 @@ function checks(categories: string[]): Check[] {
     },
     {
       code: 'empty_row',
-      severity: 'error',
-      title: 'Fila sin partida, category ni excepción',
+      severity: 'warning',
+      title: 'Fila sin partida, categoría ni excepción: el servidor la acepta, pero contará como fallo',
       sql: `SELECT line, txn_id AS txn, '' AS detail FROM export_rows WHERE item_id IS NULL AND category IS NULL AND exception IS NULL`,
     },
     {
@@ -170,9 +239,9 @@ function checks(categories: string[]): Check[] {
             FROM export_rows e
             JOIN txn t ON t.rid = e.rid
             JOIN items i ON i.item_id = e.item_id
-            WHERE e.exception IS NULL AND i.currency = t.currency
+            WHERE i.currency = t.currency
             GROUP BY e.txn_id
-            HAVING bool_or(i.kind <> 'CN') AND abs(sum(CASE WHEN i.kind = 'CN' THEN -abs(e.amount_num) ELSE abs(e.amount_num) END) - abs(any_value(t.amount))) > greatest(0.01, abs(any_value(t.amount)) * 0.005)`,
+            HAVING bool_and(e.exception IS NULL) AND bool_or(i.kind <> 'CN') AND abs(sum(CASE WHEN i.kind = 'CN' THEN -abs(e.amount_num) ELSE abs(e.amount_num) END) - abs(any_value(t.amount))) > greatest(0.01, abs(any_value(t.amount)) * 0.005)`,
     },
   ]
   if (!hasCategories) return base
@@ -208,7 +277,7 @@ export async function validateExport(db: Db, categories: string[]): Promise<Vali
 export function writeSubmission(db: Db): Promise<Uint8Array> {
   return copyToBytes(
     db,
-    'SELECT txn_id AS bank_txn_id, item_id, amount, category, exception FROM export_rows ORDER BY line',
+    `SELECT txn_id AS bank_txn_id, item_id, nullif(amount, '') AS amount, category, exception FROM export_rows ORDER BY line`,
   )
 }
 

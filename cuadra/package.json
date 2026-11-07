@@ -9,13 +9,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "sample": "node scripts/gen-sample.mjs --out public/sample/train --txns 3000 --items 12000 --golden && node scripts/gen-sample.mjs --out public/sample/live --txns 2000 --items 8000 --seed 77 && node scripts/extract-pdfs.mjs public/sample/train && node scripts/extract-pdfs.mjs public/sample/live",
+    "sample": "rm -rf public/sample/train public/sample/live && node scripts/gen-sample.mjs --out public/sample/train --txns 3000 --items 12000 --golden && node scripts/gen-sample.mjs --out public/sample/live --txns 2000 --items 8000 --seed 77 && node scripts/extract-pdfs.mjs public/sample/train && node scripts/extract-pdfs.mjs public/sample/live",
     "pdf:index": "node scripts/extract-pdfs.mjs"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
-    "@fontsource-variable/inter-tight": "^5.3.0",
-    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "apache-arrow": "^21.2.0",
     "lucide-react": "^1.70.0",
     "papaparse": "^5.7.0",

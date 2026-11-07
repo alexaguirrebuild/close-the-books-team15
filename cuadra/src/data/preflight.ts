@@ -2,18 +2,23 @@ import Papa from 'papaparse'
 import {
   classifyFile,
   isCompleteMapping,
+  isCsvName,
   resolveColumns,
   ROLE_SCHEMA,
   type ColumnMapping,
   type FileRole,
 } from './schema'
 
-export type SourceFile = { path: string; file: File }
+/** Opening is deferred: a phase can have tens of thousands of PDFs nobody will read. */
+export type SourceFile = { path: string; open: () => Promise<File> }
+
+export const fileSource = (path: string, file: File): SourceFile => ({ path, open: async () => file })
 
 export type PlannedFile = {
   role: FileRole
   path: string
   file: File
+  compressed: boolean
   headers: string[]
   mapping: ColumnMapping
   complete: boolean
@@ -21,23 +26,91 @@ export type PlannedFile = {
 
 export type Plan = {
   name: string
+  phase: string | null
   files: Partial<Record<FileRole, PlannedFile>>
+  /** Matching stages: they add source and confidence to what the merged file proposes. */
+  enrichments: PlannedFile[]
+  proposalOptions: string[]
   pdfs: SourceFile[]
   ignored: string[]
 }
 
+export type PlanOptions = { phase?: string | null; proposalPath?: string | null }
+
 const HEADER_BYTES = 64 * 1024
+const GZIP_MAGIC = [0x1f, 0x8b]
+
+export async function isGzip(file: File): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, GZIP_MAGIC.length).arrayBuffer())
+  return GZIP_MAGIC.every((byte, index) => head[index] === byte)
+}
+
+/** The slice is cut mid-stream on purpose: only the first block is needed. */
+async function inflateHead(file: File): Promise<string> {
+  const stream = file.slice(0, HEADER_BYTES).stream().pipeThrough(new DecompressionStream('gzip'))
+  const reader = stream.getReader()
+  const { value } = await reader.read()
+  void reader.cancel().catch(() => undefined)
+  return new TextDecoder().decode(value)
+}
 
 export async function readHeaders(file: File): Promise<string[]> {
-  const head = await file.slice(0, HEADER_BYTES).text()
+  const head = (await isGzip(file)) ? await inflateHead(file) : await file.slice(0, HEADER_BYTES).text()
   const parsed = Papa.parse<string[]>(head.replace(/^﻿/, ''), { preview: 1 })
   return (parsed.data[0] ?? []).map((h) => h.trim())
 }
 
-export async function buildPlan(name: string, sources: SourceFile[]): Promise<Plan> {
+async function planFile(role: FileRole, source: SourceFile): Promise<PlannedFile> {
+  const file = await source.open()
+  const headers = await readHeaders(file)
+  const mapping = resolveColumns(ROLE_SCHEMA[role], headers)
+  return {
+    role,
+    path: source.path,
+    file,
+    compressed: await isGzip(file),
+    headers,
+    mapping,
+    complete: isCompleteMapping(ROLE_SCHEMA[role], mapping),
+  }
+}
+
+const isStage = (path: string) => /(^|\/)matches\//.test(path)
+const ENGINE_RULE_COLUMN = /^(rule|regla)$/i
+const PARTIAL_RUN = /^(sub|explain)_(holdout|train_since)/
+
+/**
+ * The most finished file wins: named proposals and the engine's explained rows, then the merged submission, then the baseline.
+ * A run over a part of TRAIN comes after all of them: picked on its own it would leave most of the phase without proposals.
+ */
+function proposalRank(path: string): number {
+  const name = (path.split('/').at(-1) ?? '').toLowerCase()
+  if (isStage(path)) return 4
+  if (PARTIAL_RUN.test(name)) return 3
+  if (/^(propuestas|proposals|explain_)/.test(name)) return 0
+  if (/^(submission|sub_|merged)/.test(name)) return 1
+  if (/^baseline/.test(name)) return 2
+  return 5
+}
+
+async function pickProposal(candidates: SourceFile[], wanted: string | null | undefined): Promise<SourceFile | null> {
+  const chosen = candidates.find((source) => source.path === wanted)
+  if (chosen) return chosen
+  const ranked = [...candidates].sort((a, b) => proposalRank(a.path) - proposalRank(b.path))
+  const best = ranked[0]
+  if (!best) return null
+  const peers = ranked.filter((source) => proposalRank(source.path) === proposalRank(best.path))
+  if (peers.length === 1) return best
+  const dated = await Promise.all(peers.map(async (source) => ({ source, at: (await source.open()).lastModified })))
+  return dated.reduce((latest, next) => (next.at > latest.at ? next : latest)).source
+}
+
+/** Sorts the files of a folder by role, chooses the proposals and their stages, and records what it ignored. */
+export async function buildPlan(name: string, sources: SourceFile[], options: PlanOptions = {}): Promise<Plan> {
   const files: Plan['files'] = {}
   const pdfs: SourceFile[] = []
   const ignored: string[] = []
+  const proposals: SourceFile[] = []
 
   for (const source of sources) {
     if (source.path.toLowerCase().endsWith('.pdf')) {
@@ -45,22 +118,34 @@ export async function buildPlan(name: string, sources: SourceFile[]): Promise<Pl
       continue
     }
     const role = classifyFile(source.path)
-    if (!role || files[role]) {
-      if (source.path.toLowerCase().endsWith('.csv')) ignored.push(source.path)
+    if (role === 'proposals') {
+      proposals.push(source)
       continue
     }
-    const headers = await readHeaders(source.file)
-    const mapping = resolveColumns(ROLE_SCHEMA[role], headers)
-    files[role] = {
-      role,
-      path: source.path,
-      file: source.file,
-      headers,
-      mapping,
-      complete: isCompleteMapping(ROLE_SCHEMA[role], mapping),
+    if (!role || files[role]) {
+      if (isCsvName(source.path)) ignored.push(source.path)
+      continue
     }
+    files[role] = await planFile(role, source)
   }
-  return { name, files, pdfs, ignored }
+
+  const primary = await pickProposal(proposals, options.proposalPath)
+  if (primary) files.proposals = await planFile('proposals', primary)
+  // The engine says where each row came from and gives no confidence: the stages and theirs belong to another pipeline.
+  const mapping = files.proposals?.mapping
+  const fromEngine = ENGINE_RULE_COLUMN.test(mapping?.source ?? '') && !mapping?.confidence
+  const stages = fromEngine ? [] : proposals.filter((source) => isStage(source.path) && source.path !== primary?.path)
+  const enrichments = await Promise.all(stages.map((source) => planFile('proposals', source)))
+
+  return {
+    name,
+    phase: options.phase ?? null,
+    files,
+    enrichments,
+    proposalOptions: proposals.map((source) => source.path),
+    pdfs,
+    ignored,
+  }
 }
 
 export function withMapping(plan: Plan, role: FileRole, field: string, column: string): Plan {
@@ -78,11 +163,14 @@ export function withMapping(plan: Plan, role: FileRole, field: string, column: s
 
 export type PlanProblem = { role?: FileRole; message: string }
 
+/** What stops this plan from loading: missing files and required columns without a mapping. */
 export function planProblems(plan: Plan): PlanProblem[] {
   const problems: PlanProblem[] = []
-  if (!plan.files.bank) problems.push({ message: 'Falta bank_transactions.csv en la carpeta.' })
-  if (!plan.files.ar && !plan.files.ap && !plan.files.cn) {
-    problems.push({ message: 'Falta al menos un fichero de partidas: ar_invoices, ap_invoices o credit_notes.' })
+  if (!plan.files.bank) {
+    problems.push({ message: 'Falta bank_transactions.csv en la carpeta. Si los datos son enlaces simbólicos, elige la carpeta original: el navegador no los sigue.' })
+  }
+  if (!plan.files.ar && !plan.files.ap && !plan.files.cn && !plan.files.open) {
+    problems.push({ message: 'Falta al menos un fichero de partidas: ar_invoices, ap_invoices, credit_notes u open_items_at_start.' })
   }
   for (const file of Object.values(plan.files)) {
     if (file && !file.complete) {

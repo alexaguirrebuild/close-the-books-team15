@@ -1,17 +1,15 @@
 import { useEffect } from 'react'
 import { Shell } from './components/Shell'
-import { Bench } from './screens/Bench'
 import { Dashboard } from './screens/Dashboard'
 import { ExportScreen } from './screens/ExportScreen'
 import { LoadScreen } from './screens/LoadScreen'
-import { QueueScreen } from './screens/QueueScreen'
+import { Review } from './screens/Review'
 import { useStore, type Screen } from './store'
 
 const SCREEN_BY_CODE: Record<string, Screen> = {
   Digit1: 'panel',
-  Digit2: 'queue',
-  Digit3: 'bench',
-  Digit4: 'export',
+  Digit2: 'review',
+  Digit3: 'export',
 }
 
 function isTyping(target: EventTarget | null): boolean {
@@ -31,13 +29,13 @@ export function App() {
         state.go(SCREEN_BY_CODE[event.code])
         return
       }
-      if (isTyping(event.target)) return
+      if (isTyping(event.target) || event.repeat) return
       if (event.key === '?') {
         event.preventDefault()
         state.setHelp(!state.helpOpen)
       }
       if (event.key === 'Escape' && state.helpOpen) state.setHelp(false)
-      if ((event.key === 'z' || event.key === 'Z') && !event.metaKey && !event.ctrlKey) {
+      if ((event.key === 'z' || event.key === 'Z') && !event.metaKey && !event.ctrlKey && !state.bulkOpen) {
         event.preventDefault()
         void state.undoLast()
       }
@@ -51,8 +49,7 @@ export function App() {
   return (
     <Shell>
       {screen === 'panel' && <Dashboard />}
-      {screen === 'queue' && <QueueScreen />}
-      {screen === 'bench' && <Bench />}
+      {screen === 'review' && <Review />}
       {screen === 'export' && <ExportScreen />}
     </Shell>
   )
