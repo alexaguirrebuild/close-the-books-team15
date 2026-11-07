@@ -16,7 +16,7 @@ Baselines: naive ≈ 19, well-tuned rules ≈ 61, perfect = 100.
 |---|---|
 | Data | TRAIN 2021-07→2025-06 (1.49M lines, **with golden**), LIVE 2025-07→12 (203k lines, 16.7k PDFs, no golden), FINAL 2026-01→06 (220k lines) |
 | Schedule | 10:00 hacking + LIVE open · 14:00 lunch · **18:00 FINAL data released** · **19:30 submissions close** · **19:45 project submission** (video + repo + write-up) · 20:30 reveal |
-| LIVE | 1 submission/min, 100/day, scored within minutes, **best score counts**. Use it as the real test loop |
+| LIVE | Server limit: 1 submission every 10 s, 100,000/day (`/api/state`). **Team rule: 1 every 3 min, 20/day.** Scored within minutes, **best score counts**. Use it as the real test loop |
 | FINAL | **One submission only: the first valid file counts, no retry.** A file rejected by validation does not count (fix and re-upload). Score hidden until reveal |
 | File | `.csv` or `.csv.gz`, ≤ 60 MB, ≤ 3M rows, every bank line of the phase must appear |
 | Upload | `https://hackathon.usetalky.com/api`, token in env var `HK_TOKEN` (never in code, repo or chat). Poll at most every 5 s (whole room shares one IP). Requesting an upload URL already uses a slot |
@@ -74,4 +74,4 @@ Names: A = ____ · B = ____ · C = ____ · D = ____
 ## 7. Open questions
 
 - How are the Anthropic API credits issued to the team? (not yet seen on the site)
-- Does FINAL ship its own `open_items_at_start`, or must balances carry over from LIVE? Check when the data drops; the ledger must work either way.
+- FINAL `open_items_at_start`: `DATA_DICTIONARY.md` says FINAL ships its own, and the ingest reports `MISSING_FILE` if it does not. Confirm when the data drops. See `pipeline/INGESTA.md` for every file and failure mode.
